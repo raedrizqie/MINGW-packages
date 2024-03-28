@@ -1,0 +1,288 @@
+diff -ur a/configure.cmake b/configure.cmake
+--- a/configure.cmake	2024-05-15 21:57:21.000000000 +0800
++++ b/configure.cmake	2024-05-23 19:02:40.455862300 +0800
+@@ -131,7 +131,7 @@
+     CODE
+ "
+ #include \"libxml/xmlversion.h\"
+-#if !defined(LIBXML_ICU_ENABLED)
++#if !defined(LIBXML_ICU_ENABLED) && !defined(_WIN32)
+ #error libxml icu not enabled
+ #endif
+ int main() {
+@@ -209,7 +209,7 @@
+ #include \"libavformat/avformat.h\"
+ }
+ int main(void) {
+-#if LIBAVFORMAT_VERSION_MAJOR >= 59
++#if LIBAVFORMAT_VERSION_MAJOR < 60
+     AVStream stream;
+     auto first_dts = av_stream_get_first_dts(&stream);
+ #endif
+@@ -310,7 +310,7 @@
+ )
+ qt_feature("webengine-system-re2" PRIVATE
+     LABEL "re2"
+-    CONDITION UNIX AND TEST_re2
++    CONDITION (UNIX OR MINGW) AND TEST_re2
+ )
+ qt_feature("webengine-system-icu" PRIVATE
+     LABEL "icu"
+@@ -319,15 +319,15 @@
+ )
+ qt_feature("webengine-system-libwebp" PRIVATE
+     LABEL "libwebp, libwebpmux and libwebpdemux"
+-    CONDITION UNIX AND WEBP_FOUND
++    CONDITION (UNIX OR MINGW) AND WEBP_FOUND
+ )
+ qt_feature("webengine-system-libopenjpeg2" PRIVATE
+     LABEL "libopenjpeg2"
+-    CONDITION UNIX AND LIBOPENJP2_FOUND
++    CONDITION (UNIX OR MINGW) AND LIBOPENJP2_FOUND
+ )
+ qt_feature("webengine-system-opus" PRIVATE
+     LABEL "opus"
+-    CONDITION UNIX AND OPUS_FOUND
++    CONDITION (UNIX OR MINGW) AND OPUS_FOUND
+ )
+ qt_feature("webengine-system-ffmpeg" PRIVATE
+     LABEL "ffmpeg"
+@@ -337,11 +337,11 @@
+ qt_feature("webengine-system-libvpx" PRIVATE
+     LABEL "libvpx"
+     AUTODETECT FALSE
+-    CONDITION UNIX AND TEST_vpx
++    CONDITION (UNIX OR MINGW) AND TEST_vpx
+ )
+ qt_feature("webengine-system-snappy" PRIVATE
+     LABEL "snappy"
+-    CONDITION UNIX AND TEST_snappy
++    CONDITION (UNIX OR MINGW) AND TEST_snappy
+ )
+ qt_feature("webengine-system-glib" PRIVATE
+     LABEL "glib"
+@@ -349,7 +349,7 @@
+ )
+ qt_feature("webengine-system-zlib" PRIVATE
+     LABEL "zlib"
+-    CONDITION UNIX AND QT_FEATURE_system_zlib AND ZLIB_FOUND
++    CONDITION (UNIX OR MINGW) AND QT_FEATURE_system_zlib AND ZLIB_FOUND
+ )
+ qt_feature("webengine-qt-zlib" PRIVATE
+     LABEL "qtzlib"
+@@ -359,7 +359,7 @@
+ )
+ qt_feature("webengine-system-minizip" PRIVATE
+     LABEL "minizip"
+-    CONDITION UNIX AND MINIZIP_FOUND
++    CONDITION (UNIX OR MINGW) AND MINIZIP_FOUND
+ )
+ qt_feature("webengine-system-libevent" PRIVATE
+     LABEL "libevent"
+@@ -367,19 +367,19 @@
+ )
+ qt_feature("webengine-system-libxml" PRIVATE
+     LABEL "libxml2 and libxslt"
+-    CONDITION UNIX AND TEST_libxml2
++    CONDITION (UNIX OR MINGW) AND TEST_libxml2
+ )
+ qt_feature("webengine-system-lcms2" PRIVATE
+     LABEL "lcms2"
+-    CONDITION UNIX AND LCMS2_FOUND
++    CONDITION (UNIX OR MINGW) AND LCMS2_FOUND
+ )
+ qt_feature("webengine-system-libpng" PRIVATE
+     LABEL "png"
+-    CONDITION UNIX AND TARGET Qt::Gui AND PNG_FOUND AND QT_FEATURE_system_png
++    CONDITION (UNIX OR MINGW) AND TARGET Qt::Gui AND PNG_FOUND AND QT_FEATURE_system_png
+ )
+ qt_feature("webengine-system-libtiff" PRIVATE
+     LABEL "tiff"
+-    CONDITION UNIX AND TARGET Qt::Gui AND TIFF_FOUND
++    CONDITION (UNIX OR MINGW) AND TARGET Qt::Gui AND TIFF_FOUND
+ )
+ qt_feature("webengine-qt-libpng" PRIVATE
+     LABEL "qtpng"
+@@ -390,7 +390,7 @@
+ )
+ qt_feature("webengine-system-libjpeg" PRIVATE
+     LABEL "jpeg"
+-    CONDITION UNIX AND TARGET Qt::Gui AND TEST_jpeg AND QT_FEATURE_system_jpeg
++    CONDITION (UNIX OR MINGW) AND TARGET Qt::Gui AND TEST_jpeg AND QT_FEATURE_system_jpeg
+ )
+ qt_feature("webengine-qt-libjpeg" PRIVATE
+     LABEL "qtjpeg"
+@@ -401,7 +401,7 @@
+ )
+ qt_feature("webengine-system-harfbuzz" PRIVATE
+     LABEL "harfbuzz"
+-    CONDITION UNIX AND TARGET Qt::Gui AND HARFBUZZ_FOUND AND QT_FEATURE_system_harfbuzz
++    CONDITION (UNIX OR MINGW) AND TARGET Qt::Gui AND HARFBUZZ_FOUND AND QT_FEATURE_system_harfbuzz
+ )
+ qt_feature("webengine-qt-harfbuzz" PRIVATE
+     LABEL "qtharfbuzz"
+@@ -412,7 +412,7 @@
+ )
+ qt_feature("webengine-system-freetype" PRIVATE
+     LABEL "freetype"
+-    CONDITION UNIX AND TARGET Qt::Gui AND TEST_freetype AND QT_FEATURE_system_freetype
++    CONDITION (UNIX OR MINGW) AND TARGET Qt::Gui AND TEST_freetype AND QT_FEATURE_system_freetype
+ )
+ qt_feature("webengine-qt-freetype" PRIVATE
+     LABEL "qtfreetype"
+@@ -579,6 +579,8 @@
+    CONDITION MSVC OR
+        (LINUX AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU") OR
+        (LINUX AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang") OR
++       (MINGW AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU") OR
++       (MINGW AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang") OR
+        (MACOS AND CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
+    MESSAGE
+        "${CMAKE_CXX_COMPILER_ID} compiler is not supported."
+@@ -596,7 +598,7 @@
+    MESSAGE
+        "${CMAKE_CXX_COMPILER_ID} compiler is not supported."
+ )
+-if(WIN32)
++if(WIN32 AND NOT MINGW)
+     if(MSVC)
+         if(MSVC_TOOLSET_VERSION EQUAL 142) # VS 2019 (16.0)
+             add_check_for_support(
+@@ -643,7 +645,7 @@
+ qt_configure_add_summary_entry(ARGS "qtpdf-quick-build")
+ qt_configure_end_summary_section()
+ # >> Optional system libraries
+-if(UNIX)
++if(UNIX OR MINGW)
+     qt_configure_add_summary_section(NAME "Optional system libraries")
+     qt_configure_add_summary_entry(ARGS "webengine-system-re2")
+     qt_configure_add_summary_entry(ARGS "webengine-system-icu")
+diff -ur a/cmake/Functions.cmake b/cmake/Functions.cmake
+--- a/cmake/Functions.cmake	2024-05-15 21:57:21.000000000 +0800
++++ b/cmake/Functions.cmake	2024-05-23 19:02:40.580810400 +0800
+@@ -1051,7 +1051,7 @@
+     if(WIN32)
+         get_gn_arch(cpu ${arch})
+         list(APPEND gnArgArg target_cpu="${cpu}")
+-        if(MINGW)
++        if(MINGW AND CMAKE_CROSSCOMPILING)
+             get_gn_arch(cpu ${TEST_architecture_arch})
+             list(APPEND gnArgArg
+                 # note '/' prefix
+diff -ur a/src/core/CMakeLists.txt b/src/core/CMakeLists.txt
+--- a/src/core/CMakeLists.txt	2024-05-15 21:57:21.000000000 +0800
++++ b/src/core/CMakeLists.txt	2024-05-23 19:02:40.658991700 +0800
+@@ -554,6 +554,47 @@
+             )
+         endif()
+ 
++        if(MINGW)
++            list(APPEND gnArgArg
++                angle_enable_vulkan=false
++                angle_shared_libvulkan=false
++                devtools_dcheck_always_on=true
++                icu_use_data_file=false
++                use_gio=false
++                use_glib=false
++                use_gtk=false
++            )
++            set(systemLibs libjpeg libpng freetype harfbuzz libwebp libxml
++                opus snappy icu ffmpeg re2 lcms2 libopenjpeg2 libvpx
++            )
++            foreach(slib ${systemLibs})
++                extend_gn_list(gnArgArg
++                    ARGS use_system_${slib}
++                    CONDITION QT_FEATURE_webengine_system_${slib}
++                )
++            endforeach()
++            extend_gn_list(gnArgArg
++                ARGS use_system_libxslt
++                CONDITION QT_FEATURE_webengine_system_libxml
++            )
++            extend_gn_list(gnArgArg
++                ARGS use_system_zlib use_system_minizip
++                CONDITION QT_FEATURE_webengine_system_zlib AND QT_FEATURE_webengine_system_minizip
++            )
++            extend_gn_list(gnArgArg
++                ARGS pdfium_use_system_zlib
++                CONDITION QT_FEATURE_webengine_system_zlib
++            )
++            extend_gn_list(gnArgArg
++                ARGS pdfium_use_system_libpng
++                CONDITION QT_FEATURE_webengine_system_libpng
++            )
++            extend_gn_list(gnArgArg
++                ARGS pdfium_use_system_libtiff
++                CONDITION QT_FEATURE_webengine_system_libtiff
++            )
++        endif()
++
+         add_gn_command(
+             CMAKE_TARGET WebEngineCore
+             NINJA_TARGETS QtWebEngineCore convert_dict
+@@ -603,21 +644,26 @@
+ ##
+ 
+ if(WIN32)
++    if(MINGW)
++        set(sandboxLibraryName "QtWebEngineCoreSandbox.a")
++    else()
++        set(sandboxLibraryName "QtWebEngineCoreSandbox.lib")
++    endif()
+     add_library(WebEngineCoreSandbox STATIC IMPORTED GLOBAL)
+     foreach(config ${configs})
+         string(TOUPPER ${config} cfg)
+         add_ninja_command(
+             TARGET QtWebEngineCoreSandbox
+-            OUTPUT QtWebEngineCoreSandbox.lib
++            OUTPUT ${sandboxLibraryName}
+             BUILDDIR ${buildDir}/${config}/${arch}
+             MODULE core
+         )
+-        set(sandboxLibraryPath ${buildDir}/${config}/${arch}/QtWebEngineCoreSandbox.lib)
++        set(sandboxLibraryPath ${buildDir}/${config}/${arch}/${sandboxLibraryName})
+         set_property(TARGET WebEngineCoreSandbox
+             PROPERTY IMPORTED_LOCATION_${cfg} ${sandboxLibraryPath}
+         )
+         add_custom_target(sandboxLibrary_${config}
+-            DEPENDS ${buildDir}/${config}/${arch}/QtWebEngineCoreSandbox.lib)
++            DEPENDS ${buildDir}/${config}/${arch}/${sandboxLibraryName})
+         add_dependencies(run_core_NinjaDone sandboxLibrary_${config})
+         add_dependencies(WebEngineCoreSandbox WebEngineCore)
+     endforeach()
+diff -ur a/src/core/configure/BUILD.root.gn.in b/src/core/configure/BUILD.root.gn.in
+--- a/src/core/configure/BUILD.root.gn.in	2024-05-15 21:57:21.000000000 +0800
++++ b/src/core/configure/BUILD.root.gn.in	2024-05-23 19:10:26.940296600 +0800
+@@ -77,6 +77,11 @@
+     @GN_INCLUDE_DIRS@,
+     rebase_path("${target_gen_dir}/.moc/")
+   ]
++
++  if (is_mingw) {
++    # Silenced warning from skia headers.
++    cflags_cc += [ "-Wno-missing-field-initializers" ]
++  }
+ }
+ 
+ declare_args() {
+@@ -90,7 +95,7 @@
+ 
+ config("cpp20_config") {
+   # Chromium is built with C++20
+-  if (is_win) {
++  if (is_win && !is_mingw) {
+     cflags_cc = [ "/std:c++20" ]
+   } else {
+     cflags_cc = [ "-std=c++20" ]
+diff -ur a/src/pdf/configure/BUILD.root.gn.in b/src/pdf/configure/BUILD.root.gn.in
+--- a/src/pdf/configure/BUILD.root.gn.in	2024-05-15 21:57:21.000000000 +0800
++++ b/src/pdf/configure/BUILD.root.gn.in	2024-05-23 19:12:12.205924500 +0800
+@@ -41,7 +41,7 @@
+ 
+ config("cpp20_config") {
+   # Chromium headers now use concepts and requires c++20
+-  if (is_win) {
++  if (is_win && !is_mingw) {
+     cflags_cc = [ "/std:c++20" ]
+   } else {
+     cflags_cc = [ "-std=c++20" ]

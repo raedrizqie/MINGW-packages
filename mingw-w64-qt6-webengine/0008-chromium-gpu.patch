@@ -1,0 +1,350 @@
+diff -ur a/src/3rdparty/chromium/gpu/command_buffer/service/BUILD.gn b/src/3rdparty/chromium/gpu/command_buffer/service/BUILD.gn
+--- a/src/3rdparty/chromium/gpu/command_buffer/service/BUILD.gn	2024-05-15 21:57:21.000000000 +0800
++++ b/src/3rdparty/chromium/gpu/command_buffer/service/BUILD.gn	2024-05-28 18:55:45.498874300 +0800
+@@ -615,7 +615,27 @@
+       "shared_image/dxgi_swap_chain_image_representation.cc",
+       "shared_image/dxgi_swap_chain_image_representation.h",
+     ]
+-    libs = [ "dxguid.lib" ]
++    if (is_mingw) {
++      sources -= [
++        "dxgi_shared_handle_manager.cc",
++        "dxgi_shared_handle_manager.h",
++        "shared_image/d3d_image_backing.cc",
++        "shared_image/d3d_image_backing.h",
++        "shared_image/d3d_image_backing_factory.cc",
++        "shared_image/d3d_image_backing_factory.h",
++        "shared_image/dcomp_image_backing_factory.cc",
++        "shared_image/dcomp_image_backing_factory.h",
++        "shared_image/dcomp_surface_image_backing.cc",
++        "shared_image/dcomp_surface_image_backing.h",
++        "shared_image/dcomp_surface_image_representation.cc",
++        "shared_image/dcomp_surface_image_representation.h",
++        "shared_image/dxgi_swap_chain_image_backing.cc",
++        "shared_image/dxgi_swap_chain_image_backing.h",
++        "shared_image/dxgi_swap_chain_image_representation.cc",
++        "shared_image/dxgi_swap_chain_image_representation.h",
++      ]
++    }
++    libs = [ "dxguid" ]
+   }
+ }
+ 
+diff -ur a/src/3rdparty/chromium/gpu/command_buffer/service/gles2_cmd_decoder_passthrough.cc b/src/3rdparty/chromium/gpu/command_buffer/service/gles2_cmd_decoder_passthrough.cc
+--- a/src/3rdparty/chromium/gpu/command_buffer/service/gles2_cmd_decoder_passthrough.cc	2024-05-15 21:57:21.000000000 +0800
++++ b/src/3rdparty/chromium/gpu/command_buffer/service/gles2_cmd_decoder_passthrough.cc	2024-05-23 20:35:30.183233300 +0800
+@@ -1420,12 +1420,12 @@
+       feature_info_->workarounds().avoid_stencil_buffers;
+   caps.multisample_compatibility =
+       feature_info_->feature_flags().ext_multisample_compatibility;
+-#if BUILDFLAG(IS_WIN)
++#if defined(COMPILER_MSVC)
+   caps.shared_image_d3d = D3DImageBackingFactory::IsD3DSharedImageSupported(
+       group_->gpu_preferences());
+   caps.shared_image_swap_chain =
+       caps.shared_image_d3d && D3DImageBackingFactory::IsSwapChainSupported();
+-#endif  // BUILDFLAG(IS_WIN)
++#endif  // defined(COMPILER_MSVC)
+   if (base::FeatureList::IsEnabled(features::kPassthroughYuvRgbConversion)) {
+     caps.supports_yuv_rgb_conversion = true;
+   }
+diff -ur a/src/3rdparty/chromium/gpu/command_buffer/service/raster_decoder.cc b/src/3rdparty/chromium/gpu/command_buffer/service/raster_decoder.cc
+--- a/src/3rdparty/chromium/gpu/command_buffer/service/raster_decoder.cc	2024-05-15 21:57:21.000000000 +0800
++++ b/src/3rdparty/chromium/gpu/command_buffer/service/raster_decoder.cc	2024-05-23 20:35:30.230112200 +0800
+@@ -1280,11 +1280,11 @@
+     caps.texture_half_float_linear =
+         feature_info()->feature_flags().enable_texture_half_float_linear;
+   }
+-#if BUILDFLAG(IS_WIN)
++#if defined(COMPILER_MSVC)
+   caps.shared_image_d3d =
+       D3DImageBackingFactory::IsD3DSharedImageSupported(gpu_preferences_);
+   caps.shared_image_swap_chain = D3DImageBackingFactory::IsSwapChainSupported();
+-#endif  // BUILDFLAG(IS_WIN)
++#endif  // defined(COMPILER_MSVC)
+   caps.disable_legacy_mailbox = disable_legacy_mailbox_;
+   // TODO(crbug.com/1450879): Support YUV rendering and readback for Graphite.
+   caps.supports_yuv_rgb_conversion = !graphite_context();
+diff -ur a/src/3rdparty/chromium/gpu/command_buffer/service/shared_image/shared_image_factory.cc b/src/3rdparty/chromium/gpu/command_buffer/service/shared_image/shared_image_factory.cc
+--- a/src/3rdparty/chromium/gpu/command_buffer/service/shared_image/shared_image_factory.cc	2024-05-15 21:57:21.000000000 +0800
++++ b/src/3rdparty/chromium/gpu/command_buffer/service/shared_image/shared_image_factory.cc	2024-05-23 20:35:30.292613400 +0800
+@@ -269,7 +269,7 @@
+     factories_.push_back(std::move(gl_texture_backing_factory));
+   }
+ 
+-#if BUILDFLAG(IS_WIN)
++#if defined(COMPILER_MSVC)
+   if (gl::DirectCompositionSupported()) {
+     factories_.push_back(std::make_unique<DCompImageBackingFactory>(
+         shared_context_state_.get()));
+@@ -282,7 +282,7 @@
+     d3d_backing_factory_ = d3d_factory.get();
+     factories_.push_back(std::move(d3d_factory));
+   }
+-#endif  // BUILDFLAG(IS_WIN)
++#endif  // defined(COMPILER_MSVC)
+ 
+ #if !BUILDFLAG(IS_ANDROID)
+   if (use_gl) {
+@@ -770,7 +770,7 @@
+   shared_images_.clear();
+ }
+ 
+-#if BUILDFLAG(IS_WIN)
++#if defined(COMPILER_MSVC)
+ bool SharedImageFactory::CreateSwapChain(const Mailbox& front_buffer_mailbox,
+                                          const Mailbox& back_buffer_mailbox,
+                                          viz::SharedImageFormat format,
+@@ -800,7 +800,7 @@
+   (*it)->PresentSwapChain();
+   return true;
+ }
+-#endif  // BUILDFLAG(IS_WIN)
++#endif  // defined(COMPILER_MSVC)
+ 
+ #if BUILDFLAG(IS_FUCHSIA)
+ void SharedImageFactory::RegisterSysmemBufferCollection(
+diff -ur a/src/3rdparty/chromium/gpu/config/BUILD.gn b/src/3rdparty/chromium/gpu/config/BUILD.gn
+--- a/src/3rdparty/chromium/gpu/config/BUILD.gn	2024-05-15 21:57:21.000000000 +0800
++++ b/src/3rdparty/chromium/gpu/config/BUILD.gn	2024-05-23 20:35:30.417653800 +0800
+@@ -223,8 +223,8 @@
+       "gpu_info_collector_win.cc",
+     ]
+     libs = [
+-      "dxgi.lib",
+-      "dxguid.lib",
++      "dxgi",
++      "dxguid",
+     ]
+ 
+     if (is_chrome_branded && is_official_build) {
+diff -ur a/src/3rdparty/chromium/gpu/config/device_perf_info.h b/src/3rdparty/chromium/gpu/config/device_perf_info.h
+--- a/src/3rdparty/chromium/gpu/config/device_perf_info.h	2024-05-15 21:57:21.000000000 +0800
++++ b/src/3rdparty/chromium/gpu/config/device_perf_info.h	2024-05-23 20:35:30.464532300 +0800
+@@ -46,7 +46,7 @@
+   uint32_t total_physical_memory_mb = 0u;
+   uint32_t total_disk_space_mb = 0u;
+   uint32_t hardware_concurrency = 0u;
+-#if BUILDFLAG(IS_WIN)
++#if defined(COMPILER_MSVC)
+   // system commit limit (n pages) x page size.
+   uint32_t system_commit_limit_mb = 0u;
+   // If multiple GPUs are detected, this holds the highest feature level.
+diff -ur a/src/3rdparty/chromium/gpu/config/gpu_driver_bug_workarounds.h b/src/3rdparty/chromium/gpu/config/gpu_driver_bug_workarounds.h
+--- a/src/3rdparty/chromium/gpu/config/gpu_driver_bug_workarounds.h	2024-05-15 21:57:21.000000000 +0800
++++ b/src/3rdparty/chromium/gpu/config/gpu_driver_bug_workarounds.h	2024-05-23 20:35:30.495742700 +0800
+@@ -5,6 +5,7 @@
+ #ifndef GPU_CONFIG_GPU_DRIVER_BUG_WORKAROUNDS_H_
+ #define GPU_CONFIG_GPU_DRIVER_BUG_WORKAROUNDS_H_
+ 
++#include <cstdint>
+ #include <vector>
+ 
+ #include "build/build_config.h"
+diff -ur a/src/3rdparty/chromium/gpu/config/gpu_info_collector_win.cc b/src/3rdparty/chromium/gpu/config/gpu_info_collector_win.cc
+--- a/src/3rdparty/chromium/gpu/config/gpu_info_collector_win.cc	2024-05-15 21:57:21.000000000 +0800
++++ b/src/3rdparty/chromium/gpu/config/gpu_info_collector_win.cc	2024-05-28 18:59:05.233229100 +0800
+@@ -329,6 +329,7 @@
+       return;
+     }
+ 
++#if defined(COMPILER_MSVC)
+     // For the default adapter only: EnumAdapters(0, ...).
+     // Check to see if the adapter supports Direct3D 12.
+     for (auto level : feature_levels) {
+@@ -338,8 +339,10 @@
+         break;
+       }
+     }
++#endif
+   }
+ 
++#if defined(COMPILER_MSVC)
+   // Query the maximum supported shader model version.
+   if (d3d12_device) {
+     // As per the documentation, CheckFeatureSupport will return E_INVALIDARG if
+@@ -363,6 +366,7 @@
+       }
+     }
+   }
++#endif
+ }
+ 
+ // The old graphics drivers are installed to the Windows system directory
+@@ -596,6 +600,7 @@
+       ConvertToHistogramShaderVersion(highest_shader_model_version));
+ }
+ 
++#if defined(COMPILER_MSVC)
+ bool CollectD3D11FeatureInfo(D3D_FEATURE_LEVEL* d3d11_feature_level,
+                              bool* has_discrete_gpu) {
+   Microsoft::WRL::ComPtr<IDXGIFactory1> dxgi_factory;
+@@ -662,6 +667,7 @@
+   }
+   return false;
+ }
++#endif
+ 
+ bool CollectContextGraphicsInfo(GPUInfo* gpu_info) {
+   TRACE_EVENT0("gpu", "CollectGraphicsInfo");
+diff -ur a/src/3rdparty/chromium/gpu/config/gpu_util.cc b/src/3rdparty/chromium/gpu/config/gpu_util.cc
+--- a/src/3rdparty/chromium/gpu/config/gpu_util.cc	2024-05-15 21:57:21.000000000 +0800
++++ b/src/3rdparty/chromium/gpu/config/gpu_util.cc	2024-05-28 19:02:28.015148200 +0800
+@@ -404,7 +404,7 @@
+   }
+ }
+ 
+-#if BUILDFLAG(IS_WIN)
++#if defined(COMPILER_MSVC)
+ uint32_t GetSystemCommitLimitMb() {
+   PERFORMANCE_INFORMATION perf_info = {sizeof(perf_info)};
+   if (::GetPerformanceInfo(&perf_info, sizeof(perf_info))) {
+@@ -415,7 +415,7 @@
+   }
+   return 0u;
+ }
+-#endif  // BUILDFLAG(IS_WIN)
++#endif  // defined(COMPILER_MSVC)
+ 
+ #if BUILDFLAG(IS_ANDROID)
+ GPUInfo* g_gpu_info_cache = nullptr;
+@@ -1005,7 +1005,7 @@
+   device_perf_info->hardware_concurrency =
+       static_cast<uint32_t>(std::thread::hardware_concurrency());
+ 
+-#if BUILDFLAG(IS_WIN)
++#if defined(COMPILER_MSVC)
+   device_perf_info->system_commit_limit_mb = GetSystemCommitLimitMb();
+   if (!in_browser_process) {
+     D3D_FEATURE_LEVEL d3d11_feature_level = D3D_FEATURE_LEVEL_1_0_CORE;
+@@ -1027,7 +1027,7 @@
+                             device_perf_info->total_disk_space_mb / 1024);
+   UMA_HISTOGRAM_COUNTS_100("Hardware.Concurrency",
+                            device_perf_info->hardware_concurrency);
+-#if BUILDFLAG(IS_WIN)
++#if defined(COMPILER_MSVC)
+   UMA_HISTOGRAM_COUNTS_100("Memory.Total.SystemCommitLimit",
+                            device_perf_info->system_commit_limit_mb / 1024);
+   UMA_HISTOGRAM_ENUMERATION("GPU.D3D11FeatureLevel",
+@@ -1035,7 +1035,7 @@
+                                 device_perf_info->d3d11_feature_level));
+   UMA_HISTOGRAM_ENUMERATION("GPU.HasDiscreteGpu",
+                             device_perf_info->has_discrete_gpu);
+-#endif  // BUILDFLAG(IS_WIN)
++#endif  // defined(COMPILER_MSVC)
+   UMA_HISTOGRAM_ENUMERATION("GPU.IntelGpuGeneration",
+                             device_perf_info->intel_gpu_generation);
+   UMA_HISTOGRAM_BOOLEAN("GPU.SoftwareRendering",
+diff -ur a/src/3rdparty/chromium/gpu/ipc/common/BUILD.gn b/src/3rdparty/chromium/gpu/ipc/common/BUILD.gn
+--- a/src/3rdparty/chromium/gpu/ipc/common/BUILD.gn	2024-05-15 21:57:21.000000000 +0800
++++ b/src/3rdparty/chromium/gpu/ipc/common/BUILD.gn	2024-05-23 20:35:30.589455700 +0800
+@@ -101,7 +101,7 @@
+       "gpu_memory_buffer_impl_dxgi.cc",
+       "gpu_memory_buffer_impl_dxgi.h",
+     ]
+-    libs = [ "d3d11.lib" ]
++    libs = [ "d3d11" ]
+   }
+   if (use_ozone) {
+     sources += [
+diff -ur a/src/3rdparty/chromium/gpu/ipc/common/device_perf_info.mojom b/src/3rdparty/chromium/gpu/ipc/common/device_perf_info.mojom
+--- a/src/3rdparty/chromium/gpu/ipc/common/device_perf_info.mojom	2024-05-15 21:57:21.000000000 +0800
++++ b/src/3rdparty/chromium/gpu/ipc/common/device_perf_info.mojom	2024-05-23 20:35:30.605071900 +0800
+@@ -32,10 +32,10 @@
+   uint32 total_disk_space_mb;
+   uint32 hardware_concurrency;
+ 
+-  [EnableIf=is_win]
++  [EnableIf=is_msvc]
+   uint32 system_commit_limit_mb;
+-  [EnableIf=is_win]
++  [EnableIf=is_msvc]
+   Direct3DFeatureLevel d3d11_feature_level;
+-  [EnableIf=is_win]
++  [EnableIf=is_msvc]
+   HasDiscreteGpu has_discrete_gpu;
+ };
+diff -ur a/src/3rdparty/chromium/gpu/ipc/common/device_perf_info_mojom_traits.cc b/src/3rdparty/chromium/gpu/ipc/common/device_perf_info_mojom_traits.cc
+--- a/src/3rdparty/chromium/gpu/ipc/common/device_perf_info_mojom_traits.cc	2024-05-15 21:57:21.000000000 +0800
++++ b/src/3rdparty/chromium/gpu/ipc/common/device_perf_info_mojom_traits.cc	2024-05-28 02:38:55.316606200 +0800
+@@ -127,11 +127,11 @@
+   out->total_disk_space_mb = data.total_disk_space_mb();
+   out->hardware_concurrency = data.hardware_concurrency();
+   bool rt = true;
+-#if BUILDFLAG(IS_WIN)
++#if defined(COMPILER_MSVC)
+   out->system_commit_limit_mb = data.system_commit_limit_mb();
+   rt &= data.ReadD3d11FeatureLevel(&out->d3d11_feature_level);
+   rt &= data.ReadHasDiscreteGpu(&out->has_discrete_gpu);
+-#endif  // BUILDFLAG(IS_WIN)
++#endif  // defined(COMPILER_MSVC)
+   return rt;
+ }
+ 
+diff -ur a/src/3rdparty/chromium/gpu/ipc/common/device_perf_info_mojom_traits.h b/src/3rdparty/chromium/gpu/ipc/common/device_perf_info_mojom_traits.h
+--- a/src/3rdparty/chromium/gpu/ipc/common/device_perf_info_mojom_traits.h	2024-05-15 21:57:21.000000000 +0800
++++ b/src/3rdparty/chromium/gpu/ipc/common/device_perf_info_mojom_traits.h	2024-05-23 20:35:30.651950300 +0800
+@@ -50,7 +50,7 @@
+     return info.hardware_concurrency;
+   }
+ 
+-#if BUILDFLAG(IS_WIN)
++#if defined(COMPILER_MSVC)
+   static uint32_t system_commit_limit_mb(const gpu::DevicePerfInfo& info) {
+     return info.system_commit_limit_mb;
+   }
+diff -ur a/src/3rdparty/chromium/gpu/ipc/service/BUILD.gn b/src/3rdparty/chromium/gpu/ipc/service/BUILD.gn
+--- a/src/3rdparty/chromium/gpu/ipc/service/BUILD.gn	2024-05-15 21:57:21.000000000 +0800
++++ b/src/3rdparty/chromium/gpu/ipc/service/BUILD.gn	2024-05-23 20:35:30.745698800 +0800
+@@ -100,9 +100,9 @@
+       "image_transport_surface_win.cc",
+     ]
+     libs += [
+-      "d3d11.lib",
+-      "dcomp.lib",
+-      "dxguid.lib",
++      "d3d11",
++      "dcomp",
++      "dxguid",
+     ]
+   }
+   if (is_apple) {
+diff -ur a/src/3rdparty/chromium/gpu/ipc/service/shared_image_stub.cc b/src/3rdparty/chromium/gpu/ipc/service/shared_image_stub.cc
+--- a/src/3rdparty/chromium/gpu/ipc/service/shared_image_stub.cc	2024-05-15 21:57:21.000000000 +0800
++++ b/src/3rdparty/chromium/gpu/ipc/service/shared_image_stub.cc	2024-05-23 20:35:30.808235300 +0800
+@@ -129,7 +129,7 @@
+       OnDestroySharedImage(request->get_destroy_shared_image());
+       break;
+ 
+-#if BUILDFLAG(IS_WIN)
++#if defined(COMPILER_MSVC)
+     case mojom::DeferredSharedImageRequest::Tag::kCopyToGpuMemoryBuffer: {
+       auto& params = *request->get_copy_to_gpu_memory_buffer();
+       OnCopyToGpuMemoryBuffer(params.mailbox, params.release_id);
+@@ -144,7 +144,7 @@
+       OnPresentSwapChain(request->get_present_swap_chain()->mailbox,
+                          request->get_present_swap_chain()->release_id);
+       break;
+-#endif  // BUILDFLAG(IS_WIN)
++#endif  // defined(COMPILER_MSVC)
+   }
+ }
+ 
+@@ -483,7 +483,7 @@
+   }
+ }
+ 
+-#if BUILDFLAG(IS_WIN)
++#if defined(COMPILER_MSVC)
+ void SharedImageStub::OnCopyToGpuMemoryBuffer(const Mailbox& mailbox,
+                                               uint32_t release_id) {
+   if (!mailbox.IsSharedImage()) {
+@@ -557,7 +557,7 @@
+ 
+   sync_point_client_state_->ReleaseFenceSync(release_id);
+ }
+-#endif  // BUILDFLAG(IS_WIN)
++#endif  // defined(COMPILER_MSVC)
+ 
+ #if BUILDFLAG(IS_FUCHSIA)
+ void SharedImageStub::RegisterSysmemBufferCollection(

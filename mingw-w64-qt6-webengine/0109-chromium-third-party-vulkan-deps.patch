@@ -1,0 +1,83 @@
+diff -ur a/src/3rdparty/chromium/third_party/vulkan-deps/vulkan-loader/src/BUILD.gn b/src/3rdparty/chromium/third_party/vulkan-deps/vulkan-loader/src/BUILD.gn
+--- a/src/3rdparty/chromium/third_party/vulkan-deps/vulkan-loader/src/BUILD.gn	2024-05-15 21:57:21.000000000 +0800
++++ b/src/3rdparty/chromium/third_party/vulkan-deps/vulkan-loader/src/BUILD.gn	2024-05-24 02:30:28.933571800 +0800
+@@ -39,7 +39,7 @@
+   defines = [
+     "VK_ENABLE_BETA_EXTENSIONS",
+   ]
+-  if (is_clang || !is_win) {
++  if (is_clang || !is_msvc) {
+     cflags = [
+       "-Wno-conversion",
+       "-Wno-extra-semi",
+@@ -80,7 +80,7 @@
+     "LOADER_USE_UNSAFE_FILE_SEARCH=1",
+   ]
+ 
+-  if (is_win) {
++  if (is_msvc) {
+     cflags = [ "/wd4201" ]
+   }
+   if (is_linux || is_chromeos) {
+@@ -90,6 +90,9 @@
+       "LOADER_ENABLE_LINUX_SORT",
+     ]
+   }
++  if (!vulkan_loader_shared) {
++    defines += [ "BUILD_STATIC_LOADER" ]
++  }
+ }
+ 
+ if (!is_android) {
+@@ -146,7 +149,7 @@
+     if (custom_vulkan_loader_library_name != "") {
+       output_name = custom_vulkan_loader_library_name
+     } else {
+-      if (is_win) {
++      if (is_msvc) {
+         output_name = "vulkan-1"
+       } else {
+         output_name = "vulkan"
+@@ -167,7 +170,13 @@
+         "loader/loader.rc",
+         "loader/vulkan-1.def",
+       ]
+-      if (!is_clang) {
++      if (!vulkan_loader_shared) {
++        sources -= [
++          "loader/loader.rc",
++          "loader/vulkan-1.def",
++        ]
++      }
++      if (is_msvc && !is_clang) {
+         cflags = [
+           "/wd4054",  # Type cast from function pointer
+           "/wd4055",  # Type cast from data pointer
+@@ -186,7 +195,7 @@
+       if (is_clang) {
+         cflags = [ "-Wno-incompatible-pointer-types" ]
+       }
+-      libs = [ "Cfgmgr32.lib" ]
++      libs = [ "cfgmgr32" ]
+     }
+     if (is_linux || is_chromeos) {
+       sources += [
+diff -ur a/src/3rdparty/chromium/third_party/vulkan-deps/vulkan-loader/src/loader/loader_windows.c b/src/3rdparty/chromium/third_party/vulkan-deps/vulkan-loader/src/loader/loader_windows.c
+--- a/src/3rdparty/chromium/third_party/vulkan-deps/vulkan-loader/src/loader/loader_windows.c	2024-05-15 21:57:21.000000000 +0800
++++ b/src/3rdparty/chromium/third_party/vulkan-deps/vulkan-loader/src/loader/loader_windows.c	2024-05-24 02:26:57.121061800 +0800
+@@ -95,6 +95,7 @@
+ #endif
+ }
+ 
++#ifndef BUILD_STATIC_LOADER
+ BOOL WINAPI DllMain(HINSTANCE hinst, DWORD reason, LPVOID reserved) {
+     (void)hinst;
+     switch (reason) {
+@@ -112,6 +113,7 @@
+     }
+     return TRUE;
+ }
++#endif
+ 
+ bool windows_add_json_entry(const struct loader_instance *inst,
+                             char **reg_data,    // list of JSON files

@@ -1,0 +1,125 @@
+diff -ur a/src/CMakeLists.txt b/src/CMakeLists.txt
+--- a/src/CMakeLists.txt	2024-05-15 21:57:21.000000000 +0800
++++ b/src/CMakeLists.txt	2024-05-24 03:10:13.499525900 +0800
+@@ -141,6 +141,7 @@
+                    -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+                    -DCMAKE_INSTALL_PREFIX:PATH=<INSTALL_DIR>
+                    -DCMAKE_PREFIX_PATH:PATH=<INSTALL_DIR>
++                   -DPython3_EXECUTABLE=${Python3_EXECUTABLE}
+                    -DWEBENGINE_ROOT_BUILD_DIR=${PROJECT_BINARY_DIR}
+                    -DQT_ALLOW_SYMLINK_IN_PATHS=${QT_ALLOW_SYMLINK_IN_PATHS}
+     )
+diff -ur a/src/3rdparty/gn/build/build_mingw.ninja.template b/src/3rdparty/gn/build/build_mingw.ninja.template
+--- a/src/3rdparty/gn/build/build_mingw.ninja.template	2024-05-15 21:57:21.000000000 +0800
++++ b/src/3rdparty/gn/build/build_mingw.ninja.template	2024-05-24 03:10:13.593251300 +0800
+@@ -5,7 +5,7 @@
+   deps = gcc
+ 
+ rule alink_thin
+-  command = cmd /c del $out && $ar rcsT $out $in
++  command = $ar rcsT $out $in
+   description = AR $out
+ 
+ rule link
+diff -ur a/src/3rdparty/gn/build/gen.py b/src/3rdparty/gn/build/gen.py
+--- a/src/3rdparty/gn/build/gen.py	2024-05-15 21:57:21.000000000 +0800
++++ b/src/3rdparty/gn/build/gen.py	2024-05-24 03:10:13.608855400 +0800
+@@ -40,7 +40,10 @@
+     elif self._platform.startswith('msys'):
+       self._platform = 'msys'
+     elif self._platform.startswith('win'):
+-      self._platform = 'msvc'
++      if 'MSC' in sys.version:
++        self._platform = 'msvc'
++      else:
++        self._platform = 'mingw'
+     elif self._platform.startswith('aix'):
+       self._platform = 'aix'
+     elif self._platform.startswith('fuchsia'):
+@@ -309,10 +312,14 @@
+   with open(template_filename) as f:
+     ninja_template = f.read()
+ 
+-  if platform.is_windows():
++  if platform.is_msvc():
+     executable_ext = '.exe'
+     library_ext = '.lib'
+     object_ext = '.obj'
++  elif platform.is_mingw():
++    executable_ext = '.exe'
++    library_ext = '.a'
++    object_ext = '.o'
+   else:
+     executable_ext = ''
+     library_ext = '.a'
+@@ -414,6 +421,9 @@
+   ld = options.ld
+   ar = options.ar
+ 
++  if platform.is_mingw():
++    ld = options.cxx
++
+   if not ar:
+      if platform.is_msvc():
+         ar = os.environ.get('AR', 'lib.exe')
+@@ -449,7 +459,8 @@
+       # or data item into its own section so --gc-sections can eliminate any
+       # unused functions and data items.
+       cflags.extend(['-fdata-sections', '-ffunction-sections'])
+-      ldflags.extend(['-fdata-sections', '-ffunction-sections'])
++      if not platform.is_mingw():
++        ldflags.extend(['-fdata-sections', '-ffunction-sections'])
+       if platform.is_darwin():
+         ldflags.append('-Wl,-dead_strip')
+       elif not platform.is_aix() and not platform.is_solaris() and not platform.is_zos():
+@@ -504,9 +515,11 @@
+     if platform.is_linux() or platform.is_mingw() or platform.is_msys():
+       ldflags.append('-Wl,--as-needed')
+ 
+-      if not options.no_static_libstdcpp:
++      if not options.no_static_libstdcpp or not platform.is_mingw():
+         ldflags.append('-static-libstdc++')
+ 
++      if platform.is_mingw():
++        cflags.remove('-pthread')
+       cflags.remove('-std=c++17')
+       cflags.extend([
+         '-Wno-deprecated-copy',
+@@ -953,8 +966,9 @@
+ def windows_target_build_arch():
+     target_arch = os.environ.get('Platform')
+     if target_arch in ['x64', 'x86']: return target_arch
++    if target_arch in ['arm64']: return 'arm64'
+ 
+-    if platform.machine().lower() in ['x86_64', 'amd64']: return 'x64'
++    if platform.machine().lower() in ['x86_64', 'amd64', 'arm64']: return 'x64'
+     return 'x86'
+ 
+ def generate_qt_version_header(qtVersion,header):
+diff -ur a/src/3rdparty/gn/src/gn/ninja_binary_target_writer.cc b/src/3rdparty/gn/src/gn/ninja_binary_target_writer.cc
+--- a/src/3rdparty/gn/src/gn/ninja_binary_target_writer.cc	2024-05-15 21:57:21.000000000 +0800
++++ b/src/3rdparty/gn/src/gn/ninja_binary_target_writer.cc	2024-05-24 03:10:13.827682400 +0800
+@@ -381,7 +381,11 @@
+   WriteLibrarySearchPath(out, tool);
+ 
+   if (optional_def_file) {
++#ifdef _MSC_VER
+     out_ << " /DEF:";
++#else
++    out_ << " ";
++#endif
+     path_output_.WriteFile(out, *optional_def_file);
+   }
+ }
+diff -ur a/src/3rdparty/gn/src/util/sys_info.cc b/src/3rdparty/gn/src/util/sys_info.cc
+--- a/src/3rdparty/gn/src/util/sys_info.cc	2024-05-15 21:57:21.000000000 +0800
++++ b/src/3rdparty/gn/src/util/sys_info.cc	2024-05-24 03:10:13.952650000 +0800
+@@ -44,6 +44,8 @@
+   SYSTEM_INFO system_info = {};
+   ::GetNativeSystemInfo(&system_info);
+   switch (system_info.wProcessorArchitecture) {
++    case PROCESSOR_ARCHITECTURE_ARM64:
++      return "arm64";
+     case PROCESSOR_ARCHITECTURE_INTEL:
+       return "x86";
+     case PROCESSOR_ARCHITECTURE_AMD64:

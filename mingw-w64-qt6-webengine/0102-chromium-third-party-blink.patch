@@ -1,0 +1,338 @@
+diff -ur a/src/3rdparty/chromium/third_party/blink/renderer/BUILD.gn b/src/3rdparty/chromium/third_party/blink/renderer/BUILD.gn
+--- a/src/3rdparty/chromium/third_party/blink/renderer/BUILD.gn	2024-05-15 21:57:21.000000000 +0800
++++ b/src/3rdparty/chromium/third_party/blink/renderer/BUILD.gn	2024-05-24 01:26:26.780360500 +0800
+@@ -41,7 +41,7 @@
+     "BLINK_IMPLEMENTATION=1",
+     "INSIDE_BLINK",
+   ]
+-  if (is_clang || !is_win) {
++  if (is_clang || !is_msvc) {
+     cflags += [
+       "-Wno-unused-variable",
+     ]
+@@ -72,7 +72,7 @@
+ 
+ config("blink_pch") {
+   if (enable_precompiled_headers) {
+-    if (is_win) {
++    if (is_win && !is_mingw) {
+       # This is a string rather than a file GN knows about. It has to match
+       # exactly what's in the /FI flag below, and what might appear in the
+       # source code in quotes for an #include directive.
+@@ -86,6 +86,8 @@
+ 
+       # Force include the header.
+       cflags = [ "/FI$precompiled_header" ]
++    } else if (is_mingw) {
++      precompiled_source = "//third_party/blink/renderer/build/win/precompile.h"
+     } else if (is_mac) {
+       precompiled_source = "//third_party/blink/renderer/build/mac/prefix.h"
+     } else if (is_linux) {
+@@ -100,7 +102,7 @@
+   cflags = []
+   defines = []
+ 
+-  if (is_win) {
++  if (is_win && !is_mingw) {
+     cflags += [
+       "/wd4305",  # Truncation from 'type1' to 'type2'.
+       "/wd4324",  # Struct padded due to declspec(align).
+diff -ur a/src/3rdparty/chromium/third_party/blink/renderer/core/BUILD.gn b/src/3rdparty/chromium/third_party/blink/renderer/core/BUILD.gn
+--- a/src/3rdparty/chromium/third_party/blink/renderer/core/BUILD.gn	2024-05-15 21:57:21.000000000 +0800
++++ b/src/3rdparty/chromium/third_party/blink/renderer/core/BUILD.gn	2024-05-24 01:26:26.796013200 +0800
+@@ -126,7 +126,7 @@
+   # Add precompiled header (pch) support when enabled, possible and
+   # making sense.
+   if (enable_precompiled_headers) {
+-    if (is_win) {
++    if (is_win && !is_mingw) {
+       # This is a string rather than a file GN knows about. It has to match
+       # exactly what's in the /FI flag below, and what might appear in the
+       # source code in quotes for an #include directive.
+@@ -140,7 +140,7 @@
+ 
+       # Force include the header.
+       cflags = [ "/FI$precompiled_header" ]
+-    } else if (is_mac || is_linux) {
++    } else if (is_mac || is_linux || is_mingw) {
+       precompiled_source = "//third_party/blink/renderer/core/precompile_core.h"
+     }
+   }
+@@ -1271,7 +1271,7 @@
+     defines += [ "USING_V8_SHARED" ]
+   }
+ 
+-  if (is_win) {
++  if (is_win && !is_mingw) {
+     cflags += [
+       # In generated bindings code: "switch contains default but no case".
+       # 4701 and 4702 are disabled because of issues in Bison-generated
+diff -ur a/src/3rdparty/chromium/third_party/blink/renderer/core/css/css_numeric_literal_value.cc b/src/3rdparty/chromium/third_party/blink/renderer/core/css/css_numeric_literal_value.cc
+--- a/src/3rdparty/chromium/third_party/blink/renderer/core/css/css_numeric_literal_value.cc	2024-05-15 21:57:21.000000000 +0800
++++ b/src/3rdparty/chromium/third_party/blink/renderer/core/css/css_numeric_literal_value.cc	2024-05-24 01:26:26.842932200 +0800
+@@ -168,11 +168,11 @@
+ }
+ 
+ static String FormatNumber(double number, const char* suffix) {
+-#if BUILDFLAG(IS_WIN) && _MSC_VER < 1900
++#if defined(_MSC_VER) && _MSC_VER < 1900
+   unsigned oldFormat = _set_output_format(_TWO_DIGIT_EXPONENT);
+ #endif
+   String result = String::Format("%.6g%s", number, suffix);
+-#if BUILDFLAG(IS_WIN) && _MSC_VER < 1900
++#if defined(_MSC_VER) && _MSC_VER < 1900
+   _set_output_format(oldFormat);
+ #endif
+   return result;
+diff -ur a/src/3rdparty/chromium/third_party/blink/renderer/core/inspector/BUILD.gn b/src/3rdparty/chromium/third_party/blink/renderer/core/inspector/BUILD.gn
+--- a/src/3rdparty/chromium/third_party/blink/renderer/core/inspector/BUILD.gn	2024-05-15 21:57:21.000000000 +0800
++++ b/src/3rdparty/chromium/third_party/blink/renderer/core/inspector/BUILD.gn	2024-05-24 01:26:27.061602200 +0800
+@@ -104,7 +104,7 @@
+                "//third_party/blink/renderer/core:core_include_dirs",
+              ]
+ 
+-  if (is_win) {
++  if (is_win && !is_mingw) {
+     cflags = [ "/wd4702" ]  # Unreachable code.
+   }
+ 
+diff -ur a/src/3rdparty/chromium/third_party/blink/renderer/core/layout/layout_object.cc b/src/3rdparty/chromium/third_party/blink/renderer/core/layout/layout_object.cc
+--- a/src/3rdparty/chromium/third_party/blink/renderer/core/layout/layout_object.cc	2024-05-15 21:57:21.000000000 +0800
++++ b/src/3rdparty/chromium/third_party/blink/renderer/core/layout/layout_object.cc	2024-05-24 01:26:27.155387000 +0800
+@@ -327,7 +327,9 @@
+ #endif
+ };
+ 
++#if !defined(COMPILER_GCC) // FIXME: check fails on MinGW
+ ASSERT_SIZE(LayoutObject, SameSizeAsLayoutObject);
++#endif
+ 
+ bool LayoutObject::affects_parent_block_ = false;
+ 
+diff -ur a/src/3rdparty/chromium/third_party/blink/renderer/core/precompile_core.h b/src/3rdparty/chromium/third_party/blink/renderer/core/precompile_core.h
+--- a/src/3rdparty/chromium/third_party/blink/renderer/core/precompile_core.h	2024-05-15 21:57:21.000000000 +0800
++++ b/src/3rdparty/chromium/third_party/blink/renderer/core/precompile_core.h	2024-05-24 01:26:27.233482500 +0800
+@@ -9,7 +9,7 @@
+ #ifndef THIRD_PARTY_BLINK_RENDERER_CORE_PRECOMPILE_CORE_H_
+ #define THIRD_PARTY_BLINK_RENDERER_CORE_PRECOMPILE_CORE_H_
+ 
+-#if defined(_MSC_VER)
++#if defined(_WIN32)
+ #include "third_party/blink/renderer/build/win/precompile.h"
+ #elif defined(__APPLE__)
+ #include "third_party/blink/renderer/build/mac/prefix.h"
+diff -ur a/src/3rdparty/chromium/third_party/blink/renderer/modules/BUILD.gn b/src/3rdparty/chromium/third_party/blink/renderer/modules/BUILD.gn
+--- a/src/3rdparty/chromium/third_party/blink/renderer/modules/BUILD.gn	2024-05-15 21:57:21.000000000 +0800
++++ b/src/3rdparty/chromium/third_party/blink/renderer/modules/BUILD.gn	2024-05-24 01:26:27.296057600 +0800
+@@ -202,7 +202,7 @@
+   public_deps = sub_modules
+   allow_circular_includes_from = sub_modules
+ 
+-  if (is_win) {
++  if (is_win && !is_mingw) {
+     cflags =
+         [ "/wd4334" ]  # Result of 32-bit shift implicitly converted to 64 bits.
+   }
+diff -ur a/src/3rdparty/chromium/third_party/blink/renderer/modules/webaudio/BUILD.gn b/src/3rdparty/chromium/third_party/blink/renderer/modules/webaudio/BUILD.gn
+--- a/src/3rdparty/chromium/third_party/blink/renderer/modules/webaudio/BUILD.gn	2024-05-15 21:57:21.000000000 +0800
++++ b/src/3rdparty/chromium/third_party/blink/renderer/modules/webaudio/BUILD.gn	2024-05-24 01:26:27.358542000 +0800
+@@ -192,7 +192,7 @@
+     "wave_shaper_processor.h",
+   ]
+ 
+-  if (is_win) {
++  if (is_win && !is_mingw) {
+     # Result of 32-bit shift implicitly converted to 64 bits.
+     cflags = [ "/wd4334" ]
+   }
+diff -ur a/src/3rdparty/chromium/third_party/blink/renderer/platform/BUILD.gn b/src/3rdparty/chromium/third_party/blink/renderer/platform/BUILD.gn
+--- a/src/3rdparty/chromium/third_party/blink/renderer/platform/BUILD.gn	2024-05-15 21:57:21.000000000 +0800
++++ b/src/3rdparty/chromium/third_party/blink/renderer/platform/BUILD.gn	2024-05-30 18:14:39.101879100 +0800
+@@ -244,7 +244,7 @@
+   visibility = []
+   visibility = [ "./*" ]
+   if (enable_precompiled_headers) {
+-    if (is_win) {
++    if (is_win && !is_mingw) {
+       # This is a string rather than a file GN knows about. It has to match
+       # exactly what's in the /FI flag below, and what might appear in the
+       # source code in quotes for an #include directive.
+@@ -258,7 +258,7 @@
+ 
+       # Force include the header.
+       cflags = [ "/FI$precompiled_header" ]
+-    } else if (is_mac || is_linux) {
++    } else if (is_mac || is_linux || is_mingw) {
+       precompiled_source =
+           "//third_party/blink/renderer/platform/precompile_platform.h"
+     }
+@@ -1787,10 +1787,12 @@
+       "text/locale_icu.cc",
+       "text/locale_icu.h",
+     ]
++    if (!is_mingw) {
+     cflags = [
+       "/wd4334",  # Result of 32-bit shift implicitly converted to 64 bits.
+       "/wd4724",  # Modulo by 0.
+     ]
++    }
+   }
+ 
+   if (is_android) {
+@@ -2499,7 +2501,7 @@
+       "//third_party/blink/renderer:non_test_config",
+     ]
+     public_deps = [ ":blink_platform_public_deps" ]
+-    if (is_win) {
++    if (is_win && !is_mingw) {
+       cflags = [ "/arch:AVX" ]
+     } else {
+       cflags = [ "-mavx" ]
+diff -ur a/src/3rdparty/chromium/third_party/blink/renderer/platform/fonts/font_platform_data.cc b/src/3rdparty/chromium/third_party/blink/renderer/platform/fonts/font_platform_data.cc
+--- a/src/3rdparty/chromium/third_party/blink/renderer/platform/fonts/font_platform_data.cc	2024-05-15 21:57:21.000000000 +0800
++++ b/src/3rdparty/chromium/third_party/blink/renderer/platform/fonts/font_platform_data.cc	2024-05-24 01:26:27.749137500 +0800
+@@ -71,6 +71,7 @@
+ 
+ namespace {
+ 
++#if !BUILDFLAG(IS_WIN)
+ // These functions are also implemented in sandbox_ipc_linux.cc
+ // Converts gfx::FontRenderParams::Hinting to WebFontRenderStyle::hintStyle.
+ // Returns an int for serialization, but the underlying Blink type is a char.
+@@ -100,6 +101,7 @@
+   NOTREACHED() << "Unexpected subpixel rendering value " << rendering;
+   return 0;
+ }
++#endif
+ 
+ } // namespace
+ 
+diff -ur a/src/3rdparty/chromium/third_party/blink/renderer/platform/precompile_platform.h b/src/3rdparty/chromium/third_party/blink/renderer/platform/precompile_platform.h
+--- a/src/3rdparty/chromium/third_party/blink/renderer/platform/precompile_platform.h	2024-05-15 21:57:21.000000000 +0800
++++ b/src/3rdparty/chromium/third_party/blink/renderer/platform/precompile_platform.h	2024-05-24 01:26:27.811664000 +0800
+@@ -10,7 +10,7 @@
+ 
+ #define THIRD_PARTY_BLINK_RENDERER_PLATFORM_PRECOMPILE_PLATFORM_H_
+ 
+-#if defined(_MSC_VER)
++#if defined(_WIN32)
+ #include "third_party/blink/renderer/build/win/precompile.h"
+ #elif defined(__APPLE__)
+ #include "third_party/blink/renderer/build/mac/prefix.h"
+diff -ur a/src/3rdparty/chromium/third_party/blink/renderer/platform/wtf/BUILD.gn b/src/3rdparty/chromium/third_party/blink/renderer/platform/wtf/BUILD.gn
+--- a/src/3rdparty/chromium/third_party/blink/renderer/platform/wtf/BUILD.gn	2024-05-15 21:57:21.000000000 +0800
++++ b/src/3rdparty/chromium/third_party/blink/renderer/platform/wtf/BUILD.gn	2024-05-30 18:15:38.398770700 +0800
+@@ -21,7 +21,7 @@
+ ]
+ 
+ config("wtf_config") {
+-  if (is_win) {
++  if (is_win && !is_mingw) {
+     cflags = [
+       # Don't complain about calling specific versions of templatized
+       # functions (e.g. in RefPtrHashMap.h).
+@@ -248,7 +248,7 @@
+     ]
+   }
+ 
+-  if (is_win) {
++  if (is_win && !is_mingw) {
+     cflags = [ "/wd4068" ]  # Unknown pragma.
+ 
+     # Inject Visual Studio debug visualizers for our types into all targets
+@@ -353,7 +353,7 @@
+     "vector_test.cc",
+   ]
+ 
+-  if (is_win) {
++  if (is_win && !is_mingw) {
+     cflags = [ "/wd4068" ]  # Unknown pragma.
+   }
+ 
+diff -ur a/src/3rdparty/chromium/third_party/blink/renderer/platform/wtf/stack_util.cc b/src/3rdparty/chromium/third_party/blink/renderer/platform/wtf/stack_util.cc
+--- a/src/3rdparty/chromium/third_party/blink/renderer/platform/wtf/stack_util.cc	2024-05-15 21:57:21.000000000 +0800
++++ b/src/3rdparty/chromium/third_party/blink/renderer/platform/wtf/stack_util.cc	2024-05-24 01:26:27.905361000 +0800
+@@ -88,7 +88,7 @@
+ #endif
+   }
+   return pthread_get_stacksize_np(pthread_self());
+-#elif BUILDFLAG(IS_WIN) && defined(COMPILER_MSVC)
++#elif BUILDFLAG(IS_WIN)
+   return Threading::ThreadStackSize();
+ #else
+ #error "Stack frame size estimation not supported on this platform."
+@@ -131,7 +131,7 @@
+ #endif
+ #elif BUILDFLAG(IS_APPLE)
+   return pthread_get_stackaddr_np(pthread_self());
+-#elif BUILDFLAG(IS_WIN) && defined(COMPILER_MSVC)
++#elif BUILDFLAG(IS_WIN)
+ // On Windows stack limits for the current thread are available in
+ // the thread information block (TIB).
+ // On Windows ARM64, stack limits could be retrieved by calling
+@@ -180,7 +180,7 @@
+   g_main_thread_underestimated_stack_size = underestimated_stack_size;
+ }
+ 
+-#if BUILDFLAG(IS_WIN) && defined(COMPILER_MSVC)
++#if BUILDFLAG(IS_WIN)
+ size_t ThreadStackSize() {
+   // Notice that we cannot use the TIB's StackLimit for the stack end, as i
+   // tracks the end of the committed range. We're after the end of the reserved
+diff -ur a/src/3rdparty/chromium/third_party/blink/renderer/platform/wtf/stack_util.h b/src/3rdparty/chromium/third_party/blink/renderer/platform/wtf/stack_util.h
+--- a/src/3rdparty/chromium/third_party/blink/renderer/platform/wtf/stack_util.h	2024-05-15 21:57:21.000000000 +0800
++++ b/src/3rdparty/chromium/third_party/blink/renderer/platform/wtf/stack_util.h	2024-05-24 01:26:27.920982700 +0800
+@@ -29,7 +29,7 @@
+ 
+ WTF_EXPORT void InitializeMainThreadStackEstimate();
+ 
+-#if BUILDFLAG(IS_WIN) && defined(COMPILER_MSVC)
++#if BUILDFLAG(IS_WIN)
+ size_t ThreadStackSize();
+ #endif
+ 
+diff -ur a/src/3rdparty/chromium/third_party/blink/renderer/platform/wtf/threading.cc b/src/3rdparty/chromium/third_party/blink/renderer/platform/wtf/threading.cc
+--- a/src/3rdparty/chromium/third_party/blink/renderer/platform/wtf/threading.cc	2024-05-15 21:57:21.000000000 +0800
++++ b/src/3rdparty/chromium/third_party/blink/renderer/platform/wtf/threading.cc	2024-05-24 01:26:27.936612300 +0800
+@@ -50,7 +50,7 @@
+   WtfThreading();
+ }
+ 
+-#if BUILDFLAG(IS_WIN) && defined(COMPILER_MSVC)
++#if BUILDFLAG(IS_WIN)
+ size_t Threading::ThreadStackSize() {
+   // Needed to bootstrap Threading on Windows, because this value is needed
+   // before the main thread data is fully initialized.
+diff -ur a/src/3rdparty/chromium/third_party/blink/renderer/platform/wtf/threading.h b/src/3rdparty/chromium/third_party/blink/renderer/platform/wtf/threading.h
+--- a/src/3rdparty/chromium/third_party/blink/renderer/platform/wtf/threading.h	2024-05-15 21:57:21.000000000 +0800
++++ b/src/3rdparty/chromium/third_party/blink/renderer/platform/wtf/threading.h	2024-05-24 01:26:27.967856600 +0800
+@@ -77,7 +77,7 @@
+   // Must be called on the main thread before any callers to wtfThreadData().
+   static void Initialize();
+ 
+-#if BUILDFLAG(IS_WIN) && defined(COMPILER_MSVC)
++#if BUILDFLAG(IS_WIN)
+   static size_t ThreadStackSize();
+ #endif
+ 
+@@ -86,7 +86,7 @@
+ 
+   base::PlatformThreadId thread_id_;
+ 
+-#if BUILDFLAG(IS_WIN) && defined(COMPILER_MSVC)
++#if BUILDFLAG(IS_WIN)
+   size_t thread_stack_size_ = 0u;
+ #endif
+ 
+diff -ur a/src/3rdparty/chromium/third_party/blink/tools/BUILD.gn b/src/3rdparty/chromium/third_party/blink/tools/BUILD.gn
+--- a/src/3rdparty/chromium/third_party/blink/tools/BUILD.gn	2024-05-15 21:57:21.000000000 +0800
++++ b/src/3rdparty/chromium/third_party/blink/tools/BUILD.gn	2024-05-24 01:26:27.999103900 +0800
+@@ -41,7 +41,7 @@
+     "//third_party/catapult/third_party/typ:typ",
+     "//tools/imagediff",
+   ]
+-  if (is_win) {
++  if (is_win && !is_mingw) {
+     data_deps += [ "//build/win:copy_cdb_to_output" ]
+   }
+ }

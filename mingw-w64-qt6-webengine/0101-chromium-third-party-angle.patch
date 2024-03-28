@@ -1,0 +1,174 @@
+diff -ur a/src/3rdparty/chromium/third_party/angle/BUILD.gn b/src/3rdparty/chromium/third_party/angle/BUILD.gn
+--- a/src/3rdparty/chromium/third_party/angle/BUILD.gn	2024-05-15 21:57:21.000000000 +0800
++++ b/src/3rdparty/chromium/third_party/angle/BUILD.gn	2024-05-24 01:19:09.139803800 +0800
+@@ -297,7 +297,7 @@
+   }
+ 
+   # Enable more default warnings on Windows.
+-  if (is_win) {
++  if (is_msvc) {
+     cflags += [
+       "/we4244",  # Conversion: possible loss of data.
+       "/we4312",  # Conversion: greater size.
+@@ -360,7 +360,7 @@
+   ldflags = [ "-Wl,--build-id" ]
+ }
+ 
+-_use_copy_compiler_dll = angle_has_build && is_win
++_use_copy_compiler_dll = angle_has_build && is_msvc
+ 
+ if (_use_copy_compiler_dll) {
+   copy("copy_compiler_dll") {
+@@ -634,9 +634,9 @@
+   if (is_win) {
+     sources += libangle_gpu_info_util_win_sources
+     if (!angle_is_winuwp) {
+-      libs += [ "setupapi.lib" ]
++      libs += [ "setupapi" ]
+     }
+-    libs += [ "dxgi.lib" ]
++    libs += [ "dxgi" ]
+   }
+ 
+   if (is_linux || is_chromeos) {
+@@ -779,7 +779,7 @@
+       ":angle_version_info",
+     ]
+ 
+-    if (is_win) {
++    if (is_msvc) {
+       # Necessary to suppress some system header xtree warnings in Release.
+       # For some reason this warning doesn't get triggered in Chromium
+       cflags = [ "/wd4718" ]
+@@ -966,7 +966,7 @@
+   ldflags = []
+   defines += [ "LIBANGLE_IMPLEMENTATION" ]
+ 
+-  if (is_win) {
++  if (is_msvc) {
+     cflags += [ "/wd4530" ]  # C++ exception handler used, but unwind semantics
+                              # are not enabled.
+   }
+@@ -1071,8 +1071,8 @@
+ 
+   if (is_win && !angle_is_winuwp) {
+     libs += [
+-      "gdi32.lib",
+-      "user32.lib",
++      "gdi32",
++      "user32",
+     ]
+   }
+ 
+@@ -1097,7 +1097,7 @@
+   }
+ 
+   if (angle_enable_d3d11) {
+-    libs += [ "dxguid.lib" ]
++    libs += [ "dxguid" ]
+   }
+ 
+   if (angle_enable_metal) {
+diff -ur a/src/3rdparty/chromium/third_party/angle/src/compiler/translator/Compiler.cpp b/src/3rdparty/chromium/third_party/angle/src/compiler/translator/Compiler.cpp
+--- a/src/3rdparty/chromium/third_party/angle/src/compiler/translator/Compiler.cpp	2024-05-15 21:57:21.000000000 +0800
++++ b/src/3rdparty/chromium/third_party/angle/src/compiler/translator/Compiler.cpp	2024-05-24 01:19:09.264731600 +0800
+@@ -1225,7 +1225,7 @@
+ 
+ bool TCompiler::resizeClipAndCullDistanceBuiltins(TIntermBlock *root)
+ {
+-    auto resizeVariable = [=](const ImmutableString &name, uint32_t size, uint32_t maxSize) {
++    auto resizeVariable = [=, this](const ImmutableString &name, uint32_t size, uint32_t maxSize) {
+         // Skip if the variable is not used or implicitly has the maximum size
+         if (size == 0 || size == maxSize)
+             return true;
+diff -ur a/src/3rdparty/chromium/third_party/angle/src/libANGLE/BlobCache.cpp b/src/3rdparty/chromium/third_party/angle/src/libANGLE/BlobCache.cpp
+--- a/src/3rdparty/chromium/third_party/angle/src/libANGLE/BlobCache.cpp	2024-05-15 21:57:21.000000000 +0800
++++ b/src/3rdparty/chromium/third_party/angle/src/libANGLE/BlobCache.cpp	2024-05-24 01:19:09.280351600 +0800
+@@ -14,7 +14,9 @@
+ #include "libANGLE/histogram_macros.h"
+ #include "platform/PlatformMethods.h"
+ 
++#ifndef USE_SYSTEM_ZLIB
+ #define USE_SYSTEM_ZLIB
++#endif
+ #include "compression_utils_portable.h"
+ 
+ namespace egl
+diff -ur a/src/3rdparty/chromium/third_party/angle/src/libANGLE/MemoryProgramCache.cpp b/src/3rdparty/chromium/third_party/angle/src/libANGLE/MemoryProgramCache.cpp
+--- a/src/3rdparty/chromium/third_party/angle/src/libANGLE/MemoryProgramCache.cpp	2024-05-15 21:57:21.000000000 +0800
++++ b/src/3rdparty/chromium/third_party/angle/src/libANGLE/MemoryProgramCache.cpp	2024-05-24 01:19:09.342852600 +0800
+@@ -8,7 +8,9 @@
+ //   layer to warm up the cache from disk.
+ 
+ // Include zlib first, otherwise FAR gets defined elsewhere.
++#ifndef USE_SYSTEM_ZLIB
+ #define USE_SYSTEM_ZLIB
++#endif
+ #include "compression_utils_portable.h"
+ 
+ #include "libANGLE/MemoryProgramCache.h"
+diff -ur a/src/3rdparty/chromium/third_party/angle/src/libANGLE/renderer/d3d/BUILD.gn b/src/3rdparty/chromium/third_party/angle/src/libANGLE/renderer/d3d/BUILD.gn
+--- a/src/3rdparty/chromium/third_party/angle/src/libANGLE/renderer/d3d/BUILD.gn	2024-05-15 21:57:21.000000000 +0800
++++ b/src/3rdparty/chromium/third_party/angle/src/libANGLE/renderer/d3d/BUILD.gn	2024-05-24 01:19:09.374102700 +0800
+@@ -27,14 +27,16 @@
+ if (angle_enable_d3d9) {
+   config("angle_d3d9_backend_config") {
+     defines = [ "ANGLE_ENABLE_D3D9" ]
+-    ldflags = [ "/DELAYLOAD:d3d9.dll" ]
++    if (!is_mingw) {
++      ldflags = [ "/DELAYLOAD:d3d9.dll" ]
++    }
+   }
+ 
+   angle_source_set("angle_d3d9_backend") {
+     sources = d3d9_backend_sources
+     libs = [
+-      "d3d9.lib",
+-      "delayimp.lib",
++      "d3d9",
++      "delayimp",
+     ]
+     public_deps = [ ":angle_d3d_shared" ]
+     public_configs = [ ":angle_d3d9_backend_config" ]
+@@ -52,7 +54,7 @@
+   angle_source_set("angle_d3d11_backend") {
+     sources = d3d11_backend_sources
+ 
+-    libs = [ "dxguid.lib" ]
++    libs = [ "dxguid" ]
+ 
+     public_deps = [ ":angle_d3d_shared" ]
+     public_configs = [ ":angle_d3d11_backend_config" ]
+diff -ur a/src/3rdparty/chromium/third_party/angle/util/capture/traces_export.h b/src/3rdparty/chromium/third_party/angle/util/capture/traces_export.h
+--- a/src/3rdparty/chromium/third_party/angle/util/capture/traces_export.h	2024-05-15 21:57:21.000000000 +0800
++++ b/src/3rdparty/chromium/third_party/angle/util/capture/traces_export.h	2024-05-24 01:19:09.405361600 +0800
+@@ -13,7 +13,7 @@
+ 
+ // See util/util_export.h for details on import/export labels.
+ #if !defined(ANGLE_TRACE_EXPORT)
+-#    if defined(_WIN32)
++#    if defined(COMPILER_MSVC)
+ #        if defined(ANGLE_TRACE_IMPLEMENTATION)
+ #            define ANGLE_TRACE_EXPORT __declspec(dllexport)
+ #        else
+@@ -27,7 +27,7 @@
+ #endif  // !defined(ANGLE_TRACE_EXPORT)
+ 
+ #if !defined(ANGLE_TRACE_LOADER_EXPORT)
+-#    if defined(_WIN32)
++#    if defined(COMPILER_MSVC)
+ #        if defined(ANGLE_TRACE_LOADER_IMPLEMENTATION)
+ #            define ANGLE_TRACE_LOADER_EXPORT __declspec(dllexport)
+ #        else
+diff -ur a/src/3rdparty/chromium/third_party/angle/util/util_export.h b/src/3rdparty/chromium/third_party/angle/util/util_export.h
+--- a/src/3rdparty/chromium/third_party/angle/util/util_export.h	2024-05-15 21:57:21.000000000 +0800
++++ b/src/3rdparty/chromium/third_party/angle/util/util_export.h	2024-05-24 01:19:09.420979700 +0800
+@@ -12,7 +12,7 @@
+ // We define "IMPLEMENTATION" to get the dllexport label when compiling the
+ // util library. Consumers get the dllimport label by default.
+ #if !defined(ANGLE_UTIL_EXPORT)
+-#    if defined(_WIN32)
++#    if defined(COMPILER_MSVC)
+ #        if defined(LIBANGLE_UTIL_IMPLEMENTATION)
+ #            define ANGLE_UTIL_EXPORT __declspec(dllexport)
+ #        else
