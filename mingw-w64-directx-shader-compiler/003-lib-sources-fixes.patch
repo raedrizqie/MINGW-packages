@@ -1,0 +1,93 @@
+diff --git a/lib/DxcSupport/WinAdapter.cpp b/lib/DxcSupport/WinAdapter.cpp
+index c3aaab88..fb849728 100644
+--- a/lib/DxcSupport/WinAdapter.cpp
++++ b/lib/DxcSupport/WinAdapter.cpp
+@@ -10,7 +10,8 @@
+ #include "assert.h"
+ #include "dxc/Support/WinFunctions.h"
+ #include "dxc/Support/WinIncludes.h"
+-#ifndef _WIN32
++
++#ifndef _MSC_VER
+ 
+ #include "dxc/Support/Unicode.h"
+ 
+@@ -22,6 +23,7 @@ void *CAllocator::Reallocate(void *p, size_t nBytes) throw() {
+ void *CAllocator::Allocate(size_t nBytes) throw() { return malloc(nBytes); }
+ void CAllocator::Free(void *p) throw() { free(p); }
+ 
++#ifndef __MINGW32__
+ //===--------------------------- BSTR Allocation --------------------------===//
+ 
+ void SysFreeString(BSTR bstrString) {
+@@ -60,6 +62,7 @@ unsigned int SysStringLen(const BSTR bstrString) {
+ 
+   return blobIn[0] / sizeof(OLECHAR);
+ }
++#endif // __MINGW32__
+ 
+ //===--------------------------- CHandle -------------------------------===//
+ 
+diff --git a/lib/IR/PassRegistry.cpp b/lib/IR/PassRegistry.cpp
+index b77d2bf3..6b57363a 100644
+--- a/lib/IR/PassRegistry.cpp
++++ b/lib/IR/PassRegistry.cpp
+@@ -35,7 +35,9 @@ using namespace llvm;
+ // A simple global initialized at DllMain-time will do (still does more work
+ // than we should likely perform though).
+ static uint32_t g_PassRegistryTid;
++#ifdef _MSC_VER
+ extern "C" uint32_t __stdcall GetCurrentThreadId(void);
++#endif
+ static void CheckThreadId() {
+   if (g_PassRegistryTid == 0)
+     g_PassRegistryTid = GetCurrentThreadId();
+diff --git a/lib/Support/Atomic.cpp b/lib/Support/Atomic.cpp
+index 837a3260..95ebf527 100644
+--- a/lib/Support/Atomic.cpp
++++ b/lib/Support/Atomic.cpp
+@@ -32,7 +32,7 @@ void sys::MemoryFence() {
+ #else
+ #  if defined(GNU_ATOMICS)
+   __sync_synchronize();
+-#  elif defined(_MSC_VER)
++#  elif defined(_WIN32)
+   MemoryBarrier();
+ #  else
+ # error No memory fence implementation for your platform!
+@@ -50,7 +50,7 @@ sys::cas_flag sys::CompareAndSwap(volatile sys::cas_flag* ptr,
+   return result;
+ #elif defined(GNU_ATOMICS)
+   return __sync_val_compare_and_swap(ptr, old_value, new_value);
+-#elif defined(_MSC_VER)
++#elif defined(_WIN32)
+   return InterlockedCompareExchange(ptr, new_value, old_value);
+ #else
+ #  error No compare-and-swap implementation for your platform!
+@@ -63,7 +63,7 @@ sys::cas_flag sys::AtomicIncrement(volatile sys::cas_flag* ptr) {
+   return *ptr;
+ #elif defined(GNU_ATOMICS)
+   return __sync_add_and_fetch(ptr, 1);
+-#elif defined(_MSC_VER)
++#elif defined(_WIN32)
+   return InterlockedIncrement(ptr);
+ #else
+ #  error No atomic increment implementation for your platform!
+@@ -76,7 +76,7 @@ sys::cas_flag sys::AtomicDecrement(volatile sys::cas_flag* ptr) {
+   return *ptr;
+ #elif defined(GNU_ATOMICS)
+   return __sync_sub_and_fetch(ptr, 1);
+-#elif defined(_MSC_VER)
++#elif defined(_WIN32)
+   return InterlockedDecrement(ptr);
+ #else
+ #  error No atomic decrement implementation for your platform!
+@@ -89,7 +89,7 @@ sys::cas_flag sys::AtomicAdd(volatile sys::cas_flag* ptr, sys::cas_flag val) {
+   return *ptr;
+ #elif defined(GNU_ATOMICS)
+   return __sync_add_and_fetch(ptr, val);
+-#elif defined(_MSC_VER)
++#elif defined(_WIN32)
+   return InterlockedExchangeAdd(ptr, val) + val;
+ #else
+ #  error No atomic add implementation for your platform!
