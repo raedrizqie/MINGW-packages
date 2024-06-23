@@ -1,0 +1,436 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 15097b84..834ee619 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -105,18 +105,22 @@ option(DXC_DISABLE_ALLOCATOR_OVERRIDES "Disable usage of allocator overrides" OF
+ mark_as_advanced(DXC_DISABLE_ALLOCATOR_OVERRIDES)
+ 
+ # adjust link option to enable debugging from kernel mode; not compatible with incremental linking
+-if(NOT CMAKE_VERSION VERSION_LESS "3.13" AND WIN32 AND NOT CMAKE_C_COMPILER_ARCHITECTURE_ID STREQUAL "ARM64EC")
++if(NOT CMAKE_VERSION VERSION_LESS "3.13" AND MSVC AND NOT CMAKE_C_COMPILER_ARCHITECTURE_ID STREQUAL "ARM64EC")
+   add_link_options(/DEBUGTYPE:CV,FIXUP,PDATA /INCREMENTAL:NO)
+ endif()
+ 
+ # enable control flow guard
+ if(WIN32)
+-add_compile_options(/guard:cf)
+-add_link_options(/guard:cf)
++  if(MSVC)
++    add_compile_options(/guard:cf)
++    add_link_options(/guard:cf)
++  else()
++    add_compile_options(-fcf-protection)
++  endif()
+ endif(WIN32)
+ 
+ # Enable CET Shadow Stack
+-if(WIN32 AND NOT (CMAKE_C_COMPILER_ARCHITECTURE_ID MATCHES "ARM.*"))
++if(MSVC AND NOT (CMAKE_C_COMPILER_ARCHITECTURE_ID MATCHES "ARM.*"))
+   add_link_options(/CETCOMPAT)
+ endif()
+ 
+@@ -646,9 +650,9 @@ endif( ${CMAKE_SYSTEM_NAME} MATCHES SunOS )
+ set(CMAKE_SHARED_LIBRARY_LINK_CXX_FLAGS "")
+ 
+ # enable warnings as errors for debug build
+-if (WIN32)
++if (MSVC)
+   SET(CMAKE_CXX_FLAGS_DEBUG  "${CMAKE_CXX_FLAGS_DEBUG} /WX")
+-endif (WIN32)
++endif (MSVC)
+ 
+ include(AddLLVM)
+ include(TableGen)
+@@ -761,7 +765,9 @@ if (LLVM_INCLUDE_DOCS)
+   add_subdirectory(docs)
+ endif()
+ 
+-add_hlsl_hctgen(DxilDocs OUTPUT docs/DXIL.rst CODE_TAG) # HLSL Change
++if (LLVM_BUILD_DOCS)
++  add_hlsl_hctgen(DxilDocs OUTPUT docs/DXIL.rst CODE_TAG) # HLSL Change
++endif()
+ 
+ add_subdirectory(cmake/modules)
+ 
+diff --git a/cmake/modules/AddLLVM.cmake b/cmake/modules/AddLLVM.cmake
+index 32820635..6f9a07bf 100644
+--- a/cmake/modules/AddLLVM.cmake
++++ b/cmake/modules/AddLLVM.cmake
+@@ -244,14 +244,14 @@ endfunction()
+ #
+ function(add_windows_version_resource_file OUT_VAR)
+   set(sources ${ARGN})
+-  if (MSVC)
++  if (WIN32)
+     set(resource_file ${LLVM_SOURCE_DIR}/resources/windows_version_resource.rc)
+     if(EXISTS ${resource_file})
+       set(sources ${sources} ${resource_file})
+       source_group("Resource Files" ${resource_file})
+       set(windows_resource_file ${resource_file} PARENT_SCOPE)
+     endif()
+-  endif(MSVC)
++  endif(WIN32)
+ 
+   set(${OUT_VAR} ${sources} PARENT_SCOPE)
+ endfunction(add_windows_version_resource_file)
+@@ -295,8 +295,10 @@ function(set_windows_version_resource_properties name resource_file)
+     set(ARG_PRODUCT_NAME "LLVM")
+   endif()
+ 
++  if (MSVC)
+   set_property(SOURCE ${resource_file}
+                PROPERTY COMPILE_FLAGS /nologo)
++  endif()
+   set_property(SOURCE ${resource_file}
+                PROPERTY COMPILE_DEFINITIONS
+                "RC_VERSION_FIELD_1=${ARG_VERSION_MAJOR}"
+@@ -317,7 +319,7 @@ function(set_windows_version_resource_properties name resource_file)
+                   "INCLUDE_HLSL_VERSION_FILE=1")
+       set_property(SOURCE ${resource_file}
+                   PROPERTY COMPILE_OPTIONS
+-                  "/I" "${HLSL_VERSION_LOCATION}")
++                  "-I" "${HLSL_VERSION_LOCATION}")
+     endif (DEFINED resource_file)
+   endif(${HLSL_EMBED_VERSION})
+   # HLSL change ends
+diff --git a/cmake/modules/HandleLLVMOptions.cmake b/cmake/modules/HandleLLVMOptions.cmake
+index 0ce75eea..282dc867 100644
+--- a/cmake/modules/HandleLLVMOptions.cmake
++++ b/cmake/modules/HandleLLVMOptions.cmake
+@@ -199,11 +199,13 @@ if( LLVM_ENABLE_PIC )
+     # On Windows all code is PIC. MinGW warns if -fPIC is used.
+   else()
+     add_flag_or_print_warning("-fPIC" FPIC)
++  endif()
+ 
+-    if( WIN32 OR CYGWIN)
++  check_cxx_compiler_flag("-fvisibility-inlines-hidden" SUPPORTS_FVISIBILITY_INLINES_HIDDEN_FLAG)
++  if(SUPPORTS_FVISIBILITY_INLINES_HIDDEN_FLAG)
++    if( (MINGW OR CYGWIN) AND NOT CLANG )
+       # MinGW warns if -fvisibility-inlines-hidden is used.
+     else()
+-      check_cxx_compiler_flag("-fvisibility-inlines-hidden" SUPPORTS_FVISIBILITY_INLINES_HIDDEN_FLAG)
+       append_if(SUPPORTS_FVISIBILITY_INLINES_HIDDEN_FLAG "-fvisibility-inlines-hidden -fvisibility=hidden" CMAKE_CXX_FLAGS)
+     endif()
+   endif()
+@@ -407,6 +409,15 @@ elseif( LLVM_COMPILER_IS_GCC_COMPATIBLE )
+     # Disable unknown pragma warnings because the output is just too long with them.
+     append("-Wno-unknown-pragmas" CMAKE_C_FLAGS CMAKE_CXX_FLAGS)
+ 
++    if (MINGW)
++      append("-Wno-implicit-fallthrough" CMAKE_C_FLAGS CMAKE_CXX_FLAGS)
++      append("-Wno-missing-exception-spec" CMAKE_C_FLAGS CMAKE_CXX_FLAGS)
++      append("-Wno-reorder-ctor" CMAKE_C_FLAGS CMAKE_CXX_FLAGS)
++      append("-Wno-sign-compare" CMAKE_C_FLAGS CMAKE_CXX_FLAGS)
++      append("-Wno-unused-const-variable" CMAKE_C_FLAGS CMAKE_CXX_FLAGS)
++      append("-Wno-unused-function" CMAKE_C_FLAGS CMAKE_CXX_FLAGS)
++    endif()
++
+     add_flag_if_supported("-Wno-unused-but-set-variable" UNUSED_BUT_SET_VARIABLE)
+     add_flag_if_supported("-Wno-deprecated-copy" DEPRECATED_COPY)
+ 
+@@ -614,6 +625,15 @@ if(LLVM_ENABLE_EH AND NOT LLVM_ENABLE_RTTI)
+   message(FATAL_ERROR "Exception handling requires RTTI. You must set LLVM_ENABLE_RTTI to ON")
+ endif()
+ 
++if (MINGW)
++  if (LLVM_ENABLE_EH)
++    append("-fexceptions" CMAKE_CXX_FLAGS)
++  endif()
++  if (LLVM_ENABLE_RTTI)
++    append("-frtti" CMAKE_CXX_FLAGS)
++  endif()
++endif()
++
+ # HLSL Change Begin
+ option(LLVM_ENABLE_LTO "Enable building with LTO" ${HLSL_OFFICIAL_BUILD})
+ if (LLVM_ENABLE_LTO)
+@@ -624,7 +644,7 @@ if (LLVM_ENABLE_LTO)
+     append("/GL" CMAKE_C_FLAGS${_SUFFIX} CMAKE_CXX_FLAGS${_SUFFIX})
+     append("/LTCG" CMAKE_MODULE_LINKER_FLAGS${_SUFFIX} CMAKE_MODULE_LINKER_FLAGS${_SUFFIX} CMAKE_EXE_LINKER_FLAGS${_SUFFIX})
+   else()
+-    add_flag_if_supported("-flto" SUPPORST_FLTO)
++    add_flag_if_supported("-flto" SUPPORTS_FLTO)
+   endif()
+ endif()
+ # HLSL Change End
+diff --git a/lib/DxilDia/CMakeLists.txt b/lib/DxilDia/CMakeLists.txt
+index 2423d387..fa47fa30 100644
+--- a/lib/DxilDia/CMakeLists.txt
++++ b/lib/DxilDia/CMakeLists.txt
+@@ -1,11 +1,11 @@
+ # Copyright (C) Microsoft Corporation. All rights reserved.
+ # This file is distributed under the University of Illinois Open Source License. See LICENSE.TXT for details.
+ 
+-if (WIN32)
++if (MSVC)
+   find_package(DiaSDK REQUIRED) # Used for constants and declarations.
+-endif (WIN32)
++endif (MSVC)
+ 
+-if (WIN32)
++if (MSVC)
+   add_llvm_library(LLVMDxilDia
+     DxcPixCompilationInfo.cpp
+     DxcPixDxilDebugInfo.cpp
+@@ -33,7 +33,7 @@ if (WIN32)
+     ADDITIONAL_HEADER_DIRS
+     ${LLVM_MAIN_INCLUDE_DIR}/llvm/IR
+   )
+-else(WIN32)
++else(MSVC)
+   # DxcPixLiveVariables_FragmentIterator is not dependent on dia.
+   # It is used by PixTest.
+   set(HLSL_IGNORE_SOURCES
+@@ -65,11 +65,11 @@ else(WIN32)
+     ADDITIONAL_HEADER_DIRS
+     ${LLVM_MAIN_INCLUDE_DIR}/llvm/IR
+   )
+-endif(WIN32)
++endif(MSVC)
+ 
+-if (WIN32)
++if (MSVC)
+   target_link_libraries(LLVMDxilDia PRIVATE ${LIBRARIES} ${DIASDK_LIBRARIES})
+   include_directories(AFTER ${LLVM_INCLUDE_DIR}/dxc/Tracing ${DIASDK_INCLUDE_DIRS})
+-endif (WIN32)
++endif (MSVC)
+ 
+ add_dependencies(LLVMDxilDia LLVMDxilPIXPasses intrinsics_gen)
+diff --git a/lib/Support/CMakeLists.txt b/lib/Support/CMakeLists.txt
+index 396878aa..a1627a06 100644
+--- a/lib/Support/CMakeLists.txt
++++ b/lib/Support/CMakeLists.txt
+@@ -145,8 +145,8 @@ add_llvm_library(LLVMSupport
+   )
+ 
+ set_property(TARGET LLVMSupport PROPERTY LLVM_SYSTEM_LIBS "${system_libs}")
+-if(WIN32)
++if(MSVC)
+ set_property(TARGET LLVMSupport PROPERTY COMPILE_FLAGS /EHsc )
+-endif(WIN32)
++endif(MSVC)
+ 
+ target_link_libraries(LLVMSupport PUBLIC LLVMMSSupport) # HLSL Change
+diff --git a/tools/CMakeLists.txt b/tools/CMakeLists.txt
+index 2c96814c..78f0f35f 100644
+--- a/tools/CMakeLists.txt
++++ b/tools/CMakeLists.txt
+@@ -21,10 +21,10 @@ add_llvm_tool_subdirectory(llvm-dis) # HLSL Change
+ # add_llvm_tool_subdirectory(llvm-mc) # HLSL Change
+ 
+ # HLSL Change Begins
+-if (WIN32)
++if (MSVC)
+ # This target can currently only be built on Windows.
+ add_llvm_tool_subdirectory(dxexp)
+-endif (WIN32)
++endif (MSVC)
+ # HLSL Change ends
+ 
+ # add_llvm_tool_subdirectory(llc) # HLSL Change
+diff --git a/tools/clang/lib/Basic/CMakeLists.txt b/tools/clang/lib/Basic/CMakeLists.txt
+index f06b10ee..e3852f89 100644
+--- a/tools/clang/lib/Basic/CMakeLists.txt
++++ b/tools/clang/lib/Basic/CMakeLists.txt
+@@ -35,7 +35,7 @@ set(get_svn_script "${LLVM_MAIN_SRC_DIR}/cmake/modules/GetSVN.cmake")
+ if (HLSL_ENABLE_FIXED_VER)
+   # Actual version string is no longer specified here, but instead derived from
+   # the defines in the generated or copied dxcversion.inc
+-  add_definitions(/DHLSL_FIXED_VER)
++  add_definitions(-DHLSL_FIXED_VER)
+ endif (HLSL_ENABLE_FIXED_VER)
+ # HLSL Change Ends
+ 
+diff --git a/tools/clang/lib/Sema/CMakeLists.txt b/tools/clang/lib/Sema/CMakeLists.txt
+index 92cfcf37..a4c51fa1 100644
+--- a/tools/clang/lib/Sema/CMakeLists.txt
++++ b/tools/clang/lib/Sema/CMakeLists.txt
+@@ -72,6 +72,10 @@ add_clang_library(clangSema
+ # Sema got too big for debug builds on arm64ec, which means it will hit
+ # other targets too eventually.
+ if(WIN32)
+-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /bigobj")
++  if(MSVC)
++    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /bigobj")
++  else()
++    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wa,-mbig-obj")
++  endif()
+ endif(WIN32)
+ # HLSL Change End
+diff --git a/tools/clang/tools/CMakeLists.txt b/tools/clang/tools/CMakeLists.txt
+index 144135db..ee7e4040 100644
+--- a/tools/clang/tools/CMakeLists.txt
++++ b/tools/clang/tools/CMakeLists.txt
+@@ -33,11 +33,11 @@ add_subdirectory(dxr)
+ add_subdirectory(dxv)
+ 
+ # These targets can currently only be built on Windows.
+-if (WIN32)
++if (MSVC)
+ add_subdirectory(d3dcomp)
+ add_subdirectory(dxrfallbackcompiler)
+ add_subdirectory(dxlib-sample)
+ # UI powered by .NET.
+ add_subdirectory(dotnetc)
+-endif (WIN32)
++endif (MSVC)
+ # HLSL Change Ends
+diff --git a/tools/clang/tools/dxa/CMakeLists.txt b/tools/clang/tools/dxa/CMakeLists.txt
+index 33e61ca1..6f124259 100644
+--- a/tools/clang/tools/dxa/CMakeLists.txt
++++ b/tools/clang/tools/dxa/CMakeLists.txt
+@@ -2,9 +2,9 @@
+ # This file is distributed under the University of Illinois Open Source License. See LICENSE.TXT for details.
+ # Builds dxa.exe
+ 
+-if (WIN32)
++if (MSVC)
+   find_package(DiaSDK REQUIRED) # Used for constants and declarations.
+-endif (WIN32)
++endif (MSVC)
+ 
+ set( LLVM_LINK_COMPONENTS
+   ${LLVM_TARGETS_TO_BUILD}
+@@ -27,9 +27,9 @@ target_link_libraries(dxa
+ 
+ set_target_properties(dxa PROPERTIES VERSION ${CLANG_EXECUTABLE_VERSION})
+ 
+-if (WIN32)
++if (MSVC)
+   include_directories(AFTER ${DIASDK_INCLUDE_DIRS})
+-endif (WIN32)
++endif (MSVC)
+ 
+ add_dependencies(dxa dxcompiler)
+ 
+diff --git a/tools/clang/tools/dxc/CMakeLists.txt b/tools/clang/tools/dxc/CMakeLists.txt
+index 882629c8..9df8da34 100644
+--- a/tools/clang/tools/dxc/CMakeLists.txt
++++ b/tools/clang/tools/dxc/CMakeLists.txt
+@@ -2,9 +2,9 @@
+ # This file is distributed under the University of Illinois Open Source License. See LICENSE.TXT for details.
+ # Builds dxc.exe
+ 
+-if (WIN32)
++if (MSVC)
+   find_package(DiaSDK REQUIRED) # Used for constants and declarations.
+-endif (WIN32)
++endif (MSVC)
+ 
+ set( LLVM_LINK_COMPONENTS
+   ${LLVM_TARGETS_TO_BUILD}
+@@ -33,9 +33,9 @@ endif()
+ 
+ set_target_properties(dxc PROPERTIES VERSION ${CLANG_EXECUTABLE_VERSION})
+ 
+-if (WIN32)
++if (MSVC)
+   include_directories(AFTER ${DIASDK_INCLUDE_DIRS})
+-endif (WIN32)
++endif (MSVC)
+ 
+ include_directories(${LLVM_SOURCE_DIR}/tools/clang/tools)
+ 
+diff --git a/tools/clang/tools/dxclib/CMakeLists.txt b/tools/clang/tools/dxclib/CMakeLists.txt
+index 830dedfc..74927fd4 100644
+--- a/tools/clang/tools/dxclib/CMakeLists.txt
++++ b/tools/clang/tools/dxclib/CMakeLists.txt
+@@ -2,9 +2,9 @@
+ # This file is distributed under the University of Illinois Open Source License. See LICENSE.TXT for details.
+ # Builds dxclib
+ 
+-if (WIN32)
++if (MSVC)
+   find_package(DiaSDK REQUIRED) # Used for constants and declarations.
+-endif (WIN32)
++endif (MSVC)
+ 
+ set( LLVM_LINK_COMPONENTS
+   ${LLVM_TARGETS_TO_BUILD}
+@@ -20,14 +20,19 @@ add_clang_library(dxclib
+   dxc.cpp
+   )
+ 
++if (MINGW)
++  target_link_options(dxclib PUBLIC -mconsole -municode)
++  target_link_libraries(dxclib PRIVATE version)
++endif()
++
+ if(ENABLE_SPIRV_CODEGEN)
+   target_link_libraries(dxclib PRIVATE SPIRV-Tools)
+   target_link_libraries(dxclib PRIVATE clangSPIRV)
+ endif()
+ 
+-if (WIN32)
++if (MSVC)
+   include_directories(AFTER ${DIASDK_INCLUDE_DIRS})
+-endif (WIN32)
++endif (MSVC)
+ 
+ target_compile_definitions(dxclib
+     PRIVATE VERSION_STRING_SUFFIX=" for ${CMAKE_SYSTEM_NAME}")
+diff --git a/tools/clang/tools/dxcompiler/CMakeLists.txt b/tools/clang/tools/dxcompiler/CMakeLists.txt
+index 8cddfcc9..d7aec327 100644
+--- a/tools/clang/tools/dxcompiler/CMakeLists.txt
++++ b/tools/clang/tools/dxcompiler/CMakeLists.txt
+@@ -121,13 +121,13 @@ set(GENERATED_HEADERS
+   ClangStmtNodes
+   )
+ 
+-if (WIN32)
++if (MSVC)
+   find_package(DiaSDK REQUIRED) # Used for constants and declarations.
+-endif (WIN32)
++endif (MSVC)
+ 
+ add_clang_library(dxcompiler SHARED ${SOURCES})
+ add_dependencies(dxcompiler TablegenHLSLOptions) 
+-if (WIN32)
++if (MSVC)
+   # No DxcEtw on non-Windows platforms.
+   add_dependencies(dxcompiler DxcEtw)
+ endif()
+diff --git a/tools/clang/tools/dxl/CMakeLists.txt b/tools/clang/tools/dxl/CMakeLists.txt
+index 230140cf..d3f123aa 100644
+--- a/tools/clang/tools/dxl/CMakeLists.txt
++++ b/tools/clang/tools/dxl/CMakeLists.txt
+@@ -2,9 +2,9 @@
+ # This file is distributed under the University of Illinois Open Source License. See LICENSE.TXT for details.
+ # Builds dxl.exe
+ 
+-if (WIN32)
++if (MSVC)
+   find_package(DiaSDK REQUIRED) # Used for constants and declarations.
+-endif (WIN32)
++endif (MSVC)
+ 
+ set( LLVM_LINK_COMPONENTS
+   ${LLVM_TARGETS_TO_BUILD}
+@@ -26,9 +26,9 @@ target_link_libraries(dxl
+ 
+ set_target_properties(dxl PROPERTIES VERSION ${CLANG_EXECUTABLE_VERSION})
+ 
+-if (WIN32)
++if (MSVC)
+   include_directories(AFTER ${DIASDK_INCLUDE_DIRS})
+-endif (WIN32)
++endif (MSVC)
+ 
+ include_directories(${LLVM_SOURCE_DIR}/tools/clang/tools)
+ 
+diff --git a/tools/clang/tools/dxopt/CMakeLists.txt b/tools/clang/tools/dxopt/CMakeLists.txt
+index a518d9e1..0d489ac7 100644
+--- a/tools/clang/tools/dxopt/CMakeLists.txt
++++ b/tools/clang/tools/dxopt/CMakeLists.txt
+@@ -16,6 +16,10 @@ target_link_libraries(dxopt
+   dxcompiler
+   )
+ 
++if (MINGW)
++  target_link_options(dxopt PRIVATE -mconsole -municode)
++endif()
++
+ set_target_properties(dxopt PROPERTIES VERSION ${CLANG_EXECUTABLE_VERSION})
+ 
+ add_dependencies(dxopt dxcompiler)

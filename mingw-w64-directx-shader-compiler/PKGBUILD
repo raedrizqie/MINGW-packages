@@ -1,0 +1,116 @@
+# Contributor: Raed Rizqie <raed.rizqie@gmail.com>
+
+_realname=directx-shader-compiler
+_pkgname=DirectXShaderCompiler
+_pkgdate=2024_05_24
+pkgbase=mingw-w64-${_realname}
+pkgname=${MINGW_PACKAGE_PREFIX}-${_realname}
+pkgver=1.8.2405
+pkgrel=1
+pkgdesc='A compiler for HLSL to DXIL (mingw-w64)'
+arch=('any')
+mingw_arch=('mingw64' 'ucrt64' 'clang64')
+url='https://github.com/microsoft/DirectXShaderCompiler'
+license=('spdx:MIT AND MS-PL AND LLVM-exceptions')
+makedepends=("${MINGW_PACKAGE_PREFIX}-clang"
+             "${MINGW_PACKAGE_PREFIX}-cmake"
+             "${MINGW_PACKAGE_PREFIX}-libc++"
+             "${MINGW_PACKAGE_PREFIX}-lld"
+             "${MINGW_PACKAGE_PREFIX}-ninja"
+             "${MINGW_PACKAGE_PREFIX}-python"
+             "git"
+             "unzip")
+depends=("${MINGW_PACKAGE_PREFIX}-libc++")
+options=('!strip')
+source=("https://github.com/microsoft/DirectXShaderCompiler/archive/refs/tags/v${pkgver}.tar.gz"
+        "https://github.com/microsoft/DirectXShaderCompiler/releases/download/v${pkgver}/dxc_${_pkgdate}.zip"
+        001-cmake-mingw-support.patch
+        002-headers-update.patch
+        003-lib-sources-fixes.patch
+        004-clang-tools-fixes.patch
+        005-avoid-nominmax-redefinition.patch)
+sha256sums=('0a084148b6b87e6c8fb73540b6c7bf2c3b64db8af06f7dae3aa237830e575ff6'
+            '8d2656e9523e7b3b7c41159237d74f89cc98034056f61f568b8841da0449c965'
+            'SKIP'
+            'SKIP'
+            'SKIP'
+            'SKIP'
+            '7e81b97cd0fdbc4f1be9f8075e31c03bc811131048d041b4cfefcca662fd799a')
+noextract=(dxc_${_pkgdate}.zip)
+
+apply_patch_with_msg() {
+  for _patch in "$@"
+  do
+    msg2 "Applying ${_patch}"
+    patch -Np1 -i "${srcdir}/${_patch}"
+  done
+}
+
+prepare() {
+  cd ${_pkgname}-${pkgver}
+
+  apply_patch_with_msg \
+    001-cmake-mingw-support.patch \
+    002-headers-update.patch \
+    003-lib-sources-fixes.patch \
+    004-clang-tools-fixes.patch \
+    005-avoid-nominmax-redefinition.patch
+
+  mkdir -p ${srcdir}/dxc
+  unzip -q ${srcdir}/dxc_${_pkgdate}.zip -d ${srcdir}/dxc
+}
+
+build() {
+  MSYS2_ARG_CONV_EXCL="-DCMAKE_INSTALL_PREFIX=" \
+  ${MINGW_PREFIX}/bin/cmake -Wno-dev \
+    -GNinja \
+    -DCMAKE_MESSAGE_LOG_LEVEL=STATUS \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INSTALL_PREFIX=${MINGW_PREFIX} \
+    -DCMAKE_C_COMPILER=clang \
+    -DCMAKE_CXX_COMPILER=clang++ \
+    -DCMAKE_CXX_EXTENSIONS=OFF \
+    -DCMAKE_LINKER_TYPE=LLD \
+    -DHLSL_BUILD_DXILCONV=OFF \
+    -DHLSL_ENABLE_FIXED_VER=ON \
+    -DHLSL_INCLUDE_TESTS=OFF \
+    -DHLSL_OFFICIAL_BUILD=ON \
+    -DLLVM_BUILD_STATIC=ON \
+    -DLLVM_BUILD_TOOLS=OFF \
+    -DLLVM_ENABLE_LIBCXX=ON \
+    -DLLVM_ENABLE_LTO=OFF \
+    -DLLVM_INCLUDE_TESTS=OFF \
+    -DSPIRV_BUILD_TESTS=OFF \
+    -DENABLE_SPIRV_CODEGEN=OFF \
+    -C ${_pkgname}-${pkgver}/cmake/caches/PredefinedParams.cmake \
+    -S ${_pkgname}-${pkgver} \
+    -B build-${MSYSTEM}
+
+  ${MINGW_PREFIX}/bin/cmake --build build-${MSYSTEM}
+}
+
+package() {
+  cd build-${MSYSTEM}
+
+  local _arch=x64
+  if [[ ${CARCH} == aarch64 ]]; then
+    _arch=arm64
+  elif [[ ${CARCH} == i686 ]]; then
+    _arch=x86
+  fi
+
+  mkdir -p ${pkgdir}${MINGW_PREFIX}/bin
+  install -Dm755 bin/dx*.exe                          ${pkgdir}${MINGW_PREFIX}/bin
+  install -Dm755 bin/dxcompiler.dll                   ${pkgdir}${MINGW_PREFIX}/bin/dxcompiler.dll
+  install -Dm755 ${srcdir}/dxc/bin/${_arch}/dxil.dll  ${pkgdir}${MINGW_PREFIX}/bin/dxil.dll
+
+  install -Dm755 lib/libdxcompiler.dll.a              ${pkgdir}${MINGW_PREFIX}/lib/libdxcompiler.dll.a
+
+  install -Dm644 ${srcdir}/${_pkgname}-${pkgver}/include/dxc/dxcapi.h      ${pkgdir}${MINGW_PREFIX}/include/dxc/dxcapi.h
+  install -Dm644 ${srcdir}/${_pkgname}-${pkgver}/include/dxc/dxcerrors.h   ${pkgdir}${MINGW_PREFIX}/include/dxc/dxcerrors.h
+  install -Dm644 ${srcdir}/${_pkgname}-${pkgver}/include/dxc/dxcisense.h   ${pkgdir}${MINGW_PREFIX}/include/dxc/dxcisense.h
+
+  install -Dm644 ${srcdir}/dxc/LICENSE-LLVM.TXT  ${pkgdir}${MINGW_PREFIX}/share/licenses/${_realname}/LICENSE-LLVM.TXT
+  install -Dm644 ${srcdir}/dxc/LICENSE-MIT.TXT   ${pkgdir}${MINGW_PREFIX}/share/licenses/${_realname}/LICENSE-MIT.TXT
+  install -Dm644 ${srcdir}/dxc/LICENSE-MS.TXT    ${pkgdir}${MINGW_PREFIX}/share/licenses/${_realname}/LICENSE-MS.TXT
+}

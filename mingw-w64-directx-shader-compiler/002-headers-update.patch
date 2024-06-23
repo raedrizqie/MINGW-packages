@@ -1,0 +1,479 @@
+diff --git a/include/dxc/Support/Global.h b/include/dxc/Support/Global.h
+index 9d97467d..2262b464 100644
+--- a/include/dxc/Support/Global.h
++++ b/include/dxc/Support/Global.h
+@@ -281,7 +281,7 @@ inline void OutputDebugFormatA(const char *pszFormat, ...) {
+ 
+ #ifndef NDEBUG
+ 
+-#ifdef _WIN32
++#ifdef _MSC_VER
+ 
+ // DXASSERT is used to debug break when 'exp' evaluates to false and is only
+ //     intended for internal developer use. It is compiled out in free
+@@ -314,7 +314,7 @@ inline void OutputDebugFormatA(const char *pszFormat, ...) {
+ 
+ #define DXVERIFY_NOMSG(exp) DXASSERT(exp, "")
+ 
+-#else // _WIN32
++#else // _MSC_VER
+ #include <cassert>
+ 
+ #define DXASSERT_NOMSG assert
+@@ -341,7 +341,7 @@ inline void OutputDebugFormatA(const char *pszFormat, ...) {
+     }                                                                          \
+   } while (0)
+ 
+-#endif // _WIN32
++#endif // _MSC_VER
+ 
+ #else // NDEBUG
+ 
+diff --git a/include/dxc/Support/WinIncludes.h b/include/dxc/Support/WinIncludes.h
+index b1c25ec3..3f70486a 100644
+--- a/include/dxc/Support/WinIncludes.h
++++ b/include/dxc/Support/WinIncludes.h
+@@ -65,6 +65,7 @@ template <class T> void swap(CComHeapPtr<T> &a, CComHeapPtr<T> &b) {
+ 
+ #include "dxc/WinAdapter.h"
+ 
++#ifndef __MINGW32__
+ #ifdef __cplusplus
+ #if !defined(DEFINE_ENUM_FLAG_OPERATORS)
+ // Define operator overloads to enable bit operations on enum values that are
+@@ -118,6 +119,7 @@ template <class T> struct _ENUM_FLAG_SIZED_INTEGER {
+ #else
+ #define DEFINE_ENUM_FLAG_OPERATORS(ENUMTYPE) // NOP, C allows these operators.
+ #endif
++#endif
+ 
+ #endif // _MSC_VER
+ 
+diff --git a/include/dxc/WinAdapter.h b/include/dxc/WinAdapter.h
+index b8c66468..61c8e6b7 100644
+--- a/include/dxc/WinAdapter.h
++++ b/include/dxc/WinAdapter.h
+@@ -15,7 +15,7 @@
+ #ifndef LLVM_SUPPORT_WIN_ADAPTER_H
+ #define LLVM_SUPPORT_WIN_ADAPTER_H
+ 
+-#ifndef _WIN32
++#ifndef _MSC_VER
+ 
+ #ifdef __cplusplus
+ #include <atomic>
+@@ -33,6 +33,136 @@
+ #include <vector>
+ #endif // __cplusplus
+ 
++#ifdef __MINGW32__
++
++#undef _WIN32_WINNT
++#undef _WIN32_IE
++
++// Require at least Windows 7 (Updated from XP)
++#define _WIN32_WINNT 0x0601
++#define _WIN32_IE    0x0800
++
++#define WIN32_LEAN_AND_MEAN
++#define STRSAFE_NO_DEPRECATE
++
++#include <windows.h>
++#include <strsafe.h>
++#include <intsafe.h>
++#include <sal.h>
++#include <unknwn.h>
++#include <objidl.h>
++#include <guiddef.h>
++
++#undef EN
++#undef IN
++#undef OUT
++#undef MemoryFence
++#undef ReplaceText
++
++#undef UNREFERENCED_PARAMETER
++#define UNREFERENCED_PARAMETER(P) (void)(P)
++
++#ifndef ERROR_NOT_CAPABLE
++#define ERROR_NOT_CAPABLE __MSABI_LONG(775)
++#endif
++#ifndef ERROR_UNHANDLED_EXCEPTION
++#define ERROR_UNHANDLED_EXCEPTION __MSABI_LONG(574)
++#endif
++
++#define EventRegisterMicrosoft_Windows_DXCompiler_API()
++#define EventUnregisterMicrosoft_Windows_DXCompiler_API()
++
++#define DxcEtw_DXCompilerCompile_Start()
++#define DxcEtw_DXCompilerCompile_Stop(hr)
++#define DxcEtw_DXCompilerCreateInstance_Start()
++#define DxcEtw_DXCompilerCreateInstance_Stop(hr)
++#define DxcEtw_DXCompilerDisassemble_Start()
++#define DxcEtw_DXCompilerDisassemble_Stop(hr)
++#define DxcEtw_DXCompilerInitialization_Start()
++#define DxcEtw_DXCompilerInitialization_Stop(hr)
++#define DxcEtw_DXCompilerPreprocess_Start()
++#define DxcEtw_DXCompilerPreprocess_Stop(hr)
++#define DxcEtw_DXCompilerShutdown_Start()
++#define DxcEtw_DXCompilerShutdown_Stop(hr)
++#define DxcEtw_DxcValidation_Start()
++#define DxcEtw_DxcValidation_Stop(hr)
++
++#define ATLASSERT assert
++
++#define UInt32Add UIntAdd
++#define Int32ToUInt32 IntToUInt
++
++HRESULT UInt32Mult(UINT a, UINT b, UINT *out);
++
++#define E_BOUNDS (HRESULT)0x8000000B
++#define E_NOT_VALID_STATE (HRESULT)0x8007139F
++
++// FIXME: missing from sal.h
++#define _In_NLS_string_(x)
++#define _Maybenull_
++#define _Notnull_
++#define _Ret_opt_
++
++// FIXME: missing from d3d12shader.h
++#define D3D_SHADER_REQUIRES_EARLY_DEPTH_STENCIL 0x00000002
++#define D3D12_SHVER_GET_TYPE(_Version) (((_Version) >> 16) & 0xffff)
++#define D3D12_SHVER_GET_MAJOR(_Version) (((_Version) >> 4) & 0xf)
++#define D3D12_SHVER_GET_MINOR(_Version) (((_Version) >> 0) & 0xf)
++
++#ifdef __cplusplus
++
++typedef std::nullptr_t nullptr_t;
++
++constexpr uint8_t nybble_from_hex(char c) {
++  return ((c >= '0' && c <= '9')
++              ? (c - '0')
++              : ((c >= 'a' && c <= 'f')
++                     ? (c - 'a' + 10)
++                     : ((c >= 'A' && c <= 'F') ? (c - 'A' + 10)
++                                               : /* Should be an error */ -1)));
++}
++
++constexpr uint8_t byte_from_hex(char c1, char c2) {
++  return nybble_from_hex(c1) << 4 | nybble_from_hex(c2);
++}
++
++constexpr uint8_t byte_from_hexstr(const char str[2]) {
++  return nybble_from_hex(str[0]) << 4 | nybble_from_hex(str[1]);
++}
++
++constexpr GUID guid_from_string(const char str[37]) {
++  return GUID{static_cast<uint32_t>(byte_from_hexstr(str)) << 24 |
++                  static_cast<uint32_t>(byte_from_hexstr(str + 2)) << 16 |
++                  static_cast<uint32_t>(byte_from_hexstr(str + 4)) << 8 |
++                  byte_from_hexstr(str + 6),
++              static_cast<uint16_t>(
++                  static_cast<uint16_t>(byte_from_hexstr(str + 9)) << 8 |
++                  byte_from_hexstr(str + 11)),
++              static_cast<uint16_t>(
++                  static_cast<uint16_t>(byte_from_hexstr(str + 14)) << 8 |
++                  byte_from_hexstr(str + 16)),
++              {byte_from_hexstr(str + 19), byte_from_hexstr(str + 21),
++               byte_from_hexstr(str + 24), byte_from_hexstr(str + 26),
++               byte_from_hexstr(str + 28), byte_from_hexstr(str + 30),
++               byte_from_hexstr(str + 32), byte_from_hexstr(str + 34)}};
++}
++
++#define CROSS_PLATFORM_UUIDOF(name, spec)                                      \
++    extern "C++" {                                                             \
++    struct __declspec(uuid(spec)) name;                                        \
++    template<> const GUID &__mingw_uuidof<name>() {                            \
++        constexpr __declspec(selectany) IID __uuid_inst = guid_from_string(spec);             \
++        return __uuid_inst;                                                    \
++    }                                                                          \
++    template<> const GUID &__mingw_uuidof<name*>() {                           \
++        return __mingw_uuidof<name>();                                         \
++    }                                                                          \
++    }
++
++#endif // __cplusplus
++
++#else // __MINGW32__
++
+ #define COM_NO_WINDOWS_H // needed to inform d3d headers that this isn't windows
+ 
+ //===----------------------------------------------------------------------===//
+@@ -630,6 +760,12 @@ CROSS_PLATFORM_UUIDOF(ID3D12LibraryReflection,
+ CROSS_PLATFORM_UUIDOF(ID3D12ShaderReflection,
+                       "5A58797D-A72C-478D-8BA2-EFC6B0EFE88E")
+ 
++#endif // __cplusplus
++
++#endif // __MINGW32__
++
++#ifdef __cplusplus
++
+ //===--------------------- COM Pointer Types ------------------------------===//
+ 
+ class CAllocator {
+@@ -897,6 +1033,7 @@ public:
+ 
+ #define CComHeapPtr CHeapPtr
+ 
++#ifndef __MINGW32__
+ //===--------------------------- BSTR Allocation --------------------------===//
+ 
+ void SysFreeString(BSTR bstrString);
+@@ -905,6 +1042,7 @@ BSTR SysAllocStringLen(const OLECHAR *strIn, UINT ui);
+ 
+ //===--------------------------- BSTR Length ------------------------------===//
+ unsigned int SysStringLen(const BSTR bstrString);
++#endif
+ 
+ //===--------------------- UTF-8 Related Types ----------------------------===//
+ 
+@@ -1034,6 +1172,6 @@ public:
+ 
+ #endif // __cplusplus
+ 
+-#endif // _WIN32
++#endif // _MSC_VER
+ 
+ #endif // LLVM_SUPPORT_WIN_ADAPTER_H
+diff --git a/include/dxc/dxcapi.h b/include/dxc/dxcapi.h
+index 752041b7..b77e9574 100644
+--- a/include/dxc/dxcapi.h
++++ b/include/dxc/dxcapi.h
+@@ -13,7 +13,7 @@
+ #ifndef __DXC_API__
+ #define __DXC_API__
+ 
+-#ifdef _WIN32
++#ifdef _MSC_VER
+ #ifndef DXC_API_IMPORT
+ #define DXC_API_IMPORT __declspec(dllimport)
+ #endif
+@@ -25,11 +25,15 @@
+ 
+ #ifdef _WIN32
+ 
++#ifdef _MSC_VER
+ #ifndef CROSS_PLATFORM_UUIDOF
+ // Warning: This macro exists in WinAdapter.h as well
+ #define CROSS_PLATFORM_UUIDOF(interface, spec)                                 \
+   struct __declspec(uuid(spec)) interface;
+ #endif
++#else
++#include "WinAdapter.h"
++#endif
+ 
+ #else
+ 
+@@ -1222,7 +1226,7 @@ struct IDxcPdbUtils2 : public IUnknown {
+ // Note: __declspec(selectany) requires 'extern'
+ // On Linux __declspec(selectany) is removed and using 'extern' results in link
+ // error.
+-#ifdef _MSC_VER
++#ifdef _WIN32
+ #define CLSID_SCOPE __declspec(selectany) extern
+ #else
+ #define CLSID_SCOPE
+diff --git a/include/dxc/dxcisense.h b/include/dxc/dxcisense.h
+index 661de168..6b6dbd33 100644
+--- a/include/dxc/dxcisense.h
++++ b/include/dxc/dxcisense.h
+@@ -12,7 +12,7 @@
+ #ifndef __DXC_ISENSE__
+ #define __DXC_ISENSE__
+ 
+-#include "dxcapi.h"
++#include "dxc/dxcapi.h"
+ #ifndef _WIN32
+ #include "WinAdapter.h"
+ #endif
+@@ -943,7 +943,7 @@ struct IDxcCompletionString : public IUnknown {
+ // CLSID_DxcIntelliSense is not visible externally (this is OK in C, since const
+ // is not by default static in C)
+ 
+-#ifdef _MSC_VER
++#ifdef _WIN32
+ #define CLSID_SCOPE __declspec(selectany) extern
+ #else
+ #define CLSID_SCOPE
+diff --git a/include/dxc/dxctools.h b/include/dxc/dxctools.h
+index bfdc0d86..bacc20c1 100644
+--- a/include/dxc/dxctools.h
++++ b/include/dxc/dxctools.h
+@@ -42,7 +42,7 @@ struct IDxcRewriter : public IUnknown {
+       IDxcOperationResult **ppResult) = 0;
+ };
+ 
+-#ifdef _MSC_VER
++#ifdef _WIN32
+ #define CLSID_SCOPE __declspec(selectany) extern
+ #else
+ #define CLSID_SCOPE
+diff --git a/include/llvm/ADT/StringRef.h b/include/llvm/ADT/StringRef.h
+index 957707f4..f5a49a4c 100644
+--- a/include/llvm/ADT/StringRef.h
++++ b/include/llvm/ADT/StringRef.h
+@@ -12,6 +12,7 @@
+ 
+ #include <algorithm>
+ #include <cassert>
++#include <cstdint>
+ #include <cstring>
+ #include <limits>
+ #include <string>
+diff --git a/include/llvm/Support/COFF.h b/include/llvm/Support/COFF.h
+index 3c5ee069..ffb6aa91 100644
+--- a/include/llvm/Support/COFF.h
++++ b/include/llvm/Support/COFF.h
+@@ -27,6 +27,31 @@
+ #include <cassert>
+ #include <cstring>
+ 
++#ifdef __MINGW32__
++#undef IMAGE_SYM_ABSOLUTE
++#undef IMAGE_SYM_UNDEFINED
++
++#undef IMAGE_SYM_CLASS_EXTERNAL
++#undef IMAGE_SYM_CLASS_STATIC
++#undef IMAGE_SYM_CLASS_WEAK_EXTERNAL
++#undef IMAGE_SYM_CLASS_FUNCTION
++#undef IMAGE_SYM_CLASS_FILE
++#undef IMAGE_SYM_CLASS_SECTION
++#undef IMAGE_SYM_CLASS_CLR_TOKEN
++
++#undef IMAGE_SYM_TYPE_NULL
++#undef IMAGE_SYM_DTYPE_FUNCTION
++#undef SCT_COMPLEX_TYPE_SHIFT
++
++#undef IMAGE_AUX_SYMBOL_TYPE_TOKEN_DEF
++#undef IMAGE_SCN_LNK_NRELOC_OVFL
++
++#undef IMAGE_REL_I386_SECREL
++#undef IMAGE_REL_I386_DIR32
++#undef IMAGE_REL_AMD64_SECREL
++#undef IMAGE_REL_AMD64_ADDR64
++#endif
++
+ namespace llvm {
+ namespace COFF {
+ 
+@@ -80,6 +105,7 @@ namespace COFF {
+     uint32_t NumberOfSymbols;
+   };
+ 
++#ifndef __MINGW32__
+   enum MachineTypes {
+     MT_Invalid = 0xffff,
+ 
+@@ -324,6 +350,87 @@ namespace COFF {
+     IMAGE_REL_AMD64_SSPAN32   = 0x0010
+   };
+ 
++#else
++
++  struct symbol {
++    char     Name[NameSize];
++    uint32_t Value;
++    int32_t  SectionNumber;
++    uint16_t Type;
++    uint8_t  StorageClass;
++    uint8_t  NumberOfAuxSymbols;
++  };
++
++  enum SymbolSectionNumber : int32_t {
++    IMAGE_SYM_ABSOLUTE  = -1,
++    IMAGE_SYM_UNDEFINED = 0
++  };
++
++  /// Storage class tells where and what the symbol represents
++  enum SymbolStorageClass {
++    SSC_Invalid = 0xff,
++
++    IMAGE_SYM_CLASS_EXTERNAL         = 2,   ///< External symbol
++    IMAGE_SYM_CLASS_STATIC           = 3,   ///< Static
++    IMAGE_SYM_CLASS_WEAK_EXTERNAL    = 105, ///< Duplicate tag
++    IMAGE_SYM_CLASS_FUNCTION         = 101,
++    IMAGE_SYM_CLASS_FILE             = 103, ///< File name
++    /// Line number, reformatted as symbol
++    IMAGE_SYM_CLASS_SECTION          = 104,
++    /// External symbol in dmert public lib
++    IMAGE_SYM_CLASS_CLR_TOKEN        = 107
++  };
++
++  enum SymbolBaseType {
++    IMAGE_SYM_TYPE_NULL   = 0,  ///< No type information or unknown base type.
++  };
++
++  enum SymbolComplexType {
++    IMAGE_SYM_DTYPE_FUNCTION = 2, ///< A function that returns a base type.
++    /// Type is formed as (base + (derived << SCT_COMPLEX_TYPE_SHIFT))
++    SCT_COMPLEX_TYPE_SHIFT   = 4
++  };
++
++  enum AuxSymbolType {
++    IMAGE_AUX_SYMBOL_TYPE_TOKEN_DEF = 1
++  };
++
++  struct section {
++    char     Name[NameSize];
++    uint32_t VirtualSize;
++    uint32_t VirtualAddress;
++    uint32_t SizeOfRawData;
++    uint32_t PointerToRawData;
++    uint32_t PointerToRelocations;
++    uint32_t PointerToLineNumbers;
++    uint16_t NumberOfRelocations;
++    uint16_t NumberOfLineNumbers;
++    uint32_t Characteristics;
++  };
++
++  enum SectionCharacteristics : uint32_t {
++    SC_Invalid = 0xffffffff,
++    IMAGE_SCN_LNK_NRELOC_OVFL        = 0x01000000
++  };
++
++  struct relocation {
++    uint32_t VirtualAddress;
++    uint32_t SymbolTableIndex;
++    uint16_t Type;
++  };
++
++  enum RelocationTypeI386 {
++    IMAGE_REL_I386_DIR32    = 0x0006,
++    IMAGE_REL_I386_SECREL   = 0x000B
++  };
++
++  enum RelocationTypeAMD64 {
++    IMAGE_REL_AMD64_ADDR64    = 0x0001,
++    IMAGE_REL_AMD64_SECREL    = 0x000B
++  };
++#endif
++
++#ifndef __MINGW32__
+   enum RelocationTypesARM {
+     IMAGE_REL_ARM_ABSOLUTE  = 0x0000,
+     IMAGE_REL_ARM_ADDR32    = 0x0001,
+@@ -416,6 +523,7 @@ namespace COFF {
+     uint32_t NameRVA;
+     uint32_t ImportAddressTableRVA;
+   };
++#endif
+ 
+   /// @brief The PE32 Import Lookup Table.
+   ///
+@@ -521,6 +629,7 @@ namespace COFF {
+     uint32_t Size;
+   };
+ 
++#ifndef __MINGW32__
+   enum DataDirectoryIndex {
+     EXPORT_TABLE = 0,
+     IMPORT_TABLE,
+@@ -612,6 +721,7 @@ namespace COFF {
+     IMAGE_REL_BASED_MIPS_JMPADDR16 = 9,
+     IMAGE_REL_BASED_DIR64          = 10
+   };
++#endif
+ 
+   enum ImportType {
+     IMPORT_CODE  = 0,

@@ -1,0 +1,313 @@
+diff --git a/tools/clang/include/clang/AST/Attr.h b/tools/clang/include/clang/AST/Attr.h
+index 4e282d68..8abc524b 100644
+--- a/tools/clang/include/clang/AST/Attr.h
++++ b/tools/clang/include/clang/AST/Attr.h
+@@ -149,6 +149,7 @@ public:
+   }
+ };
+ 
++#undef interface
+ #include "clang/AST/Attrs.inc"
+ 
+ inline const DiagnosticBuilder &operator<<(const DiagnosticBuilder &DB,
+diff --git a/tools/clang/include/clang/Analysis/CFG.h b/tools/clang/include/clang/Analysis/CFG.h
+index 68ed8d3e..2139de7d 100644
+--- a/tools/clang/include/clang/Analysis/CFG.h
++++ b/tools/clang/include/clang/Analysis/CFG.h
+@@ -913,8 +913,8 @@ public:
+   // Member templates useful for various batch operations over CFGs.
+   //===--------------------------------------------------------------------===//
+ 
+-  template <typename CALLBACK>
+-  void VisitBlockStmts(CALLBACK& O) const {
++  template <typename Callback>
++  void VisitBlockStmts(Callback& O) const {
+     for (const_iterator I=begin(), E=end(); I != E; ++I)
+       for (CFGBlock::const_iterator BI=(*I)->begin(), BE=(*I)->end();
+            BI != BE; ++BI) {
+diff --git a/tools/clang/lib/Analysis/UninitializedValues.cpp b/tools/clang/lib/Analysis/UninitializedValues.cpp
+index dfd689bd..a9400c35 100644
+--- a/tools/clang/lib/Analysis/UninitializedValues.cpp
++++ b/tools/clang/lib/Analysis/UninitializedValues.cpp
+@@ -116,7 +116,7 @@ Optional<unsigned> DeclToIndex::getValueIndex(const VarDecl *d) const {
+ 
+ // These values are defined in such a way that a merge can be done using
+ // a bitwise OR.
+-enum Value { Unknown = 0x0,         /* 00 */
++enum Value { UnknownValue = 0x0,      /* 00 */
+              Initialized = 0x1,     /* 01 */
+              Uninitialized = 0x2,   /* 10 */
+              MayUninitialized = 0x3 /* 11 */ };
+@@ -771,7 +771,7 @@ void TransferFunctions::VisitCallExpr(CallExpr *ce) {
+       // suppressing branch-specific false positives when we call one of these
+       // functions but keep pretending the path continues (when in reality the
+       // user doesn't care).
+-      vals.setAllScratchValues(Unknown);
++      vals.setAllScratchValues(UnknownValue);
+     }
+   }
+ }
+@@ -840,7 +840,7 @@ void TransferFunctions::VisitObjCMessageExpr(ObjCMessageExpr *ME) {
+   // If the Objective-C message expression is an implicit no-return that
+   // is not modeled in the CFG, set the tracked dataflow values to Unknown.
+   if (objCNoRet.isImplicitNoReturn(ME)) {
+-    vals.setAllScratchValues(Unknown);
++    vals.setAllScratchValues(UnknownValue);
+   }
+ }
+ 
+diff --git a/tools/clang/lib/Basic/LangOptions.cpp b/tools/clang/lib/Basic/LangOptions.cpp
+index 87d20740..a6229c95 100644
+--- a/tools/clang/lib/Basic/LangOptions.cpp
++++ b/tools/clang/lib/Basic/LangOptions.cpp
+@@ -16,14 +16,12 @@
+ ///////////////////////////////////////////////////////////////////////////////
+ using namespace clang;
+ 
+-#ifdef LLVM_ON_UNIX
+ #ifndef MS_SUPPORT_VARIABLE_LANGOPTS
+ #define LANGOPT(Name, Bits, Default, Description) const unsigned LangOptionsBase::Name;
+ #define LANGOPT_BOOL(Name, Default, Description) const bool LangOptionsBase::Name;
+ #define ENUM_LANGOPT(Name, Type, Bits, Default, Description)
+ #include "clang/Basic/LangOptions.fixed.def"
+ #endif // MS_SUPPORT_VARIABLE_LANGOPTS
+-#endif // LLVM_ON_UNIX
+ 
+ LangOptions::LangOptions() 
+     : HLSLVersion(hlsl::LangStd::vLatest) {
+diff --git a/tools/clang/tools/dxc/dxcmain.cpp b/tools/clang/tools/dxc/dxcmain.cpp
+index e865776a..98bbb796 100644
+--- a/tools/clang/tools/dxc/dxcmain.cpp
++++ b/tools/clang/tools/dxc/dxcmain.cpp
+@@ -13,7 +13,7 @@
+ 
+ #ifdef _WIN32
+ int __cdecl wmain(int argc, const wchar_t **argv_) {
+-  return dxc::main(argc, argv_);
++  return dxc::wmain(argc, argv_);
+ #else
+ int main(int argc, const char **argv_) {
+   return dxc::main(argc, argv_);
+diff --git a/tools/clang/tools/dxclib/dxc.cpp b/tools/clang/tools/dxclib/dxc.cpp
+index cdcfe2b3..37b486ac 100644
+--- a/tools/clang/tools/dxclib/dxc.cpp
++++ b/tools/clang/tools/dxclib/dxc.cpp
+@@ -61,14 +61,14 @@
+ #include "llvm/Support/MemoryBuffer.h"
+ #include "llvm/Support/Path.h"
+ #include "llvm/Support/raw_ostream.h"
+-#ifdef _WIN32
++#ifdef _MSC_VER
+ #include <comdef.h>
+ #include <dia2.h>
+ #endif
+ #include <algorithm>
+ #include <unordered_map>
+ 
+-#ifdef _WIN32
++#ifdef _MSC_VER
+ #pragma comment(lib, "version.lib")
+ #endif
+ 
+@@ -137,12 +137,12 @@ private:
+                                   IDxcBlob **ppResult);
+ 
+ // Dia is only supported on Windows.
+-#ifdef _WIN32
++#ifdef _MSC_VER
+   // TODO : Refactor two functions below. There are duplicate functions in
+   // DxcContext in dxa.cpp
+   HRESULT GetDxcDiaTable(IDxcLibrary *pLibrary, IDxcBlob *pTargetBlob,
+                          IDiaTable **ppTable, LPCWSTR tableName);
+-#endif // _WIN32
++#endif // _MSC_VER
+ 
+   HRESULT FindModuleBlob(hlsl::DxilFourCC fourCC, IDxcBlob *pSource,
+                          IDxcLibrary *pLibrary, IDxcBlob **ppTargetBlob);
+@@ -1142,7 +1142,7 @@ HRESULT DxcContext::FindModuleBlob(hlsl::DxilFourCC fourCC, IDxcBlob *pSource,
+ 
+ // This function is currently only supported on Windows due to usage of
+ // IDiaTable.
+-#ifdef _WIN32
++#ifdef _MSC_VER
+ // TODO : There is an identical code in DxaContext in Dxa.cpp. Refactor this
+ // function.
+ HRESULT DxcContext::GetDxcDiaTable(IDxcLibrary *pLibrary, IDxcBlob *pTargetBlob,
+@@ -1176,7 +1176,7 @@ HRESULT DxcContext::GetDxcDiaTable(IDxcLibrary *pLibrary, IDxcBlob *pTargetBlob,
+   *ppTable = pTable.Detach();
+   return S_OK;
+ }
+-#endif // _WIN32
++#endif // _MSC_VER
+ 
+ bool GetDLLFileVersionInfo(const char *dllPath, unsigned int *version) {
+   // This function is used to get version information from the DLL file.
+@@ -1399,7 +1399,7 @@ static LONG CALLBACK ExceptionFilter(PEXCEPTION_POINTERS pExceptionInfo) {
+ #endif
+ 
+ #ifdef _WIN32
+-int dxc::main(int argc, const wchar_t **argv_) {
++int dxc::wmain(int argc, const wchar_t **argv_) {
+ #else
+ int dxc::main(int argc, const char **argv_) {
+ #endif // _WIN32
+@@ -1439,7 +1439,7 @@ int dxc::main(int argc, const char **argv_) {
+ 
+     // Apply defaults.
+     if (dxcOpts.EntryPoint.empty() && !dxcOpts.RecompileFromBinary) {
+-      dxcOpts.EntryPoint = "main";
++      dxcOpts.EntryPoint = "wmain";
+     }
+ 
+ #ifdef _WIN32
+diff --git a/tools/clang/tools/dxclib/dxc.h b/tools/clang/tools/dxclib/dxc.h
+index 9ae7a06f..25c6ef32 100644
+--- a/tools/clang/tools/dxclib/dxc.h
++++ b/tools/clang/tools/dxclib/dxc.h
+@@ -28,7 +28,7 @@ void WriteDXILVersionInfo(llvm::raw_ostream &OS,
+                           dxc::DxcDllSupport &DxilSupport);
+ 
+ #ifdef _WIN32
+-int main(int argc, const wchar_t **argv_);
++int wmain(int argc, const wchar_t **argv_);
+ #else
+ int main(int argc, const char **argv_);
+ #endif // _WIN32
+diff --git a/tools/clang/tools/dxcompiler/DXCompiler.cpp b/tools/clang/tools/dxcompiler/DXCompiler.cpp
+index c5484414..68c56414 100644
+--- a/tools/clang/tools/dxcompiler/DXCompiler.cpp
++++ b/tools/clang/tools/dxcompiler/DXCompiler.cpp
+@@ -16,7 +16,7 @@
+ #include "dxc/config.h"
+ #include "llvm/Support/FileSystem.h"
+ #include "llvm/Support/ManagedStatic.h"
+-#ifdef LLVM_ON_WIN32
++#ifdef _MSC_VER
+ #include "dxcetw.h"
+ #endif
+ #include "dxillib.h"
+diff --git a/tools/clang/tools/dxcompiler/DXCompiler.rc b/tools/clang/tools/dxcompiler/DXCompiler.rc
+index 4bec9e09..75b2d9e6 100644
+--- a/tools/clang/tools/dxcompiler/DXCompiler.rc
++++ b/tools/clang/tools/dxcompiler/DXCompiler.rc
+@@ -11,4 +11,6 @@
+ #define VER_ORIGINALFILENAME_STR      "DXCompiler.dll"
+ 
+ // #include <common.ver>
++#ifdef _MSC_VER
+ #include "dxcetw.rc"
++#endif
+diff --git a/tools/clang/tools/dxcompiler/dxcapi.cpp b/tools/clang/tools/dxcompiler/dxcapi.cpp
+index a6a877cb..22c2d257 100644
+--- a/tools/clang/tools/dxcompiler/dxcapi.cpp
++++ b/tools/clang/tools/dxcompiler/dxcapi.cpp
+@@ -21,7 +21,7 @@
+ #include "dxc/config.h"
+ #include "dxc/dxcisense.h"
+ #include "dxc/dxctools.h"
+-#ifdef _WIN32
++#ifdef _MSC_VER
+ #include "dxcetw.h"
+ #endif
+ #include "dxc/DxilContainer/DxcContainerBuilder.h"
+@@ -110,7 +110,7 @@ static HRESULT ThreadMallocDxcCreateInstance(REFCLSID rclsid, REFIID riid,
+     hr = CreateDxcLinker(riid, ppv);
+   }
+ // Note: The following targets are not yet enabled for non-Windows platforms.
+-#ifdef _WIN32
++#ifdef _MSC_VER
+   else if (IsEqualCLSID(rclsid, CLSID_DxcDiaDataSource)) {
+     hr = CreateDxcDiaDataSource(riid, ppv);
+   }
+diff --git a/tools/clang/tools/dxcompiler/dxcompilerobj.cpp b/tools/clang/tools/dxcompiler/dxcompilerobj.cpp
+index 0ee0d007..231737d1 100644
+--- a/tools/clang/tools/dxcompiler/dxcompilerobj.cpp
++++ b/tools/clang/tools/dxcompiler/dxcompilerobj.cpp
+@@ -50,7 +50,7 @@
+ #include "dxc/Support/dxcapi.use.h"
+ #include "dxc/Support/microcom.h"
+ 
+-#ifdef _WIN32
++#ifdef _MSC_VER
+ #include "dxcetw.h"
+ #endif
+ #include "dxcompileradapter.h"
+diff --git a/tools/clang/tools/dxcompiler/dxcpdbutils.cpp b/tools/clang/tools/dxcompiler/dxcpdbutils.cpp
+index 2fc224f3..e3ad375d 100644
+--- a/tools/clang/tools/dxcompiler/dxcpdbutils.cpp
++++ b/tools/clang/tools/dxcompiler/dxcpdbutils.cpp
+@@ -47,7 +47,7 @@
+ #include <string>
+ #include <vector>
+ 
+-#ifdef _WIN32
++#ifdef _MSC_VER
+ #include "dxc/dxcpix.h"
+ #include <dia2.h>
+ #endif
+@@ -273,7 +273,7 @@ public:
+ };
+ 
+ struct DxcPdbUtils : public IDxcPdbUtils2
+-#ifdef _WIN32
++#ifdef _MSC_VER
+     // Skip Pix debug info on linux for dia dependence.
+     ,
+                      public IDxcPixDxilDebugInfoFactory
+@@ -843,7 +843,7 @@ public:
+ 
+   HRESULT STDMETHODCALLTYPE QueryInterface(REFIID iid,
+                                            void **ppvObject) override {
+-#ifdef _WIN32
++#ifdef _MSC_VER
+     HRESULT hr =
+         DoBasicQueryInterface<IDxcPdbUtils2, IDxcPixDxilDebugInfoFactory>(
+             this, iid, ppvObject);
+@@ -1071,7 +1071,7 @@ public:
+     return CopyBlobWide(m_Name, ppResult);
+   }
+ 
+-#ifdef _WIN32
++#ifdef _MSC_VER
+   virtual STDMETHODIMP
+   NewDxcPixDxilDebugInfo(IDxcPixDxilDebugInfo **ppDxilDebugInfo) override {
+     if (!m_pDebugProgramBlob)
+diff --git a/tools/clang/tools/dxcompiler/dxcvalidator.cpp b/tools/clang/tools/dxcompiler/dxcvalidator.cpp
+index c24d6da7..d62307b0 100644
+--- a/tools/clang/tools/dxcompiler/dxcvalidator.cpp
++++ b/tools/clang/tools/dxcompiler/dxcvalidator.cpp
+@@ -26,7 +26,7 @@
+ #include "llvm/Support/MSFileSystem.h"
+ #include "llvm/Support/MemoryBuffer.h"
+ 
+-#ifdef _WIN32
++#ifdef _MSC_VER
+ #include "dxcetw.h"
+ #endif
+ 
+diff --git a/tools/clang/tools/dxl/dxl.cpp b/tools/clang/tools/dxl/dxl.cpp
+index f566ee11..864d3901 100644
+--- a/tools/clang/tools/dxl/dxl.cpp
++++ b/tools/clang/tools/dxl/dxl.cpp
+@@ -19,7 +19,7 @@ int __cdecl wmain(int argc, const wchar_t **argv_) {
+     args.emplace_back(argv_[i]);
+   args.emplace_back(L"-link");
+ 
+-  return dxc::main(args.size(), args.data());
++  return dxc::wmain(args.size(), args.data());
+ #else
+ int main(int argc, const char **argv_) {
+   std::vector<const char *> args;
+diff --git a/tools/clang/tools/dxopt/dxopt.cpp b/tools/clang/tools/dxopt/dxopt.cpp
+index 29e3876e..9f566417 100644
+--- a/tools/clang/tools/dxopt/dxopt.cpp
++++ b/tools/clang/tools/dxopt/dxopt.cpp
+@@ -109,7 +109,7 @@ static void PrintOptOutput(LPCWSTR pFileName, IDxcBlob *pBlob,
+   CComPtr<IDxcLibrary> pLibrary;
+   CComPtr<IDxcBlobEncoding> pOutputText16;
+   IFT(g_DxcSupport.CreateInstance(CLSID_DxcLibrary, &pLibrary));
+-#ifdef _WIN32
++#ifdef _MSC_VER
+   IFT(pLibrary->GetBlobAsWide(pOutputText, &pOutputText16));
+   wprintf(L"%*s", (int)pOutputText16->GetBufferSize(),
+           (wchar_t *)pOutputText16->GetBufferPointer());
