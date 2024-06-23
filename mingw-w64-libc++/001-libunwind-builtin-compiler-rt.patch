@@ -1,0 +1,39 @@
+--- a/cmake/config-ix.cmake
++++ b/cmake/config-ix.cmake
+@@ -20,6 +20,8 @@ endif()
+ if (NOT LIBUNWIND_USE_COMPILER_RT)
+   if (ANDROID)
+     check_library_exists(gcc __gcc_personality_v0 "" LIBUNWIND_HAS_GCC_LIB)
++  elseif (MINGW)
++    check_library_exists(gcc_eh __gcc_personality_v0 "" LIBUNWIND_HAS_GCC_EH_LIB)
+   else ()
+     check_library_exists(gcc_s __gcc_personality_v0 "" LIBUNWIND_HAS_GCC_S_LIB)
+     check_library_exists(gcc __absvdi2 "" LIBUNWIND_HAS_GCC_LIB)
+@@ -47,7 +49,7 @@ endif()
+ 
+ # Only link against compiler-rt manually if we use -nodefaultlibs, since
+ # otherwise the compiler will do the right thing on its own.
+-if (NOT CXX_SUPPORTS_NOSTDLIBXX_FLAG AND C_SUPPORTS_NODEFAULTLIBS_FLAG)
++if ((NOT CXX_SUPPORTS_NOSTDLIBXX_FLAG AND C_SUPPORTS_NODEFAULTLIBS_FLAG) OR MINGW)
+   if (LIBUNWIND_HAS_C_LIB)
+     list(APPEND CMAKE_REQUIRED_LIBRARIES c)
+   endif ()
+@@ -60,6 +62,9 @@ if (NOT CXX_SUPPORTS_NOSTDLIBXX_FLAG AND C_SUPPORTS_NODEFAULTLIBS_FLAG)
+                              FLAGS ${LIBUNWIND_COMPILE_FLAGS})
+     list(APPEND CMAKE_REQUIRED_LIBRARIES "${LIBUNWIND_BUILTINS_LIBRARY}")
+   else ()
++    if (LIBUNWIND_HAS_GCC_EH_LIB)
++      list(APPEND CMAKE_REQUIRED_LIBRARIES gcc_eh)
++    endif ()
+     if (LIBUNWIND_HAS_GCC_S_LIB)
+       list(APPEND CMAKE_REQUIRED_LIBRARIES gcc_s)
+     endif ()
+@@ -116,7 +121,7 @@ if(LIBUNWIND_TARGET_ARM AND NOT LIBUNWIND_USES_SJLJ_EXCEPTIONS AND NOT LIBUNWIND
+ endif()
+ 
+ # Check libraries
+-if(FUCHSIA)
++if(FUCHSIA OR MINGW)
+   set(LIBUNWIND_HAS_DL_LIB NO)
+   set(LIBUNWIND_HAS_PTHREAD_LIB NO)
+ else()

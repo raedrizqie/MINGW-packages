@@ -1,0 +1,58 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -683,7 +683,7 @@ function(cxx_link_system_libraries target)
+     target_add_link_flags_if_supported(${target} PRIVATE "--unwindlib=none")
+   endif()
+ 
+-  if (MSVC)
++  if (WIN32)
+     if (LIBCXX_USE_COMPILER_RT)
+       find_compiler_rt_library(builtins LIBCXX_BUILTINS_LIBRARY)
+       if (LIBCXX_BUILTINS_LIBRARY)
+@@ -691,6 +691,8 @@ function(cxx_link_system_libraries target)
+       endif()
+     elseif (LIBCXX_HAS_GCC_LIB)
+       target_link_libraries(${target} PRIVATE gcc)
++    elseif (LIBCXX_HAS_GCC_EH_LIB)
++      target_link_libraries(${target} PRIVATE gcc_eh)
+     elseif (LIBCXX_HAS_GCC_S_LIB)
+       target_link_libraries(${target} PRIVATE gcc_s)
+     endif()
+--- a/cmake/config-ix.cmake
++++ b/cmake/config-ix.cmake
+@@ -20,6 +20,8 @@ if (NOT LIBCXX_USE_COMPILER_RT)
+   else()
+     if(ANDROID)
+       check_library_exists(gcc __gcc_personality_v0 "" LIBCXX_HAS_GCC_LIB)
++    elseif(MINGW)
++      check_library_exists(gcc_eh __gcc_personality_v0 "" LIBCXX_HAS_GCC_EH_LIB)
+     else()
+       check_library_exists(gcc_s __gcc_personality_v0 "" LIBCXX_HAS_GCC_S_LIB)
+     endif()
+@@ -47,7 +49,7 @@ endif()
+ 
+ # Only link against compiler-rt manually if we use -nodefaultlibs, since
+ # otherwise the compiler will do the right thing on its own.
+-if (NOT CXX_SUPPORTS_NOSTDLIBXX_FLAG AND C_SUPPORTS_NODEFAULTLIBS_FLAG)
++if ((NOT CXX_SUPPORTS_NOSTDLIBXX_FLAG AND C_SUPPORTS_NODEFAULTLIBS_FLAG) OR MINGW)
+   if (LIBCXX_USE_COMPILER_RT)
+     include(HandleCompilerRT)
+     find_compiler_rt_library(builtins LIBCXX_BUILTINS_LIBRARY
+@@ -59,6 +61,8 @@ if (NOT CXX_SUPPORTS_NOSTDLIBXX_FLAG AND C_SUPPORTS_NODEFAULTLIBS_FLAG)
+     endif()
+   elseif (LIBCXX_HAS_GCC_LIB)
+     list(APPEND CMAKE_REQUIRED_LIBRARIES gcc)
++  elseif (LIBCXX_HAS_GCC_EH_LIB)
++    list(APPEND CMAKE_REQUIRED_LIBRARIES gcc_eh)
+   elseif (LIBCXX_HAS_GCC_S_LIB)
+     list(APPEND CMAKE_REQUIRED_LIBRARIES gcc_s)
+   endif ()
+@@ -98,7 +102,7 @@ int main(void) { return 0; }
+ endif()
+ 
+ # Check libraries
+-if(WIN32 AND NOT MINGW)
++if(WIN32)
+   # TODO(compnerd) do we want to support an emulation layer that allows for the
+   # use of pthread-win32 or similar libraries to emulate pthreads on Windows?
+   set(LIBCXX_HAS_PTHREAD_LIB NO)
