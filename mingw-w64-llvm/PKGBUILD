@@ -28,14 +28,14 @@ pkgname=("${MINGW_PACKAGE_PREFIX}-llvm"
          "${MINGW_PACKAGE_PREFIX}-compiler-rt"
          $( (( _clangprefix )) && echo "${MINGW_PACKAGE_PREFIX}-gcc-compat" )
          "${MINGW_PACKAGE_PREFIX}-lld")
-_version=18.1.6
+_version=18.1.8
 _rc=""
 _tag=llvmorg-${_version}${_rc}
 pkgver=${_version}${_rc/-/}
-pkgrel=1
+pkgrel=2
 pkgdesc="C language family frontend for LLVM (mingw-w64)"
 arch=('any')
-mingw_arch=('mingw32' 'mingw64' 'ucrt64' 'clang64' 'clang32' 'clangarm64')
+mingw_arch=('mingw64' 'mingw32' 'ucrt64')
 url="https://llvm.org/"
 msys2_references=(
   "cpe: cpe:/a:llvm:llvm"
@@ -53,7 +53,8 @@ makedepends=($([[ "$_compiler" == "clang" ]] && echo \
              "${MINGW_PACKAGE_PREFIX}-z3"
              "${MINGW_PACKAGE_PREFIX}-python"
              "${MINGW_PACKAGE_PREFIX}-python-sphinx"
-             $((( _clangprefix )) && echo \
+             $([[ "$_compiler" == "clang" ]] && echo \
+               "${MINGW_PACKAGE_PREFIX}-lld" \
                "${MINGW_PACKAGE_PREFIX}-compiler-rt" \
                "${MINGW_PACKAGE_PREFIX}-libc++")
              "git"
@@ -68,7 +69,6 @@ source=("${_url}/llvm-${pkgver}.src.tar.xz"{,.sig}
         "${_url}/third-party-${pkgver}.src.tar.xz"{,.sig}
         # 0001-0099 -> llvm
         "0001-Fix-GetHostTriple-for-mingw-w64-in-msys.patch"
-        "0002-Fix-Findzstd-on-MINGW.patch"
         "0003-add-pthread-as-system-lib-for-mingw.patch"
         "0004-enable-emutls-for-mingw.patch"
         # 0101-0199 -> clang
@@ -76,29 +76,30 @@ source=("${_url}/llvm-${pkgver}.src.tar.xz"{,.sig}
         "0102-Rename-flang-new-flang-experimental-exec-to-flang.patch"
         # 0201-0299 -> rt
         # 0301-0399 -> lld
+        "0301-disable-emutls-on-mingw.patch"
         "0303-ignore-new-bfd-options.patch"
         # 0401-0499 -> clang-tools-extra
         )
-sha256sums=('c231d0a5445db2aafab855e052c247bdd9856ff9d7d9bffdd04e9f0bf8d5366f'
+sha256sums=('f68cf90f369bc7d0158ba70d860b0cb34dbc163d6ff0ebc6cfa5e515b9b2e28d'
             'SKIP'
-            '54e0817f918b90b5f94684e9729ac2f9d3820fce040d6395d71c1f19ffa3b03c'
+            '5724fe0a13087d5579104cedd2f8b3bc10a212fb79a0fcdac98f4880e19f4519'
             'SKIP'
-            'd78732ec6d55b7374abe14b97c9529a7b56a1fe19929a5bf4c3802b69f77764e'
+            'e58877fcd95ed106824bd1a31276dd17ed0c53adcd60ca75289eac0654f0a7f1'
             'SKIP'
-            'f05f4e15a4524194c93303aa6027006a5182eccfe8f5c90491c2f1fbfcedb96b'
+            'e054e99a9c9240720616e927cb52363abbc8b4f1ef0286bad3df79ec8fdf892f'
             'SKIP'
-            'f1f059c2bf98ffa558cd0c48ea568736c41f0c8029dabb53147d48b9efdaa802'
+            '800e6805fb613eb8428f7a199f6d06c4c19f78f2db69157a129bb04fc1c99769'
             'SKIP'
-            'a643261ed98ff76ab10f1a7039291fa841c292435ba1cfe11e235c2231b95cdb'
+            '59badef592dd34893cd319d42b323aaa990b452d05c7180ff20f23ab1b41e837'
             'SKIP'
-            '4ae7b394d341aea6fb7d3d373a4f561ba8e48c0fecded4bb4f1f5f12ba9bd2b6'
+            'b76b810f3d3dc5d08e83c4236cb6e395aa9bd5e3ea861e8c319b216d093db074'
             'SKIP'
             'eb03df53671df6627768141b3aaa76abe176a14e5e47911c97bec544387c4aff'
-            '0aff3a85d70ae437dfc634fe40db506bf5701403049284ffbdb931135ae8a483'
             '016fbf6f742c062cc59360070264546c10385b1e8c37605758f62dcbea8f9bcc'
             '5f86e542dd1ec92b2fe06ee59061c3e23512df7bafabe82206f2b7d80b81836b'
             '715cb8862753854b2d9256e0b70003e2d1f57083d83eaeaf5a095fc72b8a4e26'
             '2770cadf8ccf6b31aece6aee8f76dceb71e6e9d01fdf3be74c3743480ce34899'
+            'SKIP'
             'fd0253879cc5e31857f57307e6105e56493358e35d7c4540e0b476be607ab94e')
 validpgpkeys=('B6C8F98282B944E3B0D5C2530FC3042E345AD05D'  # Hans Wennborg, Google.
               '474E22316ABF4785A88C6E8EA2C794A986419D8A'  # Tom Stellard
@@ -134,8 +135,7 @@ prepare() {
   # Patch llvm
   cd "${srcdir}"/llvm
   apply_patch_with_msg \
-    "0001-Fix-GetHostTriple-for-mingw-w64-in-msys.patch" \
-    "0002-Fix-Findzstd-on-MINGW.patch"
+    "0001-Fix-GetHostTriple-for-mingw-w64-in-msys.patch"
 
   if (( ! _clangprefix )); then
     apply_patch_with_msg \
@@ -156,6 +156,11 @@ prepare() {
 
   # Patch lld
   cd "${srcdir}"/lld
+
+  if (( ! _clangprefix )); then
+    apply_patch_with_msg \
+      "0301-disable-emutls-on-mingw.patch"
+  fi
 
   apply_patch_with_msg \
     "0303-ignore-new-bfd-options.patch"
@@ -248,15 +253,33 @@ build() {
     local _clang_links="clang++;clang-cpp;as;c++;cc;cpp;${MINGW_CHOST}-cc;${MINGW_CHOST}-c++;${MINGW_CHOST}-clang;${MINGW_CHOST}-clang++"
 
     platform_config+=(
+      -DLLVM_INSTALL_BINUTILS_SYMLINKS=ON
+      -DCLANG_LINKS_TO_CREATE="${_clang_links}"
+      -DCLANG_DEFAULT_RTLIB=compiler-rt
+      -DCOMPILER_RT_USE_BUILTINS_LIBRARY=ON
+    )
+  else
+    if [[ $MSYSTEM == MINGW32 ]]; then
+      platform_config+=(
+        -DCLANG_DEFAULT_RTLIB=libgcc
+        -DCOMPILER_RT_USE_BUILTINS_LIBRARY=OFF
+      )
+    else
+      platform_config+=(
+        -DCLANG_DEFAULT_RTLIB=compiler-rt
+        -DCOMPILER_RT_USE_BUILTINS_LIBRARY=ON
+      )
+    fi
+  fi
+
+  if [ "${_compiler}" == "clang" ]; then
+    platform_config+=(
       -DLLVM_ENABLE_LIBCXX=ON
       -DLLVM_ENABLE_LLD=ON
-      -DLLVM_INSTALL_BINUTILS_SYMLINKS=ON
       -DCLANG_DEFAULT_LINKER=lld
-      -DCLANG_DEFAULT_RTLIB=compiler-rt
       -DCLANG_DEFAULT_UNWINDLIB=libunwind
       -DCLANG_DEFAULT_CXX_STDLIB=libc++
-      -DCLANG_LINKS_TO_CREATE="${_clang_links}"
-      -DCOMPILER_RT_USE_BUILTINS_LIBRARY=ON
+      -DCOMPILER_RT_EXCLUDE_ATOMIC_BUILTIN=OFF
     )
   fi
 
@@ -316,7 +339,7 @@ package_clang() {
   url="https://clang.llvm.org/"
   depends=("${MINGW_PACKAGE_PREFIX}-llvm=${pkgver}"
            "${MINGW_PACKAGE_PREFIX}-clang-libs=${pkgver}"
-           $( ((_clangprefix)) && echo \
+           $([[ "$_compiler" == "clang" ]] && echo \
              "${MINGW_PACKAGE_PREFIX}-compiler-rt=${pkgver}" \
              "${MINGW_PACKAGE_PREFIX}-crt" \
              "${MINGW_PACKAGE_PREFIX}-headers" \
@@ -389,7 +412,9 @@ package_clang-tools-extra() {
 package_compiler-rt() {
   pkgdesc="Runtime libraries for Clang and LLVM (mingw-w64)"
   url="https://compiler-rt.llvm.org/"
-  depends=($( (( _clangprefix )) || echo "${MINGW_PACKAGE_PREFIX}-gcc-libs"))
+  depends=($([[ "$_compiler" == "clang" ]] && echo \
+             "${MINGW_PACKAGE_PREFIX}-libc++" \
+             || echo "${MINGW_PACKAGE_PREFIX}-gcc-libs"))
 
   DESTDIR="${pkgdir}" ${MINGW_PREFIX}/bin/cmake --install "${srcdir}"/build-${MSYSTEM}/projects/compiler-rt
   mkdir -p "${pkgdir}"${MINGW_PREFIX}/bin/
@@ -470,6 +495,8 @@ package_llvm() {
 package_llvm-libs() {
   pkgdesc="Low Level Virtual Machine Runtime Libraries (mingw-w64)"
   depends=("${MINGW_PACKAGE_PREFIX}-gcc-libs"
+           $([[ "$_compiler" == "clang" ]] && echo \
+             "${MINGW_PACKAGE_PREFIX}-libc++")
            "${MINGW_PACKAGE_PREFIX}-libffi"
            "${MINGW_PACKAGE_PREFIX}-libxml2"
            "${MINGW_PACKAGE_PREFIX}-zlib"

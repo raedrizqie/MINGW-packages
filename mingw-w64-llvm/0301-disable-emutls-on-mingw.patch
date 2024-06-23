@@ -1,0 +1,11 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -167,6 +167,8 @@ option(LLD_DEFAULT_LD_LLD_IS_MINGW
+     "Use MinGW as the default backend for ld.lld. If OFF, ELF will be used." OFF)
+ if (LLD_DEFAULT_LD_LLD_IS_MINGW)
+   add_definitions("-DLLD_DEFAULT_LD_LLD_IS_MINGW=1")
++  add_compile_options(-fno-emulated-tls)
++  add_link_options(-fno-emulated-tls)
+ endif()
+ 
+ if (MSVC)
