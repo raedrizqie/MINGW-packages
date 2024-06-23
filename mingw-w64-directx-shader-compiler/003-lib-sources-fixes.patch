@@ -1,0 +1,44 @@
+diff --git a/lib/DxcSupport/WinAdapter.cpp b/lib/DxcSupport/WinAdapter.cpp
+index c3aaab88..fb849728 100644
+--- a/lib/DxcSupport/WinAdapter.cpp
++++ b/lib/DxcSupport/WinAdapter.cpp
+@@ -10,7 +10,8 @@
+ #include "assert.h"
+ #include "dxc/Support/WinFunctions.h"
+ #include "dxc/Support/WinIncludes.h"
+-#ifndef _WIN32
++
++#ifndef _MSC_VER
+ 
+ #include "dxc/Support/Unicode.h"
+ 
+@@ -22,6 +23,7 @@ void *CAllocator::Reallocate(void *p, size_t nBytes) throw() {
+ void *CAllocator::Allocate(size_t nBytes) throw() { return malloc(nBytes); }
+ void CAllocator::Free(void *p) throw() { free(p); }
+ 
++#ifndef __MINGW32__
+ //===--------------------------- BSTR Allocation --------------------------===//
+ 
+ void SysFreeString(BSTR bstrString) {
+@@ -60,6 +62,7 @@ unsigned int SysStringLen(const BSTR bstrString) {
+ 
+   return blobIn[0] / sizeof(OLECHAR);
+ }
++#endif // __MINGW32__
+ 
+ //===--------------------------- CHandle -------------------------------===//
+ 
+diff --git a/lib/IR/PassRegistry.cpp b/lib/IR/PassRegistry.cpp
+index b77d2bf3..6b57363a 100644
+--- a/lib/IR/PassRegistry.cpp
++++ b/lib/IR/PassRegistry.cpp
+@@ -35,7 +35,9 @@ using namespace llvm;
+ // A simple global initialized at DllMain-time will do (still does more work
+ // than we should likely perform though).
+ static uint32_t g_PassRegistryTid;
++#ifdef _MSC_VER
+ extern "C" uint32_t __stdcall GetCurrentThreadId(void);
++#endif
+ static void CheckThreadId() {
+   if (g_PassRegistryTid == 0)
+     g_PassRegistryTid = GetCurrentThreadId();
