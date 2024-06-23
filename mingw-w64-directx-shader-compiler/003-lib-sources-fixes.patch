@@ -1,0 +1,151 @@
+diff --git a/lib/DxcSupport/WinAdapter.cpp b/lib/DxcSupport/WinAdapter.cpp
+index c3aaab88..fb849728 100644
+--- a/lib/DxcSupport/WinAdapter.cpp
++++ b/lib/DxcSupport/WinAdapter.cpp
+@@ -10,7 +10,8 @@
+ #include "assert.h"
+ #include "dxc/Support/WinFunctions.h"
+ #include "dxc/Support/WinIncludes.h"
+-#ifndef _WIN32
++
++#ifndef _MSC_VER
+ 
+ #include "dxc/Support/Unicode.h"
+ 
+@@ -22,6 +23,7 @@ void *CAllocator::Reallocate(void *p, size_t nBytes) throw() {
+ void *CAllocator::Allocate(size_t nBytes) throw() { return malloc(nBytes); }
+ void CAllocator::Free(void *p) throw() { free(p); }
+ 
++#ifndef __MINGW32__
+ //===--------------------------- BSTR Allocation --------------------------===//
+ 
+ void SysFreeString(BSTR bstrString) {
+@@ -60,6 +62,7 @@ unsigned int SysStringLen(const BSTR bstrString) {
+ 
+   return blobIn[0] / sizeof(OLECHAR);
+ }
++#endif // __MINGW32__
+ 
+ //===--------------------------- CHandle -------------------------------===//
+ 
+diff --git a/lib/DxilContainer/D3DReflectionStrings.cpp b/lib/DxilContainer/D3DReflectionStrings.cpp
+index 03387b22..5f2707e5 100644
+--- a/lib/DxilContainer/D3DReflectionStrings.cpp
++++ b/lib/DxilContainer/D3DReflectionStrings.cpp
+@@ -626,10 +626,12 @@ LPCSTR ToString(D3D_NAME Name) {
+     return "D3D_NAME_DEPTH_GREATER_EQUAL";
+   case D3D_NAME_DEPTH_LESS_EQUAL:
+     return "D3D_NAME_DEPTH_LESS_EQUAL";
++#ifdef _MSC_VER
+   case D3D_NAME_STENCIL_REF:
+     return "D3D_NAME_STENCIL_REF";
+   case D3D_NAME_INNER_COVERAGE:
+     return "D3D_NAME_INNER_COVERAGE";
++#endif
+   case D3D_NAME_SHADINGRATE:
+     return "D3D_NAME_SHADINGRATE";
+   case D3D_NAME_CULLPRIMITIVE:
+diff --git a/lib/HLSL/DxilContainerReflection.cpp b/lib/HLSL/DxilContainerReflection.cpp
+index bebe018e..6e547f60 100644
+--- a/lib/HLSL/DxilContainerReflection.cpp
++++ b/lib/HLSL/DxilContainerReflection.cpp
+@@ -2134,7 +2134,11 @@ D3D_NAME SemanticToSystemValueType(const Semantic *S,
+   case Semantic::Kind::Coverage:
+     return D3D_NAME_COVERAGE;
+   case Semantic::Kind::InnerCoverage:
++#ifdef _MSC_VER
+     return D3D_NAME_INNER_COVERAGE;
++#else
++    return D3D_NAME_UNDEFINED; // FIXME: missing D3D_NAME_INNER_COVERAGE
++#endif
+   case Semantic::Kind::PrimitiveID:
+     return D3D_NAME_PRIMITIVE_ID;
+   case Semantic::Kind::SampleIndex:
+@@ -2156,7 +2160,11 @@ D3D_NAME SemanticToSystemValueType(const Semantic *S,
+   case Semantic::Kind::DepthGreaterEqual:
+     return D3D_NAME_DEPTH_GREATER_EQUAL;
+   case Semantic::Kind::StencilRef:
++#ifdef _MSC_VER
+     return D3D_NAME_STENCIL_REF;
++#else
++    return D3D_NAME_UNDEFINED; // FIXME: missing D3D_NAME_STENCIL_REF
++#endif
+   case Semantic::Kind::TessFactor: {
+     switch (domain) {
+     case DXIL::TessellatorDomain::IsoLine:
+diff --git a/lib/IR/PassRegistry.cpp b/lib/IR/PassRegistry.cpp
+index b77d2bf3..6b57363a 100644
+--- a/lib/IR/PassRegistry.cpp
++++ b/lib/IR/PassRegistry.cpp
+@@ -35,7 +35,9 @@ using namespace llvm;
+ // A simple global initialized at DllMain-time will do (still does more work
+ // than we should likely perform though).
+ static uint32_t g_PassRegistryTid;
++#ifdef _MSC_VER
+ extern "C" uint32_t __stdcall GetCurrentThreadId(void);
++#endif
+ static void CheckThreadId() {
+   if (g_PassRegistryTid == 0)
+     g_PassRegistryTid = GetCurrentThreadId();
+diff --git a/lib/Support/Atomic.cpp b/lib/Support/Atomic.cpp
+index 837a3260..95ebf527 100644
+--- a/lib/Support/Atomic.cpp
++++ b/lib/Support/Atomic.cpp
+@@ -32,7 +32,7 @@ void sys::MemoryFence() {
+ #else
+ #  if defined(GNU_ATOMICS)
+   __sync_synchronize();
+-#  elif defined(_MSC_VER)
++#  elif defined(_WIN32)
+   MemoryBarrier();
+ #  else
+ # error No memory fence implementation for your platform!
+@@ -50,7 +50,7 @@ sys::cas_flag sys::CompareAndSwap(volatile sys::cas_flag* ptr,
+   return result;
+ #elif defined(GNU_ATOMICS)
+   return __sync_val_compare_and_swap(ptr, old_value, new_value);
+-#elif defined(_MSC_VER)
++#elif defined(_WIN32)
+   return InterlockedCompareExchange(ptr, new_value, old_value);
+ #else
+ #  error No compare-and-swap implementation for your platform!
+@@ -63,7 +63,7 @@ sys::cas_flag sys::AtomicIncrement(volatile sys::cas_flag* ptr) {
+   return *ptr;
+ #elif defined(GNU_ATOMICS)
+   return __sync_add_and_fetch(ptr, 1);
+-#elif defined(_MSC_VER)
++#elif defined(_WIN32)
+   return InterlockedIncrement(ptr);
+ #else
+ #  error No atomic increment implementation for your platform!
+@@ -76,7 +76,7 @@ sys::cas_flag sys::AtomicDecrement(volatile sys::cas_flag* ptr) {
+   return *ptr;
+ #elif defined(GNU_ATOMICS)
+   return __sync_sub_and_fetch(ptr, 1);
+-#elif defined(_MSC_VER)
++#elif defined(_WIN32)
+   return InterlockedDecrement(ptr);
+ #else
+ #  error No atomic decrement implementation for your platform!
+@@ -89,7 +89,7 @@ sys::cas_flag sys::AtomicAdd(volatile sys::cas_flag* ptr, sys::cas_flag val) {
+   return *ptr;
+ #elif defined(GNU_ATOMICS)
+   return __sync_add_and_fetch(ptr, val);
+-#elif defined(_MSC_VER)
++#elif defined(_WIN32)
+   return InterlockedExchangeAdd(ptr, val) + val;
+ #else
+ #  error No atomic add implementation for your platform!
+diff --git a/lib/Support/assert.cpp b/lib/Support/assert.cpp
+index 10094205..9f7bb2e0 100644
+--- a/lib/Support/assert.cpp
++++ b/lib/Support/assert.cpp
+@@ -9,7 +9,7 @@
+ 
+ #include "assert.h"
+ 
+-#ifdef _WIN32
++#ifdef _MSC_VER
+ 
+ #include "dxc/Support/Global.h"
+ #include "windows.h"

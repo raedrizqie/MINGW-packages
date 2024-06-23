@@ -1,0 +1,32 @@
+diff --git a/include/llvm/Object/COFF.h b/include/llvm/Object/COFF.h
+index 025a9dbc..3c867a16 100644
+--- a/include/llvm/Object/COFF.h
++++ b/include/llvm/Object/COFF.h
+@@ -14,6 +14,11 @@
+ #ifndef LLVM_OBJECT_COFF_H
+ #define LLVM_OBJECT_COFF_H
+ 
++// Prevent inclusion of winnt.h
++#ifdef _WINNT_
++#undef _WINNT_
++#endif
++
+ #include "llvm/ADT/PointerUnion.h"
+ #include "llvm/Object/ObjectFile.h"
+ #include "llvm/Support/COFF.h"
+diff --git a/include/llvm/Support/DataTypes.h.in b/include/llvm/Support/DataTypes.h.in
+index b8b2ba56..39fff62a 100644
+--- a/include/llvm/Support/DataTypes.h.in
++++ b/include/llvm/Support/DataTypes.h.in
+@@ -78,6 +78,11 @@ typedef u_int64_t uint64_t;
+ #endif
+ #endif
+ 
++// Prevent inclusion of winnt.h
++#ifdef _WINNT_
++#undef _WINNT_
++#endif
++
+ #else /* _MSC_VER */
+ #include <stdlib.h>
+ #include <stddef.h>
