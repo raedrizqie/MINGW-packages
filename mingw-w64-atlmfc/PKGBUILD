@@ -1,0 +1,90 @@
+# Contributor: Raed Rizqie <raed.rizqie@gmail.com>
+
+_realname=atlmfc
+pkgbase=mingw-w64-${_realname}
+pkgname="${MINGW_PACKAGE_PREFIX}-${_realname}"
+pkgver=10.00.40219
+pkgrel=1
+pkgdesc='Microsoft Active Template Library / Microsoft Foundation Classes C++ (Unicode) library (mingw-w64)'
+url='https://www.microsoft.com/'
+license=('spdx:MS-PL')
+arch=('any')
+mingw_arch=('ucrt64' 'clang64')
+makedepends=("${MINGW_PACKAGE_PREFIX}-clang"
+             "${MINGW_PACKAGE_PREFIX}-cc"
+             "${MINGW_PACKAGE_PREFIX}-lld"
+             "${MINGW_PACKAGE_PREFIX}-uasm"
+             "${MINGW_PACKAGE_PREFIX}-compiler-rt"
+             "${MINGW_PACKAGE_PREFIX}-libc++"
+             "git")
+depends=("${MINGW_PACKAGE_PREFIX}-libc++")
+_commit="c06a69f615000e4b8c39bde71a54fe3c2adaf1b7"
+source=("${_realname}::git+https://github.com/adzm/atlmfc.git#commit=${_commit}"
+        001-atlmfc-10-headers.patch
+        002-atlmfc-10-atl.patch
+        003-atlmfc-10-mfc.patch
+        004-atlmfc-10-mfcm.patch
+        005-fix-resource-file.patch
+        Makefile)
+sha256sums=('SKIP'
+            'SKIP'
+            'SKIP'
+            'SKIP'
+            'SKIP'
+            'SKIP'
+            'SKIP')
+
+apply_patch_with_msg() {
+  for _patch in "$@"
+  do
+    msg2 "Applying ${_patch}"
+    patch -p1 -i "${srcdir}/${_patch}"
+  done
+}
+
+prepare() {
+  cd ${_realname}
+
+  # windres cannot handle UTF-16 file encoding
+  dos2unix include/*.rc
+  dos2unix src/mfc/*.rc
+
+  apply_patch_with_msg \
+    001-atlmfc-10-headers.patch \
+    002-atlmfc-10-atl.patch \
+    003-atlmfc-10-mfc.patch \
+    004-atlmfc-10-mfcm.patch \
+    005-fix-resource-file.patch
+
+  cp -f ../Makefile src
+}
+
+build() {
+  cd ${_realname}/src
+
+  # build options:
+  #   DEBUG=1   default: none (release build)
+  #   X86=1     default: none (build for X64)
+  #   MBCS=1    default: none (unicode build)
+  #   MFCENU=1  default: none (build english resources dll)
+
+  if [[ ${MSYSTEM} == CLANG* ]]; then
+    CRTLIBS+=" -lucrt"
+  else
+    CRTLIBS+=" -lmsvcrt -lucrt -lucrtbase"
+  fi
+
+  make MFCENU=1
+}
+
+package() {
+  cd ${_realname}/src
+
+  install -Dm755 libmfc100u.dll        ${pkgdir}${MINGW_PREFIX}/bin/libmfc100u.dll
+
+  install -d ${pkgdir}${MINGW_PREFIX}/include/atlmfc
+  install -Dm644 ../include/*.{h,inl}  ${pkgdir}${MINGW_PREFIX}/include/atlmfc
+
+  install -Dm755 libatls.a             ${pkgdir}${MINGW_PREFIX}/lib/libatls.a
+  install -Dm755 libmfc100u.dll.a      ${pkgdir}${MINGW_PREFIX}/lib/libmfc100u.dll.a
+}

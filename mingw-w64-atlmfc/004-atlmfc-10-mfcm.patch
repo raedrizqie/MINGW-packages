@@ -1,0 +1,49 @@
+diff --git a/src/mfcm/postdllmain.cpp b/src/mfcm/postdllmain.cpp
+index 46b25e8..51c0602 100644
+--- a/src/mfcm/postdllmain.cpp
++++ b/src/mfcm/postdllmain.cpp
+@@ -41,8 +41,8 @@ __declspec(dllimport) BOOL AFXAPI AfxIsModuleDll();
+ __declspec(dllimport) BOOL AFXAPI AfxInitCurrentStateApp();
+ 
+ extern "C"
++BOOL WINAPI InternalDllMain(HINSTANCE hInstance, unsigned int dwReason, void *lpReserved)
+ {
+-	BOOL WINAPI InternalDllMain(HINSTANCE hInstance, unsigned int dwReason, void *lpReserved);
+ }
+ 
+ __declspec(dllimport) HINSTANCE AFXAPI AfxGetInstanceHandleHelper();
+diff --git a/src/mfcm/stdafx.h b/src/mfcm/stdafx.h
+index eec8454..efbfdba 100644
+--- a/src/mfcm/stdafx.h
++++ b/src/mfcm/stdafx.h
+@@ -13,12 +13,17 @@
+ 
+ #pragma once
+ 
++#ifdef _MSC_VER
+ #include <winsdkver.h>
+ 
+ #undef _WIN32_WINNT
+ #define _WIN32_WINNT _WIN32_WINNT_MAXVER
+ 
+ #include <sdkddkver.h>
++#else
++#undef _WIN32_WINNT
++#define _WIN32_WINNT 0x0601
++#endif
+ 
+ #ifndef VC_EXTRALEAN
+ #define VC_EXTRALEAN		// Exclude rarely-used stuff from Windows headers
+diff --git a/src/mfcm/wfrmsite.cpp b/src/mfcm/wfrmsite.cpp
+index 68cd4f8..05723cf 100644
+--- a/src/mfcm/wfrmsite.cpp
++++ b/src/mfcm/wfrmsite.cpp
+@@ -30,7 +30,7 @@ HRESULT CWinFormsControlSite::DoVerb(LONG nVerb, LPMSG lpMsg)
+ 			get_Control()->Visible = false;
+ 			break;
+ 		default:
+-			hr=__super::DoVerb(nVerb, lpMsg);
++			hr=CWinFormsControlSite::DoVerb(nVerb, lpMsg);
+ 	} //End switch
+ 	return hr;
+ }

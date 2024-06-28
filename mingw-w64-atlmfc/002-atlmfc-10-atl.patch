@@ -1,0 +1,164 @@
+diff --git a/src/atl/atls/ATLComTime.cpp b/src/atl/atls/ATLComTime.cpp
+index 3287f7b..6128d0a 100644
+--- a/src/atl/atls/ATLComTime.cpp
++++ b/src/atl/atls/ATLComTime.cpp
+@@ -20,7 +20,7 @@
+ namespace ATL
+ {
+ 
+-bool CTime::GetAsDBTIMESTAMP(_Out_ DBTIMESTAMP& dbts) const
++bool CTime::GetAsDBTIMESTAMP(_Out_ DBTIMESTAMP& dbts) const throw()
+ {
+ 	struct tm tmLocal;
+ 	GetLocalTm(&tmLocal);
+diff --git a/src/atl/atls/AtlTraceModuleManager.cpp b/src/atl/atls/AtlTraceModuleManager.cpp
+index 1aa8ae2..1e864d4 100644
+--- a/src/atl/atls/AtlTraceModuleManager.cpp
++++ b/src/atl/atls/AtlTraceModuleManager.cpp
+@@ -68,7 +68,7 @@ CAtlTraceModule::CAtlTraceModule() :
+ void CAtlTraceModule::CrtDbgReport(
+ 	_In_opt_ CAtlTraceModule::fnCrtDbgReport_t pfnCrtDbgReport)
+ {
+-#ifdef _DEBUG
++#if defined(_DEBUG) && !defined(_ATL_NO_DEBUG_CRT)
+ 	m_pfnCrtDbgReport = pfnCrtDbgReport ? pfnCrtDbgReport : _CrtDbgReport;
+ #else
+ 	m_pfnCrtDbgReport = pfnCrtDbgReport ? pfnCrtDbgReport : NULL;
+diff --git a/src/atl/atls/LoadNSave.cpp b/src/atl/atls/LoadNSave.cpp
+index 0468049..20bd673 100644
+--- a/src/atl/atls/LoadNSave.cpp
++++ b/src/atl/atls/LoadNSave.cpp
+@@ -102,7 +102,7 @@ BOOL __stdcall AtlTraceLoadSettingsA(
+ 			CAtlTraceProcess *pProcess;
+ 			CAtlTraceModule *pModule;
+ 			CAtlTraceCategory *pCategory;
+-			CHAR *pszProcess = "Process";
++			CHAR *pszProcess = (CHAR*)"Process";
+ 			CHAR cEnabled, cFuncAndCategoryNames, cFileNameAndLineInfo;
+ 			CAtlAllocator *pAllocator = &g_Allocator;
+ 
+diff --git a/src/atl/atls/amd64/atlthunk.cpp b/src/atl/atls/amd64/atlthunk.cpp
+index cf0ba0f..6ce8fd0 100644
+--- a/src/atl/atls/amd64/atlthunk.cpp
++++ b/src/atl/atls/amd64/atlthunk.cpp
+@@ -9,6 +9,7 @@
+ // Active Template Library product.
+ 
+ #include <windows.h>
++#include <atldef.h>
+ #include <atlstdthunk.h>
+ 
+ using namespace ATL;
+diff --git a/src/atl/atls/atlfuncs.cpp b/src/atl/atls/atlfuncs.cpp
+index fbd9aea..d2c6403 100644
+--- a/src/atl/atls/atlfuncs.cpp
++++ b/src/atl/atls/atlfuncs.cpp
+@@ -27,6 +27,7 @@ namespace  ATL
+ 
+ #ifdef _M_IX86
+ extern "C"
++#ifdef _MSC_VER
+ void __declspec(naked) __stdcall CComStdCallThunkHelper()
+ {
+ 	__asm
+@@ -37,6 +38,18 @@ void __declspec(naked) __stdcall CComStdCallThunkHelper()
+ 		mov eax, [eax+8];	// get pThunk->pfn
+ 		jmp eax;			// jump pfn
+ 	};
++#else
++void __attribute__((naked)) __stdcall CComStdCallThunkHelper()
++{
++	__asm
++	(
++		"mov 0x4(%esp), %eax;"
++		"mov 0x4(%eax), %edx;"
++		"mov %edx, 0x4(%esp);"
++		"mov 0x8(%eax), %eax;"
++		"jmp *%eax;"
++	);
++#endif
+ }
+ 
+ #endif
+diff --git a/src/atl/atls/atltrace.cpp b/src/atl/atls/atltrace.cpp
+index 4c69819..52cb92d 100644
+--- a/src/atl/atls/atltrace.cpp
++++ b/src/atl/atls/atltrace.cpp
+@@ -19,35 +19,35 @@ namespace ATL
+ 
+ #ifdef _DEBUG
+ 
+-CTraceCategory atlTraceGeneral("atlTraceGeneral");
+-CTraceCategory atlTraceCOM("atlTraceCOM");  
+-CTraceCategory atlTraceQI("atlTraceQI");	
+-CTraceCategory atlTraceRegistrar("atlTraceRegistrar");
+-CTraceCategory atlTraceRefcount("atlTraceRefcount");
+-CTraceCategory atlTraceWindowing("atlTraceWindowing");
+-CTraceCategory atlTraceControls("atlTraceControls");
+-CTraceCategory atlTraceHosting("atlTraceHosting"); 
+-CTraceCategory atlTraceDBClient("atlTraceDBClient");  
+-CTraceCategory atlTraceDBProvider("atlTraceDBProvider");
+-CTraceCategory atlTraceSnapin("atlTraceSnapin");
+-CTraceCategory atlTraceNotImpl("atlTraceNotImpl");   
+-CTraceCategory atlTraceAllocation("atlTraceAllocation");
+-CTraceCategory atlTraceException("atlTraceException");
+-CTraceCategory atlTraceTime("atlTraceTime");
+-CTraceCategory atlTraceCache("atlTraceCache");
+-CTraceCategory atlTraceStencil("atlTraceStencil");
+-CTraceCategory atlTraceString("atlTraceString");
+-CTraceCategory atlTraceMap("atlTraceMap");	
+-CTraceCategory atlTraceUtil("atlTraceUtil");		
+-CTraceCategory atlTraceSecurity("atlTraceSecurity");
+-CTraceCategory atlTraceSync("atlTraceSync");
+-CTraceCategory atlTraceISAPI("atlTraceISAPI");		
++CTraceCategory atlTraceGeneral(L"atlTraceGeneral");
++CTraceCategory atlTraceCOM(L"atlTraceCOM");  
++CTraceCategory atlTraceQI(L"atlTraceQI");	
++CTraceCategory atlTraceRegistrar(L"atlTraceRegistrar");
++CTraceCategory atlTraceRefcount(L"atlTraceRefcount");
++CTraceCategory atlTraceWindowing(L"atlTraceWindowing");
++CTraceCategory atlTraceControls(L"atlTraceControls");
++CTraceCategory atlTraceHosting(L"atlTraceHosting"); 
++CTraceCategory atlTraceDBClient(L"atlTraceDBClient");  
++CTraceCategory atlTraceDBProvider(L"atlTraceDBProvider");
++CTraceCategory atlTraceSnapin(L"atlTraceSnapin");
++CTraceCategory atlTraceNotImpl(L"atlTraceNotImpl");   
++CTraceCategory atlTraceAllocation(L"atlTraceAllocation");
++CTraceCategory atlTraceException(L"atlTraceException");
++CTraceCategory atlTraceTime(L"atlTraceTime");
++CTraceCategory atlTraceCache(L"atlTraceCache");
++CTraceCategory atlTraceStencil(L"atlTraceStencil");
++CTraceCategory atlTraceString(L"atlTraceString");
++CTraceCategory atlTraceMap(L"atlTraceMap");	
++CTraceCategory atlTraceUtil(L"atlTraceUtil");		
++CTraceCategory atlTraceSecurity(L"atlTraceSecurity");
++CTraceCategory atlTraceSync(L"atlTraceSync");
++CTraceCategory atlTraceISAPI(L"atlTraceISAPI");		
+ 
+ #pragma warning( disable: 4995 )  // Ignore #pragma deprecated warnings
+-CTraceCategory atlTraceUser("atlTraceUser");		
+-CTraceCategory atlTraceUser2("atlTraceUser2");		
+-CTraceCategory atlTraceUser3("atlTraceUser3");		
+-CTraceCategory atlTraceUser4("atlTraceUser4");		
++CTraceCategory atlTraceUser(L"atlTraceUser");		
++CTraceCategory atlTraceUser2(L"atlTraceUser2");		
++CTraceCategory atlTraceUser3(L"atlTraceUser3");		
++CTraceCategory atlTraceUser4(L"atlTraceUser4");		
+ 
+ #endif
+ 
+diff --git a/src/atl/atls/stdafx.h b/src/atl/atls/stdafx.h
+index a61ed24..596bc22 100644
+--- a/src/atl/atls/stdafx.h
++++ b/src/atl/atls/stdafx.h
+@@ -9,7 +9,10 @@
+ // Active Template Library product.
+ 
+ #define _ATL_STATIC_LIB_IMPL
++
++#if defined(_DEBUG) && defined(_ATL_DEBUG_QI)
+ #define _ATL_DEBUG_INTERFACES
++#endif
+ 
+ #include <atlbase.h>
+ #include <atlcom.h>
