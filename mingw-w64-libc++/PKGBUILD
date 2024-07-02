@@ -25,6 +25,7 @@ makedepends=("${MINGW_PACKAGE_PREFIX}-clang"
              "${MINGW_PACKAGE_PREFIX}-cmake"
              "${MINGW_PACKAGE_PREFIX}-ninja"
              "${MINGW_PACKAGE_PREFIX}-lld"
+             "${MINGW_PACKAGE_PREFIX}-libunwind"
              "${MINGW_PACKAGE_PREFIX}-compiler-rt"
              "${MINGW_PACKAGE_PREFIX}-python")
 _url=https://github.com/llvm/llvm-project/releases/download/${_tag}
@@ -83,7 +84,7 @@ prepare() {
     003-libcxxabi-builtin-compiler-rt.patch
 
   if [[ ${MSYSTEM} == MINGW32 ]]; then
-    sed -e 's|-rtlib=compiler-rt|-rtlib=libgcc|g' -i libunwind/CMakeLists.txt
+    sed -e 's|-rtlib=compiler-rt|-rtlib=libgcc|g' -i ${srcdir}/libunwind/CMakeLists.txt
   fi
 }
 
