@@ -1,0 +1,38 @@
+--- a/Source/WTF/wtf/StdLibExtras.h	2020-03-05 01:16:37.000000000 +0800
++++ b/Source/WTF/wtf/StdLibExtras.h	2024-07-23 09:05:53.670175400 +0800
+@@ -292,7 +292,7 @@
+ // This adds various C++14 features for versions of the STL that may not yet have them.
+ namespace std {
+ // MSVC 2013 supports std::make_unique already.
+-#if !defined(_MSC_VER) || _MSC_VER < 1800
++#if (!defined(_MSC_VER) || _MSC_VER < 1800) && !defined(__MINGW32__)
+ template<class T> struct _Unique_if {
+     typedef unique_ptr<T> _Single_object;
+ };
+@@ -323,7 +323,7 @@
+ #endif
+ 
+ // MSVC 2015 supports these functions.
+-#if !COMPILER(MSVC) || _MSC_VER < 1900
++#if (!defined(_MSC_VER) || _MSC_VER < 1900) && !defined(__MINGW32__)
+ // Compile-time integer sequences
+ // http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2013/n3658.html
+ // (Note that we only implement index_sequence, and not the more generic integer_sequence).
+@@ -354,7 +354,7 @@
+ }
+ #endif
+ 
+-#if COMPILER_SUPPORTS(CXX_USER_LITERALS)
++#if COMPILER_SUPPORTS(CXX_USER_LITERALS) && !defined(__MINGW32__)
+ // These literals are available in C++14, so once we require C++14 compilers we can get rid of them here.
+ // (User-literals need to have a leading underscore so we add it here - the "real" literals don't have underscores).
+ namespace literals {
+@@ -399,7 +399,7 @@
+ using WTF::bitwise_cast;
+ using WTF::safeCast;
+ 
+-#if COMPILER_SUPPORTS(CXX_USER_LITERALS)
++#if COMPILER_SUPPORTS(CXX_USER_LITERALS) && !defined(__MINGW32__)
+ // We normally don't want to bring in entire std namespaces, but literals are an exception.
+ using namespace std::literals::chrono_literals;
+ #endif
