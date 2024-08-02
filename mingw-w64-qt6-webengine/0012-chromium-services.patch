@@ -23,7 +23,7 @@ index 8971001..0d40c27 100644
  #include "base/strings/utf_string_conversions.h"
  #include "third_party/abseil-cpp/absl/types/optional.h"
  
-+#include <winreg.h> // for HKEY_CURRENT_USER
++//#include <winreg.h> // for HKEY_CURRENT_USER
 +
  namespace {
  // The full specification of the registry is located over here
