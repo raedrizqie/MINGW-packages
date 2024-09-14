@@ -1,0 +1,816 @@
+diff --git a/src/3rdparty/chromium/third_party/abseil-cpp/absl/base/BUILD.gn b/src/3rdparty/chromium/third_party/abseil-cpp/absl/base/BUILD.gn
+index 0a7a1b4..039d95f 100644
+--- a/src/3rdparty/chromium/third_party/abseil-cpp/absl/base/BUILD.gn
++++ b/src/3rdparty/chromium/third_party/abseil-cpp/absl/base/BUILD.gn
+@@ -194,6 +194,9 @@ absl_source_set("base") {
+     ":spinlock_wait",
+     "//third_party/abseil-cpp/absl/meta:type_traits",
+   ]
++  if (is_mingw) {
++    libs = [ ":libpthread.a" ]
++  }
+ }
+ 
+ # This should be an executable() more than a test.
+diff --git a/src/3rdparty/chromium/third_party/abseil-cpp/absl/base/internal/thread_identity.h b/src/3rdparty/chromium/third_party/abseil-cpp/absl/base/internal/thread_identity.h
+index f6196ec..86d2afe 100644
+--- a/src/3rdparty/chromium/third_party/abseil-cpp/absl/base/internal/thread_identity.h
++++ b/src/3rdparty/chromium/third_party/abseil-cpp/absl/base/internal/thread_identity.h
+@@ -20,7 +20,7 @@
+ #ifndef ABSL_BASE_INTERNAL_THREAD_IDENTITY_H_
+ #define ABSL_BASE_INTERNAL_THREAD_IDENTITY_H_
+ 
+-#ifndef _WIN32
++#ifndef _MSC_VER
+ #include <pthread.h>
+ // Defines __GOOGLE_GRTE_VERSION__ (via glibc-specific features.h) when
+ // supported.
+diff --git a/src/3rdparty/chromium/third_party/boringssl/BUILD.gn b/src/3rdparty/chromium/third_party/boringssl/BUILD.gn
+index b517102..d3531e5 100644
+--- a/src/3rdparty/chromium/third_party/boringssl/BUILD.gn
++++ b/src/3rdparty/chromium/third_party/boringssl/BUILD.gn
+@@ -102,7 +102,7 @@ if (enable_rust) {
+   }
+ }
+ 
+-if (is_msan || (is_msvc && current_cpu == "arm64" && !is_clang)) {
++if (is_msan || is_mingw || (is_msvc && current_cpu == "arm64" && !is_clang)) {
+   # MSan instrumentation is incompatible with assembly optimizations.
+   # BoringSSL's GAS-compatible assembly knows how to detect MSan, but the NASM
+   # assembly does not, so we check for MSan explicitly.
+@@ -114,7 +114,7 @@ if (is_msan || (is_msvc && current_cpu == "arm64" && !is_clang)) {
+     visibility = [ ":*" ]
+     testonly = true
+   }
+-} else if (is_win && (current_cpu == "x86" || current_cpu == "x64")) {
++} else if (is_msvc && (current_cpu == "x86" || current_cpu == "x64")) {
+   # Windows' x86 and x86_64 assembly is built with NASM.
+   import("//third_party/nasm/nasm_assemble.gni")
+   nasm_assemble("boringssl_asm") {
+diff --git a/src/3rdparty/chromium/third_party/boringssl/src/include/openssl/base.h b/src/3rdparty/chromium/third_party/boringssl/src/include/openssl/base.h
+index fa42e97..3fba90a 100644
+--- a/src/3rdparty/chromium/third_party/boringssl/src/include/openssl/base.h
++++ b/src/3rdparty/chromium/third_party/boringssl/src/include/openssl/base.h
+@@ -64,6 +64,7 @@
+ #if defined(__MINGW32__)
+ // stdio.h is needed on MinGW for __MINGW_PRINTF_FORMAT.
+ #include <stdio.h>
++#undef X509_NAME
+ #endif
+ 
+ #if defined(__APPLE__)
+diff --git a/src/3rdparty/chromium/third_party/ced/BUILD.gn b/src/3rdparty/chromium/third_party/ced/BUILD.gn
+index bf1d7ad..990784f 100644
+--- a/src/3rdparty/chromium/third_party/ced/BUILD.gn
++++ b/src/3rdparty/chromium/third_party/ced/BUILD.gn
+@@ -51,7 +51,7 @@ static_library("ced") {
+ 
+   public_configs = [ ":ced_config" ]
+ 
+-  if (is_win) {
++  if (is_msvc) {
+     defines = [ "COMPILER_MSVC" ]
+     cflags = [
+       "/wd4005",  # Macro defined twice.
+@@ -76,7 +76,7 @@ test("ced_unittests") {
+ 
+   configs += [ ":ced_config_private" ]
+ 
+-  if (is_win) {
++  if (is_msvc) {
+     defines = [ "COMPILER_MSVC" ]
+     cflags = [
+       "/wd4310",  # Truncation of constant value.
+diff --git a/src/3rdparty/chromium/third_party/cpuinfo/BUILD.gn b/src/3rdparty/chromium/third_party/cpuinfo/BUILD.gn
+index 0730ae9..d66eb7c 100644
+--- a/src/3rdparty/chromium/third_party/cpuinfo/BUILD.gn
++++ b/src/3rdparty/chromium/third_party/cpuinfo/BUILD.gn
+@@ -11,7 +11,7 @@ config("cpuinfo_include") {
+ }
+ 
+ config("cpuinfo_config") {
+-  if (is_clang || !is_win) {
++  if (is_clang || !is_msvc) {
+   cflags = [
+     # For chipset.c and utils.h.
+     "-Wno-implicit-function-declaration",
+@@ -50,6 +50,9 @@ source_set("cpuinfo") {
+     ":os_specific",
+   ]
+ 
++  if (is_mingw) {
++    configs -= [ "//build/config/win:nominmax" ]
++  }
+   configs -= [
+     "//build/config/compiler:chromium_code",
+     "//build/config/sanitizers:default_sanitizer_flags",
+diff --git a/src/3rdparty/chromium/third_party/cpuinfo/src/src/x86/windows/init.c b/src/3rdparty/chromium/third_party/cpuinfo/src/src/x86/windows/init.c
+index d233280..3c4d776 100644
+--- a/src/3rdparty/chromium/third_party/cpuinfo/src/src/x86/windows/init.c
++++ b/src/3rdparty/chromium/third_party/cpuinfo/src/src/x86/windows/init.c
+@@ -16,12 +16,21 @@
+ #define CPUINFO_ALLOCA _alloca
+ #endif
+ 
++#ifndef _WIN32
++#define max(a,b)             \
++({                           \
++    __typeof__ (a) _a = (a); \
++    __typeof__ (b) _b = (b); \
++    _a > _b ? _a : _b;       \
++})
++#endif
++
+ static inline uint32_t bit_mask(uint32_t bits) {
+ 	return (UINT32_C(1) << bits) - UINT32_C(1);
+ }
+ 
+ static inline uint32_t low_index_from_kaffinity(KAFFINITY kaffinity) {
+-#if defined(_M_X64) || defined(_M_AMD64)
++#if defined(_M_X64) || defined(_M_AMD64) || defined(__x86_64__)
+ 	unsigned long index;
+ 	_BitScanForward64(&index, (unsigned __int64)kaffinity);
+ 	return (uint32_t)index;
+diff --git a/src/3rdparty/chromium/third_party/crc32c/BUILD.gn b/src/3rdparty/chromium/third_party/crc32c/BUILD.gn
+index 1ff0f72..d27d29a 100644
+--- a/src/3rdparty/chromium/third_party/crc32c/BUILD.gn
++++ b/src/3rdparty/chromium/third_party/crc32c/BUILD.gn
+@@ -33,7 +33,7 @@ config("crc32c_config") {
+       "HAVE_SSE42=0",
+     ]
+   }
+-  if (is_clang || !is_win) {
++  if (is_clang || !is_msvc) {
+     defines += [ "HAVE_BUILTIN_PREFETCH=1" ]
+   } else {
+     defines += [ "HAVE_BUILTIN_PREFETCH=0" ]
+@@ -85,7 +85,7 @@ source_set("crc32c_sse42") {
+ 
+   configs += [ ":crc32c_config" ]
+   if (current_cpu == "x86" || current_cpu == "x64") {
+-    if (is_win && !is_clang) {
++    if (is_msvc && !is_clang) {
+       cflags = [ "/arch:AVX" ]
+     } else {
+       cflags = [ "-msse4.2" ]
+diff --git a/src/3rdparty/chromium/third_party/dav1d/BUILD.gn b/src/3rdparty/chromium/third_party/dav1d/BUILD.gn
+index 8c8e6b3..49cf99f 100644
+--- a/src/3rdparty/chromium/third_party/dav1d/BUILD.gn
++++ b/src/3rdparty/chromium/third_party/dav1d/BUILD.gn
+@@ -78,7 +78,7 @@ config("dav1d_config") {
+     "libdav1d/include/dav1d",
+     platform_config_root,
+   ]
+-  if (is_win && !is_clang) {
++  if (is_msvc && !is_clang) {
+     include_dirs += [ "libdav1d/include/compat/msvc" ]
+   }
+ }
+@@ -88,7 +88,7 @@ dav1d_copts = [
+   "-D_POSIX_C_SOURCE=200112L",
+ ]
+ 
+-if (is_win) {
++if (is_msvc) {
+   if (!is_clang) {
+     dav1d_copts += [ "/wd4028" ]
+   }
+@@ -97,7 +97,7 @@ if (is_win) {
+   if (is_mac || is_ios) {
+     dav1d_copts += [ "-D_DARWIN_C_SOURCE" ]
+   }
+-  if (is_linux || is_chromeos || is_android || current_os == "aix") {
++  if (is_linux || is_chromeos || is_android || is_mingw || current_os == "aix") {
+     if (!is_clang) {
+       dav1d_copts += [ "-D_GNU_SOURCE" ]
+     }
+@@ -105,7 +105,7 @@ if (is_win) {
+ }
+ 
+ if (is_clang && (current_cpu == "arm" || current_cpu == "arm64")) {
+-  if (is_win) {
++  if (is_msvc) {
+     dav1d_copts += [ "/clang:-fno-align-functions" ]
+   } else {
+     dav1d_copts += [ "-fno-align-functions" ]
+diff --git a/src/3rdparty/chromium/third_party/dav1d/config/win/arm64/config.h b/src/3rdparty/chromium/third_party/dav1d/config/win/arm64/config.h
+index 04bbe46..3718483 100644
+--- a/src/3rdparty/chromium/third_party/dav1d/config/win/arm64/config.h
++++ b/src/3rdparty/chromium/third_party/dav1d/config/win/arm64/config.h
+@@ -63,6 +63,6 @@
+ 
+ #define __USE_MINGW_ANSI_STDIO 1
+ 
+-#define fseeko _fseeki64
++// #define fseeko _fseeki64
+ 
+-#define ftello _ftelli64
++// #define ftello _ftelli64
+diff --git a/src/3rdparty/chromium/third_party/dav1d/config/win/x64/config.h b/src/3rdparty/chromium/third_party/dav1d/config/win/x64/config.h
+index 7851543..0447304 100644
+--- a/src/3rdparty/chromium/third_party/dav1d/config/win/x64/config.h
++++ b/src/3rdparty/chromium/third_party/dav1d/config/win/x64/config.h
+@@ -59,6 +59,6 @@
+ 
+ #define __USE_MINGW_ANSI_STDIO 1
+ 
+-#define fseeko _fseeki64
++// #define fseeko _fseeki64
+ 
+-#define ftello _ftelli64
++// #define ftello _ftelli64
+diff --git a/src/3rdparty/chromium/third_party/dav1d/config/win/x86/config.h b/src/3rdparty/chromium/third_party/dav1d/config/win/x86/config.h
+index 43c446c..d44fd13 100644
+--- a/src/3rdparty/chromium/third_party/dav1d/config/win/x86/config.h
++++ b/src/3rdparty/chromium/third_party/dav1d/config/win/x86/config.h
+@@ -61,6 +61,6 @@
+ 
+ #define __USE_MINGW_ANSI_STDIO 1
+ 
+-#define fseeko _fseeki64
++// #define fseeko _fseeki64
+ 
+-#define ftello _ftelli64
++// #define ftello _ftelli64
+diff --git a/src/3rdparty/chromium/third_party/dawn/src/dawn/common/BUILD.gn b/src/3rdparty/chromium/third_party/dawn/src/dawn/common/BUILD.gn
+index 63d20a8..76dd057 100644
+--- a/src/3rdparty/chromium/third_party/dawn/src/dawn/common/BUILD.gn
++++ b/src/3rdparty/chromium/third_party/dawn/src/dawn/common/BUILD.gn
+@@ -160,7 +160,7 @@ config("internal_config") {
+       "-Wunused-macros",
+     ]
+ 
+-    if (is_win) {
++    if (is_msvc) {
+       cflags += [
+         # clang-cl doesn't know -pedantic, pass it explicitly to the clang driver
+         "/clang:-pedantic",
+@@ -173,7 +173,7 @@ config("internal_config") {
+     }
+   }
+ 
+-  if (!is_clang && is_win) {
++  if (!is_clang && is_msvc) {
+     # Dawn extends wgpu enums with internal enums.
+     # MSVC considers these invalid switch values. crbug.com/dawn/397.
+     cflags += [ "/wd4063" ]
+diff --git a/src/3rdparty/chromium/third_party/flac/BUILD.gn b/src/3rdparty/chromium/third_party/flac/BUILD.gn
+index 330dada..26d4443 100644
+--- a/src/3rdparty/chromium/third_party/flac/BUILD.gn
++++ b/src/3rdparty/chromium/third_party/flac/BUILD.gn
+@@ -137,10 +137,17 @@ source_set("bundled_flac") {
+ 
+     # win_utf8_io.c defines this itself.
+     configs -= [ "//build/config/win:lean_and_mean" ]
+-    cflags = [
+-      "/wd4334",  # 32-bit shift converted to 64 bits.
+-      "/wd4267",  # Converting from size_t to unsigned on 64-bit.
+-    ]
++    if (is_mingw) {
++      defines += [
++        "HAVE_FSEEKO",
++        "HAVE_INTTYPES_H",
++      ]
++    } else {
++      cflags = [
++        "/wd4334",  # 32-bit shift converted to 64 bits.
++        "/wd4267",  # Converting from size_t to unsigned on 64-bit.
++      ]
++    }
+   } else {
+     defines += [ "HAVE_INTTYPES_H" ]
+   }
+diff --git a/src/3rdparty/chromium/third_party/hunspell/BUILD.gn b/src/3rdparty/chromium/third_party/hunspell/BUILD.gn
+index caa1392..2aa855c 100644
+--- a/src/3rdparty/chromium/third_party/hunspell/BUILD.gn
++++ b/src/3rdparty/chromium/third_party/hunspell/BUILD.gn
+@@ -77,7 +77,7 @@ static_library("hunspell") {
+ 
+   cflags = []
+ 
+-  if (is_win) {
++  if (is_msvc) {
+     cflags += [
+       # TODO(jschuh): http://crbug.com/167187 size_t -> int
+       "/wd4267",
+diff --git a/src/3rdparty/chromium/third_party/jsoncpp/BUILD.gn b/src/3rdparty/chromium/third_party/jsoncpp/BUILD.gn
+index 0d445cc..1bb59db 100644
+--- a/src/3rdparty/chromium/third_party/jsoncpp/BUILD.gn
++++ b/src/3rdparty/chromium/third_party/jsoncpp/BUILD.gn
+@@ -35,7 +35,7 @@ source_set("jsoncpp") {
+ 
+   include_dirs = [ "source/src/lib_json" ]
+ 
+-  if (!is_win || is_clang) {
++  if (!is_msvc || is_clang) {
+     cflags_cc = [ "-Wno-implicit-fallthrough" ]
+   }
+ }
+diff --git a/src/3rdparty/chromium/third_party/leveldatabase/BUILD.gn b/src/3rdparty/chromium/third_party/leveldatabase/BUILD.gn
+index db16e21..df742ff 100644
+--- a/src/3rdparty/chromium/third_party/leveldatabase/BUILD.gn
++++ b/src/3rdparty/chromium/third_party/leveldatabase/BUILD.gn
+@@ -132,7 +132,7 @@ component("leveldatabase") {
+     "//third_party/snappy",
+   ]
+ 
+-  if (is_win) {
++  if (is_msvc) {
+     # leveldb compiles with a limited set of warnings enabled, and is not
+     # likely to accept fixes for other warnings. See crbug.com/698013
+     cflags = [ "/wd4018" ]  # Signed/unsigned mismatch in comparison.
+@@ -169,7 +169,7 @@ static_library("leveldb_static") {
+     "//third_party/snappy",
+   ]
+ 
+-  if (is_win) {
++  if (is_msvc) {
+     # leveldb compiles with a limited set of warnings enabled, and is not
+     # likely to accept fixes for other warnings. See crbug.com/698013
+     cflags = [ "/wd4018" ]  # Signed/unsigned mismatch in comparison.
+@@ -248,7 +248,7 @@ test("leveldb_unittests") {
+   configs -= [ "//build/config/compiler:chromium_code" ]
+   configs += [ "//build/config/compiler:no_chromium_code" ]
+ 
+-  if (is_win) {
++  if (is_msvc) {
+     # util\cache_test.cc(167): warning C4018: '<': signed/unsigned mismatch
+     # util\cache_test.cc(171): warning C4018: '<': signed/unsigned mismatch
+     cflags = [ "/wd4018" ]  # Signed/unsigned mismatch in comparison.
+diff --git a/src/3rdparty/chromium/third_party/libaom/BUILD.gn b/src/3rdparty/chromium/third_party/libaom/BUILD.gn
+index 589e4a5..5582d8a 100644
+--- a/src/3rdparty/chromium/third_party/libaom/BUILD.gn
++++ b/src/3rdparty/chromium/third_party/libaom/BUILD.gn
+@@ -121,7 +121,7 @@ if (current_cpu == "x86" || (current_cpu == "x64" && !is_msan)) {
+     configs += [ "//build/config/compiler:no_chromium_code" ]
+     configs += [ ":libaom_config" ]
+     configs -= [ "//build/config/compiler:default_init_stack_vars" ]
+-    if (!is_win || is_clang) {
++    if (!is_msvc || is_clang) {
+       cflags = [ "-msse2" ]
+     }
+     sources = aom_av1_common_intrin_sse2
+@@ -136,7 +136,7 @@ if (current_cpu == "x86" || (current_cpu == "x64" && !is_msan)) {
+     configs += [ "//build/config/compiler:no_chromium_code" ]
+     configs += [ ":libaom_config" ]
+     configs -= [ "//build/config/compiler:default_init_stack_vars" ]
+-    if (!is_win || is_clang) {
++    if (!is_msvc || is_clang) {
+       cflags = [ "-msse3" ]
+     }
+     sources = aom_av1_encoder_intrin_sse3
+@@ -148,7 +148,7 @@ if (current_cpu == "x86" || (current_cpu == "x64" && !is_msan)) {
+     configs += [ "//build/config/compiler:no_chromium_code" ]
+     configs += [ ":libaom_config" ]
+     configs -= [ "//build/config/compiler:default_init_stack_vars" ]
+-    if (!is_win || is_clang) {
++    if (!is_msvc || is_clang) {
+       cflags = [ "-mssse3" ]
+     }
+     sources = aom_av1_common_intrin_ssse3
+@@ -165,7 +165,7 @@ if (current_cpu == "x86" || (current_cpu == "x64" && !is_msan)) {
+     configs += [ "//build/config/compiler:no_chromium_code" ]
+     configs += [ ":libaom_config" ]
+     configs -= [ "//build/config/compiler:default_init_stack_vars" ]
+-    if (!is_win || is_clang) {
++    if (!is_msvc || is_clang) {
+       cflags = [ "-msse4.1" ]
+     }
+     sources = aom_av1_common_intrin_sse4_1
+@@ -180,7 +180,7 @@ if (current_cpu == "x86" || (current_cpu == "x64" && !is_msan)) {
+     configs += [ "//build/config/compiler:no_chromium_code" ]
+     configs += [ ":libaom_config" ]
+     configs -= [ "//build/config/compiler:default_init_stack_vars" ]
+-    if (!is_win || is_clang) {
++    if (!is_msvc || is_clang) {
+       cflags = [ "-msse4.2" ]
+     }
+     sources = aom_av1_encoder_intrin_sse4_2
+@@ -192,7 +192,7 @@ if (current_cpu == "x86" || (current_cpu == "x64" && !is_msan)) {
+     configs += [ "//build/config/compiler:no_chromium_code" ]
+     configs += [ ":libaom_config" ]
+     configs -= [ "//build/config/compiler:default_init_stack_vars" ]
+-    if (is_win) {
++    if (is_msvc) {
+       cflags = [ "/arch:AVX" ]
+     } else {
+       cflags = [ "-mavx" ]
+@@ -206,7 +206,7 @@ if (current_cpu == "x86" || (current_cpu == "x64" && !is_msan)) {
+     configs += [ "//build/config/compiler:no_chromium_code" ]
+     configs += [ ":libaom_config" ]
+     configs -= [ "//build/config/compiler:default_init_stack_vars" ]
+-    if (is_win) {
++    if (is_msvc) {
+       cflags = [ "/arch:AVX2" ]
+     } else {
+       cflags = [ "-mavx2" ]
+@@ -245,7 +245,7 @@ if (current_cpu == "arm64") {
+     configs += [ "//build/config/compiler:no_chromium_code" ]
+     configs += [ ":libaom_config" ]
+     configs -= [ "//build/config/compiler:default_init_stack_vars" ]
+-    if (!is_win || is_clang) {
++    if (!is_msvc || is_clang) {
+       cflags = [ "-march=armv8-a+crc" ]
+     }
+     sources = aom_av1_encoder_intrin_arm_crc32
+@@ -257,7 +257,7 @@ if (current_cpu == "arm64") {
+     configs += [ "//build/config/compiler:no_chromium_code" ]
+     configs += [ ":libaom_config" ]
+     configs -= [ "//build/config/compiler:default_init_stack_vars" ]
+-    if (!is_win || is_clang) {
++    if (!is_msvc || is_clang) {
+       cflags = [ "-march=armv8.2-a+dotprod" ]
+     }
+     sources = aom_av1_common_intrin_neon_dotprod
+@@ -271,7 +271,7 @@ if (current_cpu == "arm64") {
+     configs += [ "//build/config/compiler:no_chromium_code" ]
+     configs += [ ":libaom_config" ]
+     configs -= [ "//build/config/compiler:default_init_stack_vars" ]
+-    if (!is_win || is_clang) {
++    if (!is_msvc || is_clang) {
+       cflags = [ "-march=armv8.2-a+dotprod+i8mm" ]
+     }
+     sources = aom_av1_common_intrin_neon_i8mm
+@@ -312,6 +312,13 @@ static_library("libaom") {
+     # overflows in the transform functions.
+     defines += [ "DO_RANGE_CHECK_CLAMP=1" ]
+   }
++  if (is_win) {
++    if (is_mingw) {
++      defines = [ "HAVE_PTHREAD_H=1" ]
++    } else {
++      defines = [ "HAVE_PTHREAD_H=0" ]
++    }
++  }
+   deps = []
+   if (current_cpu == "x86" || (current_cpu == "x64" && !is_msan)) {
+     deps += [
+@@ -362,6 +369,13 @@ static_library("libaomrc") {
+   configs -= [ "//build/config/compiler:chromium_code" ]
+   configs += [ "//build/config/compiler:no_chromium_code" ]
+   configs += [ ":libaom_config" ]
++  if (is_win) {
++    if (is_mingw) {
++      defines = [ "HAVE_PTHREAD_H=1" ]
++    } else {
++      defines = [ "HAVE_PTHREAD_H=0" ]
++    }
++  }
+ 
+   public_configs = [ ":libaom_public_config" ]
+   public_deps = [ ":libaom" ]
+diff --git a/src/3rdparty/chromium/third_party/libaom/source/config/win/arm64-cpu-detect/config/aom_config.h b/src/3rdparty/chromium/third_party/libaom/source/config/win/arm64-cpu-detect/config/aom_config.h
+index 0e525ff..8aa4eae 100644
+--- a/src/3rdparty/chromium/third_party/libaom/source/config/win/arm64-cpu-detect/config/aom_config.h
++++ b/src/3rdparty/chromium/third_party/libaom/source/config/win/arm64-cpu-detect/config/aom_config.h
+@@ -82,7 +82,6 @@
+ #define HAVE_NEON 1
+ #define HAVE_NEON_DOTPROD 1
+ #define HAVE_NEON_I8MM 1
+-#define HAVE_PTHREAD_H  0
+ #define HAVE_SSE 0
+ #define HAVE_SSE2 0
+ #define HAVE_SSE3 0
+diff --git a/src/3rdparty/chromium/third_party/libaom/source/config/win/ia32/config/aom_config.h b/src/3rdparty/chromium/third_party/libaom/source/config/win/ia32/config/aom_config.h
+index 5a647c9..e2edb69 100644
+--- a/src/3rdparty/chromium/third_party/libaom/source/config/win/ia32/config/aom_config.h
++++ b/src/3rdparty/chromium/third_party/libaom/source/config/win/ia32/config/aom_config.h
+@@ -82,7 +82,6 @@
+ #define HAVE_NEON 0
+ #define HAVE_NEON_DOTPROD 0
+ #define HAVE_NEON_I8MM 0
+-#define HAVE_PTHREAD_H  0
+ #define HAVE_SSE 1
+ #define HAVE_SSE2 1
+ #define HAVE_SSE3 1
+diff --git a/src/3rdparty/chromium/third_party/libaom/source/config/win/x64/config/aom_config.h b/src/3rdparty/chromium/third_party/libaom/source/config/win/x64/config/aom_config.h
+index 2ef6551..6760073 100644
+--- a/src/3rdparty/chromium/third_party/libaom/source/config/win/x64/config/aom_config.h
++++ b/src/3rdparty/chromium/third_party/libaom/source/config/win/x64/config/aom_config.h
+@@ -82,7 +82,6 @@
+ #define HAVE_NEON 0
+ #define HAVE_NEON_DOTPROD 0
+ #define HAVE_NEON_I8MM 0
+-#define HAVE_PTHREAD_H  0
+ #define HAVE_SSE 1
+ #define HAVE_SSE2 1
+ #define HAVE_SSE3 1
+diff --git a/src/3rdparty/chromium/third_party/libsrtp/BUILD.gn b/src/3rdparty/chromium/third_party/libsrtp/BUILD.gn
+index 45033b7..1988abc 100644
+--- a/src/3rdparty/chromium/third_party/libsrtp/BUILD.gn
++++ b/src/3rdparty/chromium/third_party/libsrtp/BUILD.gn
+@@ -70,7 +70,7 @@ config("libsrtp_config") {
+ 
+ config("libsrtp_warnings") {
+   cflags = []
+-  if (is_win) {
++  if (is_msvc) {
+     cflags += [ "/wd4018" ]  # Signed/unsigned mismatch in comparison
+   }
+ }
+diff --git a/src/3rdparty/chromium/third_party/libvpx/BUILD.gn b/src/3rdparty/chromium/third_party/libvpx/BUILD.gn
+index f34c555..9265105 100644
+--- a/src/3rdparty/chromium/third_party/libvpx/BUILD.gn
++++ b/src/3rdparty/chromium/third_party/libvpx/BUILD.gn
+@@ -102,7 +102,7 @@ config("libvpx_config") {
+       # libvpx has many static functions in header, which trigger this warning.
+       "-Wno-unused-function",
+     ]
+-  } else if (!is_win) {
++  } else if (!is_msvc) {
+     cflags = [
+       "-Wno-unused-function",
+       "-Wno-sign-compare",
+@@ -188,7 +188,7 @@ if (current_cpu == "x86" || (current_cpu == "x64" && !is_msan)) {
+     configs -= [ "//build/config/compiler:chromium_code" ]
+     configs += [ "//build/config/compiler:no_chromium_code" ]
+     configs += [ ":libvpx_config" ]
+-    if (!is_win) {
++    if (!is_msvc) {
+       cflags = [ "-mmmx" ]
+     }
+     if (current_cpu == "x86") {
+@@ -204,7 +204,7 @@ if (current_cpu == "x86" || (current_cpu == "x64" && !is_msan)) {
+     configs -= [ "//build/config/compiler:chromium_code" ]
+     configs += [ "//build/config/compiler:no_chromium_code" ]
+     configs += [ ":libvpx_config" ]
+-    if (!is_win || is_clang) {
++    if (!is_msvc || is_clang) {
+       cflags = [ "-msse2" ]
+     }
+     if (current_cpu == "x86") {
+@@ -220,7 +220,7 @@ if (current_cpu == "x86" || (current_cpu == "x64" && !is_msan)) {
+     configs -= [ "//build/config/compiler:chromium_code" ]
+     configs += [ "//build/config/compiler:no_chromium_code" ]
+     configs += [ ":libvpx_config" ]
+-    if (!is_win || is_clang) {
++    if (!is_msvc || is_clang) {
+       cflags = [ "-mssse3" ]
+     }
+     if (current_cpu == "x86") {
+@@ -236,7 +236,7 @@ if (current_cpu == "x86" || (current_cpu == "x64" && !is_msan)) {
+     configs -= [ "//build/config/compiler:chromium_code" ]
+     configs += [ "//build/config/compiler:no_chromium_code" ]
+     configs += [ ":libvpx_config" ]
+-    if (!is_win || is_clang) {
++    if (!is_msvc || is_clang) {
+       cflags = [ "-msse4.1" ]
+     }
+     if (current_cpu == "x86") {
+@@ -252,7 +252,7 @@ if (current_cpu == "x86" || (current_cpu == "x64" && !is_msan)) {
+     configs -= [ "//build/config/compiler:chromium_code" ]
+     configs += [ "//build/config/compiler:no_chromium_code" ]
+     configs += [ ":libvpx_config" ]
+-    if (is_win) {
++    if (is_msvc) {
+       cflags = [ "/arch:AVX" ]
+     } else {
+       cflags = [ "-mavx" ]
+@@ -270,7 +270,7 @@ if (current_cpu == "x86" || (current_cpu == "x64" && !is_msan)) {
+     configs -= [ "//build/config/compiler:chromium_code" ]
+     configs += [ "//build/config/compiler:no_chromium_code" ]
+     configs += [ ":libvpx_config" ]
+-    if (is_win) {
++    if (is_msvc) {
+       cflags = [ "/arch:AVX2" ]
+     } else {
+       cflags = [ "-mavx2" ]
+@@ -288,7 +288,7 @@ if (current_cpu == "x86" || (current_cpu == "x64" && !is_msan)) {
+     configs -= [ "//build/config/compiler:chromium_code" ]
+     configs += [ "//build/config/compiler:no_chromium_code" ]
+     configs += [ ":libvpx_config" ]
+-    if (is_win) {
++    if (is_msvc) {
+       # clang-cl does not accept this flag.
+       # https://bugs.chromium.org/p/chromium/issues/detail?id=783370
+       cflags = [ "/arch:AVX512" ]
+@@ -356,7 +356,7 @@ if (current_cpu == "arm64") {
+     configs -= [ "//build/config/compiler:chromium_code" ]
+     configs += [ "//build/config/compiler:no_chromium_code" ]
+     configs += [ ":libvpx_config" ]
+-    if (!is_win || is_clang) {
++    if (!is_msvc || is_clang) {
+       cflags = [ "-march=armv8.2-a+dotprod" ]
+     }
+     if (cpu_arch_full == "arm64") {
+@@ -373,7 +373,7 @@ if (current_cpu == "arm64") {
+     configs -= [ "//build/config/compiler:chromium_code" ]
+     configs += [ "//build/config/compiler:no_chromium_code" ]
+     configs += [ ":libvpx_config" ]
+-    if (!is_win || is_clang) {
++    if (!is_msvc || is_clang) {
+       cflags = [ "-march=armv8.2-a+i8mm" ]
+     }
+     if (cpu_arch_full == "arm64") {
+diff --git a/src/3rdparty/chromium/third_party/libxml/BUILD.gn b/src/3rdparty/chromium/third_party/libxml/BUILD.gn
+index f7aa11a..d605da2 100644
+--- a/src/3rdparty/chromium/third_party/libxml/BUILD.gn
++++ b/src/3rdparty/chromium/third_party/libxml/BUILD.gn
+@@ -31,7 +31,7 @@ config("libxml_config") {
+ }
+ 
+ config("libxml_warnings") {
+-  if (is_win) {
++  if (is_win && !is_mingw) {
+     cflags_c = [
+       "/wd4018",  # Signed/unsigned mismatch in comparison.
+       "/wd4267",  # TODO(brucedawson): http://crbug.com/554200 fix C4267
+@@ -70,7 +70,7 @@ config("libxml_warnings") {
+       # TODO(hans): See if we can fix upstream (http://crbug.com/763944).
+       "-Wno-enum-compare",
+     ]
+-  } else if (is_linux || is_chromeos) {
++  } else if (is_linux || is_chromeos || is_mingw) {
+     cflags = [
+       # gcc spits out a bunch of warnings about passing too many arguments to
+       # __xmlSimpleError.
+@@ -274,13 +274,15 @@ static_library("bundled_libxml") {
+     ]
+   }
+ 
+-  if (is_win && !is_mingw) {
+-    sources += [
+-      "src/include/win32config.h",
+-      "src/include/wsockcompat.h",
+-      "win32/config.h",
+-      "win32/include/libxml/xmlversion.h",
+-    ]
++  if (is_win) {
++    if (!is_mingw) {
++      sources += [
++        "src/include/win32config.h",
++        "src/include/wsockcompat.h",
++        "win32/config.h",
++        "win32/include/libxml/xmlversion.h",
++      ]
++    }
+ 
+     # libxml2 already defines WIN32_LEAN_AND_MEAN.
+     configs -= [ "//build/config/win:lean_and_mean" ]
+diff --git a/src/3rdparty/chromium/third_party/libxslt/BUILD.gn b/src/3rdparty/chromium/third_party/libxslt/BUILD.gn
+index ce2c5eb..68634e3 100644
+--- a/src/3rdparty/chromium/third_party/libxslt/BUILD.gn
++++ b/src/3rdparty/chromium/third_party/libxslt/BUILD.gn
+@@ -94,13 +94,17 @@ static_library("bundled_libxslt") {
+     include_dirs = [ "linux" ]
+   } else if (is_win) {
+     include_dirs = [ "win32" ]
+-    cflags += [
+-      "/wd4267",  # size_t to int.
++    if (is_mingw) {
++      cflags += [ "-Wno-incompatible-pointer-types" ]
++    } else {
++      cflags += [
++        "/wd4267",  # size_t to int.
+ 
+-      # TODO(brucedawson): http://crbug.com/554200 4311 is a VS
+-      # 2015 64-bit warning for pointer truncation
+-      "/wd4311",
+-    ]
++        # TODO(brucedawson): http://crbug.com/554200 4311 is a VS
++        # 2015 64-bit warning for pointer truncation
++        "/wd4311",
++      ]
++    }
+   } else if (is_apple) {
+     include_dirs = [ "mac" ]
+   }
+diff --git a/src/3rdparty/chromium/third_party/libyuv/BUILD.gn b/src/3rdparty/chromium/third_party/libyuv/BUILD.gn
+index fb3c4f4..478da0f 100644
+--- a/src/3rdparty/chromium/third_party/libyuv/BUILD.gn
++++ b/src/3rdparty/chromium/third_party/libyuv/BUILD.gn
+@@ -73,7 +73,7 @@ group("libyuv") {
+   all_dependent_configs = [ ":libyuv_config" ]
+   deps = []
+ 
+-  if (is_win && target_cpu == "x64" && !is_qtwebengine) {
++  if (is_msvc && target_cpu == "x64" && !is_qtwebengine) {
+     # Compile with clang in order to get inline assembly
+     public_deps = [ ":libyuv_internal(//build/toolchain/win:win_clang_x64)" ]
+   } else {
+@@ -208,7 +208,7 @@ static_library("libyuv_internal") {
+   }
+ 
+   # To enable AVX2 or other cpu optimization, pass flag here
+-  if (!is_win) {
++  if (!is_msvc) {
+     cflags = [
+       # "-mpopcnt",
+       # "-mavx2",
+@@ -335,14 +335,14 @@ if (libyuv_use_lasx) {
+ 
+ if (libyuv_include_tests) {
+   config("libyuv_unittest_warnings_config") {
+-    if (!is_win) {
++    if (!is_msvc) {
+       cflags = [
+         # TODO(fbarchard): Fix sign and unused variable warnings.
+         "-Wno-sign-compare",
+         "-Wno-unused-variable",
+       ]
+     }
+-    if (is_win) {
++    if (is_msvc) {
+       cflags = [
+         "/wd4245",  # signed/unsigned mismatch
+         "/wd4189",  # local variable is initialized but not referenced
+diff --git a/src/3rdparty/chromium/third_party/nasm/BUILD.gn b/src/3rdparty/chromium/third_party/nasm/BUILD.gn
+index d9edea9..beabe3f 100644
+--- a/src/3rdparty/chromium/third_party/nasm/BUILD.gn
++++ b/src/3rdparty/chromium/third_party/nasm/BUILD.gn
+@@ -62,6 +62,12 @@ config("nasm_config") {
+   ]
+ 
+   defines = [ "HAVE_CONFIG_H" ]
++  if (is_mingw) {
++    defines += [
++      "HAVE_FSEEKO",
++      "HAVE_MEMPCPY",
++    ]
++  }
+ 
+   if (is_clang) {
+     cflags = [
+diff --git a/src/3rdparty/chromium/third_party/nasm/include/nasmint.h b/src/3rdparty/chromium/third_party/nasm/include/nasmint.h
+index 6be623b..8dcd889 100644
+--- a/src/3rdparty/chromium/third_party/nasm/include/nasmint.h
++++ b/src/3rdparty/chromium/third_party/nasm/include/nasmint.h
+@@ -35,6 +35,7 @@
+ 
+ #if _I64_MAX == 9223372036854775807
+ 
++#ifdef _MSC_VER
+ /* Windows-based compiler: use __int64 */
+ typedef signed __int64		int64_t;
+ typedef unsigned __int64	uint64_t;
+@@ -42,6 +43,14 @@ typedef unsigned __int64	uint64_t;
+ #define _pri64			"I64"
+ #define INT64_C(x)		x ## i64
+ #define UINT64_C(x)		x ## ui64
++#else
++typedef signed long long	int64_t;
++typedef unsigned long long	uint64_t;
++#define _scn64			"ll"
++#define _pri64			"ll"
++#define INT64_C(x)		x ## LL
++#define UINT64_C(x)		x ## ULL
++#endif
+ 
+ #elif LONG_MAX == 9223372036854775807L
+ 
+diff --git a/src/3rdparty/chromium/third_party/node/node.py b/src/3rdparty/chromium/third_party/node/node.py
+index dbbab59..7a21902 100755
+--- a/src/3rdparty/chromium/third_party/node/node.py
++++ b/src/3rdparty/chromium/third_party/node/node.py
+@@ -44,7 +44,11 @@ def GetBinaryPath():
+ 
+ 
+ def RunNode(cmd_parts, stdout=None):
+-  cmd = [GetBinaryPath()] + cmd_parts
++  if sys.platform == 'win32' and 'GCC' in sys.version:
++    # We have to invoke node.exe through winpty
++    cmd = ['node'] + cmd_parts
++  else:
++    cmd = [GetBinaryPath()] + cmd_parts
+   process = subprocess.Popen(
+       cmd, cwd=os.getcwd(), stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+       universal_newlines=True)
+diff --git a/src/3rdparty/chromium/third_party/protobuf/proto_library.gni b/src/3rdparty/chromium/third_party/protobuf/proto_library.gni
+index f43ac07..74ef4af 100644
+--- a/src/3rdparty/chromium/third_party/protobuf/proto_library.gni
++++ b/src/3rdparty/chromium/third_party/protobuf/proto_library.gni
+@@ -604,7 +604,7 @@ template("proto_library") {
+           public_deps += [ "$_this_dir:protobuf_lite" ]
+         }
+ 
+-        if (is_win) {
++        if (is_msvc) {
+           cflags = [
+             # disable: C4125 decimal digit terminates octal escape sequence
+             # Protoc generates such sequences frequently, there's no obvious
+diff --git a/src/3rdparty/chromium/third_party/sqlite/BUILD.gn b/src/3rdparty/chromium/third_party/sqlite/BUILD.gn
+index 392f0d8..43d8568 100644
+--- a/src/3rdparty/chromium/third_party/sqlite/BUILD.gn
++++ b/src/3rdparty/chromium/third_party/sqlite/BUILD.gn
+@@ -160,7 +160,7 @@ config("sqlite_warnings") {
+       "-Wno-#warnings",
+     ]
+   }
+-  if (is_win && !is_clang) {
++  if (is_msvc && !is_clang) {
+     cflags += [ "/wd4101" ]  # 'zTrace' unreferenced variable in src/src/vdbe.c
+   }
+ }
+diff --git a/src/3rdparty/chromium/third_party/woff2/BUILD.gn b/src/3rdparty/chromium/third_party/woff2/BUILD.gn
+index c6308da..01f1fbd 100644
+--- a/src/3rdparty/chromium/third_party/woff2/BUILD.gn
++++ b/src/3rdparty/chromium/third_party/woff2/BUILD.gn
+@@ -33,7 +33,7 @@ static_library("woff2_dec") {
+   public_configs = [ ":woff2_includes" ]
+ 
+   # TODO(ksakamoto): http://crbug.com/167187
+-  if (is_win) {
++  if (is_msvc) {
+     cflags = [ "/wd4267" ]  # Conversion from size_t to 'type'.
+   }
+ }
