@@ -1,0 +1,184 @@
+diff --git a/Source/WebKit/qt/WebCoreSupport/InitWebCoreQt.cpp b/Source/WebKit/qt/WebCoreSupport/InitWebCoreQt.cpp
+index 3496b86..a1eff6e 100644
+--- a/Source/WebKit/qt/WebCoreSupport/InitWebCoreQt.cpp
++++ b/Source/WebKit/qt/WebCoreSupport/InitWebCoreQt.cpp
+@@ -53,7 +53,11 @@ namespace WebKit {
+ 
+ static QtStyleFacadeFactoryFunction initCallback = 0;
+ 
++#ifdef QT_STATIC
++void setWebKitWidgetsInitCallback(QtStyleFacadeFactoryFunction callback)
++#else
+ Q_DECL_EXPORT void setWebKitWidgetsInitCallback(QtStyleFacadeFactoryFunction callback)
++#endif
+ {
+     initCallback = callback;
+ }
+@@ -67,7 +71,11 @@ static WebCore::QStyleFacade* createStyleForPage(WebCore::Page* page)
+ }
+ 
+ // Called also from WebKit2's WebProcess
++#ifdef QT_STATIC
++void initializeWebKitQt()
++#else
+ Q_DECL_EXPORT void initializeWebKitQt()
++#endif
+ {
+     if (initCallback) {
+         WebCore::RenderThemeQStyle::setStyleFactoryFunction(createStyleForPage);
+@@ -75,7 +83,11 @@ Q_DECL_EXPORT void initializeWebKitQt()
+     }
+ }
+ 
++#ifdef QT_STATIC
++void setImagePlatformResource(const char* name, const QPixmap& pixmap)
++#else
+ Q_DECL_EXPORT void setImagePlatformResource(const char* name, const QPixmap& pixmap)
++#endif
+ {
+     WebCore::Image::setPlatformResource(name, pixmap);
+ }
+@@ -84,7 +96,11 @@ Q_DECL_EXPORT void setImagePlatformResource(const char* name, const QPixmap& pix
+ 
+ namespace WebCore {
+ 
++#ifdef QT_STATIC
++void initializeWebCoreQt()
++#else
+ Q_DECL_EXPORT void initializeWebCoreQt()
++#endif
+ {
+     static bool initialized = false;
+     if (initialized)
+diff --git a/Source/WebKit/qt/WebCoreSupport/InitWebCoreQt.h b/Source/WebKit/qt/WebCoreSupport/InitWebCoreQt.h
+index 5913999..abd6122 100644
+--- a/Source/WebKit/qt/WebCoreSupport/InitWebCoreQt.h
++++ b/Source/WebKit/qt/WebCoreSupport/InitWebCoreQt.h
+@@ -42,15 +42,25 @@ typedef WebCore::QStyleFacade* (*QtStyleFacadeFactoryFunction)(QWebPageAdapter*)
+ 
+ namespace WebKit {
+ 
++#ifdef QT_STATIC
++void setWebKitWidgetsInitCallback(QtStyleFacadeFactoryFunction);
++void initializeWebKitQt();
++void setImagePlatformResource(const char* /* name */, const QPixmap&);
++#else
+ Q_DECL_EXPORT void setWebKitWidgetsInitCallback(QtStyleFacadeFactoryFunction);
+ Q_DECL_EXPORT void initializeWebKitQt();
+ Q_DECL_EXPORT void setImagePlatformResource(const char* /* name */, const QPixmap&);
++#endif
+ 
+ }
+ 
+ namespace WebCore {
+ 
++#ifdef QT_STATIC
++void initializeWebCoreQt();
++#else
+ Q_DECL_EXPORT void initializeWebCoreQt();
++#endif
+ 
+ }
+ 
+diff --git a/Source/WebKit2/DatabaseProcess/qt/DatabaseProcessMainQt.cpp b/Source/WebKit2/DatabaseProcess/qt/DatabaseProcessMainQt.cpp
+index 93e8672..4df5877 100644
+--- a/Source/WebKit2/DatabaseProcess/qt/DatabaseProcessMainQt.cpp
++++ b/Source/WebKit2/DatabaseProcess/qt/DatabaseProcessMainQt.cpp
+@@ -35,7 +35,11 @@ using namespace WebCore;
+ 
+ namespace WebKit {
+ 
++#ifdef QT_STATIC
++int DatabaseProcessMainQt(int argc, char** argv)
++#else
+ Q_DECL_EXPORT int DatabaseProcessMainQt(int argc, char** argv)
++#endif
+ {
+     QCoreApplication app(argc, argv);
+     return ChildProcessMain<DatabaseProcess, ChildProcessMainBase>(argc, argv);
+diff --git a/Source/WebKit2/NetworkProcess/EntryPoint/qt/NetworkProcessMain.cpp b/Source/WebKit2/NetworkProcess/EntryPoint/qt/NetworkProcessMain.cpp
+index b102fc5..3a34f36 100644
+--- a/Source/WebKit2/NetworkProcess/EntryPoint/qt/NetworkProcessMain.cpp
++++ b/Source/WebKit2/NetworkProcess/EntryPoint/qt/NetworkProcessMain.cpp
+@@ -26,7 +26,11 @@
+ #include "config.h"
+ 
+ namespace WebKit {
++#ifdef QT_STATIC
++int NetworkProcessMainQt(int argc, char** argv);
++#else
+ Q_DECL_IMPORT int NetworkProcessMainQt(int argc, char** argv);
++#endif
+ }
+ 
+ int main(int argc, char** argv)
+diff --git a/Source/WebKit2/NetworkProcess/qt/NetworkProcessMainQt.cpp b/Source/WebKit2/NetworkProcess/qt/NetworkProcessMainQt.cpp
+index d3799bb..ac6cd0f 100644
+--- a/Source/WebKit2/NetworkProcess/qt/NetworkProcessMainQt.cpp
++++ b/Source/WebKit2/NetworkProcess/qt/NetworkProcessMainQt.cpp
+@@ -116,7 +116,11 @@ public:
+     }
+ };
+ 
++#ifdef QT_STATIC
++int NetworkProcessMainQt(int argc, char** argv)
++#else
+ Q_DECL_EXPORT int NetworkProcessMainQt(int argc, char** argv)
++#endif
+ {
+     QCoreApplication app(argc, argv);
+     return ChildProcessMain<NetworkProcess, ChildProcessMainBase>(argc, argv);
+diff --git a/Source/WebKit2/PluginProcess/qt/PluginProcessMainQt.cpp b/Source/WebKit2/PluginProcess/qt/PluginProcessMainQt.cpp
+index 7a93fbb..1463432 100644
+--- a/Source/WebKit2/PluginProcess/qt/PluginProcessMainQt.cpp
++++ b/Source/WebKit2/PluginProcess/qt/PluginProcessMainQt.cpp
+@@ -63,7 +63,11 @@ static bool initializeGtk()
+     return true;
+ }
+ 
++#ifdef QT_STATIC
++int PluginProcessMain(int argc, char** argv)
++#else
+ Q_DECL_EXPORT int PluginProcessMain(int argc, char** argv)
++#endif
+ {
+ #if PLUGIN_ARCHITECTURE(X11)
+     QByteArray suppressOutput = qgetenv("QT_WEBKIT_SUPPRESS_WEB_PROCESS_OUTPUT");
+diff --git a/Source/WebKit2/WebProcess/qt/WebProcessMainQt.cpp b/Source/WebKit2/WebProcess/qt/WebProcessMainQt.cpp
+index ec271b5..3fbaebd 100644
+--- a/Source/WebKit2/WebProcess/qt/WebProcessMainQt.cpp
++++ b/Source/WebKit2/WebProcess/qt/WebProcessMainQt.cpp
+@@ -122,7 +122,11 @@ pid_t chrootMe()
+ }
+ #endif
+ 
++#ifdef QT_STATIC
++int WebProcessMainQt(QGuiApplication* app)
++#else
+ Q_DECL_EXPORT int WebProcessMainQt(QGuiApplication* app)
++#endif
+ {
+ #if ENABLE(SUID_SANDBOX_LINUX)
+     pid_t helper = chrootMe();
+diff --git a/Source/WebKit2/qt/MainQt.cpp b/Source/WebKit2/qt/MainQt.cpp
+index 17ad853..7eba6f2 100644
+--- a/Source/WebKit2/qt/MainQt.cpp
++++ b/Source/WebKit2/qt/MainQt.cpp
+@@ -41,10 +41,17 @@ typedef QApplication ApplicationType;
+ #endif
+ 
+ namespace WebKit {
++#ifdef QT_STATIC
++int WebProcessMainQt(QGuiApplication*);
++#if !defined(QT_NO_WIDGETS)
++void initializeWebKitWidgets();
++#endif
++#else
+ Q_DECL_IMPORT int WebProcessMainQt(QGuiApplication*);
+ #if !defined(QT_NO_WIDGETS)
+ Q_DECL_IMPORT void initializeWebKitWidgets();
+ #endif
++#endif // QT_STATIC
+ }
+ 
+ #if !defined(NDEBUG) && defined(Q_OS_UNIX)
