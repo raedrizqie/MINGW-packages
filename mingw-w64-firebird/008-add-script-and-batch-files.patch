@@ -121,29 +121,27 @@ index 0000000..e249764
 +    shift
 +  done
 diff --git a/configure.ac b/configure.ac
-index 3d03ce3..d92adf4 100644
+index 1d8a2e2..c2213b2 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -1616,6 +1621,14 @@ case "$PLATFORM" in
-     ;;
+@@ -1617,6 +1617,12 @@ case "$PLATFORM" in
  
    DARWIN)
-+    AC_CONFIG_FILES([
-+        gen/darwin.defaults:${MAKE_SRC_DIR}/darwin.defaults])
-+    ;;
+     ;;
 +  win32)
 +    AC_CONFIG_FILES([
 +        gen/$fb_tgt/firebird/bin/fb_config:builds/install/arch-specific/mingw/fb_config.in
 +        gen/$fb_tgt/firebird/bin/fb_install_service.bat:builds/install/arch-specific/win32/install_service.bat
 +        gen/$fb_tgt/firebird/bin/fb_uninstall_service.bat:builds/install/arch-specific/win32/uninstall_service.bat])
-     ;;
++    ;;
  esac
  if test -f ${MAKE_SRC_DIR}/postfix.${MAKEFILE_POSTFIX};then
-@@ -1631,7 +1644,6 @@ AC_CONFIG_FILES(
- gen/make.rules:${MAKE_SRC_DIR}/make.rules
- gen/make.defaults:${MAKE_SRC_DIR}/make.defaults
- gen/make.platform:${MAKE_SRC_DIR}/prefix.${MAKEFILE_PREFIX}
--gen/darwin.defaults:${MAKE_SRC_DIR}/darwin.defaults
- ${POSTFIX_FILE}
- gen/make.shared.variables:${MAKE_SRC_DIR}/make.shared.variables
- gen/make.shared.targets:${MAKE_SRC_DIR}/make.shared.targets
+ 	POSTFIX_FILE=gen/make.platform.postfix:${MAKE_SRC_DIR}/postfix.${MAKEFILE_POSTFIX}
+@@ -1639,6 +1645,7 @@ gen/Makefile:${MAKE_SRC_DIR}/Makefile.in
+ gen/examples/Makefile.examples:${MAKE_SRC_DIR}/Makefile.in.examples
+ gen/Makefile.plugins_examples:${MAKE_SRC_DIR}/Makefile.in.plugins_examples
+ gen/Makefile.install:builds/install/arch-specific/${INSTALL_PREFIX}/Makefile.in
++examples/extauth/Makefile:${MAKE_SRC_DIR}/Makefile.in.extauth
+ Makefile:Makefile.in
+ )
+ if test "$STD_EDITLINE" = "false"; then

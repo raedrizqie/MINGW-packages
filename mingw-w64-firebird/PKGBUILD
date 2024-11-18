@@ -4,8 +4,8 @@
 _realname=firebird
 pkgbase=mingw-w64-${_realname}
 pkgname="${MINGW_PACKAGE_PREFIX}-${_realname}"
-pkgver=5.0.0.1306
-pkgrel=2
+pkgver=5.0.1.1469
+pkgrel=1
 pkgdesc="Cross-platform relational database offering many ANSI SQL standard features (mingw-w64)"
 url="https://www.firebirdsql.org/"
 license=('spdx:Interbase-1.0 AND MPL-1.0')
@@ -19,14 +19,13 @@ msys2_repository_url='https://github.com/FirebirdSQL/firebird/'
 msys2_documentation_url='https://www.firebirdsql.org/en/documentation/'
 conflicts=("${MINGW_PACKAGE_PREFIX}-firebird2-git")
 replaces=("${MINGW_PACKAGE_PREFIX}-firebird2-git")
-depends=("${MINGW_PACKAGE_PREFIX}-libiconv"
+depends=("${MINGW_PACKAGE_PREFIX}-icu"
          "${MINGW_PACKAGE_PREFIX}-libtomcrypt"
          "${MINGW_PACKAGE_PREFIX}-libtommath"
          "${MINGW_PACKAGE_PREFIX}-re2")
 makedepends=("${MINGW_PACKAGE_PREFIX}-cc"
              "${MINGW_PACKAGE_PREFIX}-cmake"
              "${MINGW_PACKAGE_PREFIX}-autotools"
-             "${MINGW_PACKAGE_PREFIX}-icu"
              "unzip")
 source=("https://github.com/FirebirdSQL/firebird/archive/refs/tags/v${pkgver%.*}.tar.gz"
         001-configure-fixes.patch
@@ -39,15 +38,15 @@ source=("https://github.com/FirebirdSQL/firebird/archive/refs/tags/v${pkgver%.*}
         008-add-script-and-batch-files.patch
         pathtools.cpp
         pathtools.h)
-sha256sums=('4da3aedbbe780f5f878f19998828fa64a9b43285499eff99c5dad71b7c72dcaf'
-            'be70056bebc87a4834ff7785e32915b547b5d62cf14042851d54e5762ea05368'
-            '70b4b5327e128409b9dc2bf14871062a6b36fcffb3e69d30bb6a7f0e36f95b90'
-            'd99dc050c57c43e351000c161d51c0ec0420004de912547fcf04e9325cd6de27'
-            '88959ee452b2950ebaac5e1a034cbb54eb95c886616a322664074704a02ba43e'
-            '84714bc93ba21368b35fe9de757eafbc390742eeb4b5641d2f8330d828b72bba'
-            '76f337487b62c99cff3dd2045f4143a69b0395c82d76ebf42d18d7ca3f5eca66'
+sha256sums=('da13a066c9f7ff3107fde4d8c87bcd314d85631757cfad30b365183ad203d8c0'
+            '0f5b2154ea17ebaa6a61f65e2ef1ee5efbe43c4dd69ed9febfa05ff78fc46031'
+            'c78785f7f50dedd5f50a646781c27f7e022c530e6e95808bd9e7f5db18be3f18'
+            '326d887edc4d9ef2cdb37379c9b336d0ef1999300437850cc955ad415d8de51b'
+            '7bb92688bb3238ffe73400845521aba68674d837117dc78e14ddff28b9ac372b'
+            'a50ec017bfc9fa837696c2bc7a2c2758d51034fb8a79e61d0164f9ef1e9f7c60'
+            'bd691af0df4872aaf5903d9fec721b0ff8d26a2be2a4ee28aef9726195054077'
             'f9babbf59dfb99a5d0048647bb64fce39f821c110e768049aa955614396382e2'
-            '094896b8614981854eadcca789726e8eb646918811829f58cde43a27870156ed'
+            'aafeac5d7e1b132bd69ed1f4d9cda5ef0e6085706e9427091546355f9f155dfb'
             '2f357fe2c6cdec3bfd90979616cfd075aee2de51beeaa08cd7a4192878efa64e'
             '0e6014650703817bc106825bb6a92bea72d9d790e89975c88d058fba2a26eddc')
 
@@ -79,6 +78,8 @@ prepare() {
     006-resource-file-fixes.patch \
     007-pathtools-fixes.patch \
     008-add-script-and-batch-files.patch
+
+  mv -f examples/extauth/Makefile builds/posix/Makefile.in.extauth
 }
 
 build() {

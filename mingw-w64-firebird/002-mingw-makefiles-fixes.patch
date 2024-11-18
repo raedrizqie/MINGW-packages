@@ -1,20 +1,8 @@
 diff --git a/builds/posix/Makefile.in b/builds/posix/Makefile.in
-index f5342bb..48f4a7b 100644
+index f5342bb..ccdd7c0 100644
 --- a/builds/posix/Makefile.in
 +++ b/builds/posix/Makefile.in
-@@ -246,7 +246,11 @@ endif
- %.vers: $(ROOT)/builds/posix/%.vers
- 	sh vers.sh $(firstword $@)
- 
-+ifeq ($(PLATFORM),win32)
-+export_lists:
-+else
- export_lists: $(ALLVERS)
-+endif
- 
- #___________________________________________________________________________
- # LibTomMath - used by cross-builds
-@@ -305,7 +309,7 @@ $(RE2_LIB):	$(RE2_Objs)
+@@ -305,7 +305,7 @@ $(RE2_LIB):	$(RE2_Objs)
  libcds:
  	mkdir -p $(LIBCDS)/lib/$(TARGET)
  	cd $(LIBCDS)/lib/$(TARGET); \
@@ -23,19 +11,15 @@ index f5342bb..48f4a7b 100644
  	AR="$(AR)" $(MAKE) -C $(LIBCDS)/lib/$(TARGET)
  
  ifeq ($(TARGET),Debug)
-@@ -537,14 +541,18 @@ $(LIBIBUTIL_SO): $(UTIL_Objects)
- # most of utilities, including network server and UDF support
- #
+@@ -541,10 +541,15 @@ $(LIBIBUTIL_SO): $(UTIL_Objects)
  
--.PHONY:	firebird_server fb_lock_print fbguard fbsvcmgr fbtracemgr gbak gfix gsec gsplit gstat isql nbackup
-+.PHONY:	firebird_server fb_lock_print fbguard fbsvcmgr fbtracemgr gbak gfix gsec gsplit gstat isql nbackup instreg instsvc instclient
+ utilities: firebird_server fb_lock_print fbguard fbsvcmgr fbtracemgr gbak gfix gsec gsplit gstat isql nbackup udfsupport
  
 +ifeq ($(PLATFORM),win32)
-+utilities: firebird_server fb_lock_print fbguard fbsvcmgr fbtracemgr gbak gfix gsec gsplit gstat isql nbackup udfsupport instreg instsvc instclient
-+else
- utilities: firebird_server fb_lock_print fbguard fbsvcmgr fbtracemgr gbak gfix gsec gsplit gstat isql nbackup udfsupport
++.PHONY:	instreg instsvc instclient
++utilities +: instreg instsvc instclient
 +endif
- 
++
  firebird_server:	$(FB_DAEMON)
  
  $(FB_DAEMON):	$(Remote_Server_Objects) $(COMMON_LIB)
@@ -44,7 +28,7 @@ index f5342bb..48f4a7b 100644
  
  fb_lock_print:	$(LOCKPRINT)
  
-@@ -554,7 +562,7 @@ $(LOCKPRINT):	$(LOCKPRINT_Objects) $(COMMON_LIB)
+@@ -554,7 +559,7 @@ $(LOCKPRINT):	$(LOCKPRINT_Objects) $(COMMON_LIB)
  fbguard:		$(FBGUARD)
  
  $(FBGUARD):		$(FBGUARD_Objects) $(COMMON_LIB)
@@ -53,7 +37,7 @@ index f5342bb..48f4a7b 100644
  
  fbsvcmgr:		$(FBSVCMGR)
  
-@@ -601,6 +609,21 @@ nbackup:		$(NBACKUP)
+@@ -601,6 +606,21 @@ nbackup:		$(NBACKUP)
  $(NBACKUP):		$(NBACKUP_Objects) $(COMMON_LIB)
  	$(EXE_LINK) $(EXE_LINK_OPTIONS) $^ -o $@ $(FIREBIRD_LIBRARY_LINK) $(LINK_LIBS)
  
@@ -75,20 +59,16 @@ index f5342bb..48f4a7b 100644
  
  #___________________________________________________________________________
  # plugins - some of them are required to build examples, use separate entry for them
-@@ -623,6 +646,12 @@ ifeq ($(TARGET),Debug)
+@@ -623,6 +643,8 @@ ifeq ($(TARGET),Debug)
  	BUILD_DEBUG:=auth_debug
  endif
  
-+ifeq ($(PLATFORM),win32)
-+PLUGIN_SONAME=$(notdir $@)
-+else
 +PLUGIN_SONAME=$(notdir $@).0
-+endif
 +
  plugins: udr legacy_user_management legacy_auth_server srp_user_management trace $(BUILD_DEBUG) udf_compat chacha profiler
  
  udr:	$(UDR_PLUGIN) $(PLUGINS)/udr_engine.conf
-@@ -631,31 +660,31 @@ $(PLUGINS)/udr_engine.conf: $(ROOT)/src/plugins/udr_engine/udr_engine.conf
+@@ -631,31 +653,31 @@ $(PLUGINS)/udr_engine.conf: $(ROOT)/src/plugins/udr_engine/udr_engine.conf
  	cp $^ $@
  
  $(UDR_PLUGIN):	$(UDRENG_Objects) $(COMMON_LIB)
@@ -125,7 +105,7 @@ index f5342bb..48f4a7b 100644
   $(call LIB_LINK_DARWIN_INSTALL_NAME,plugins/libDefault_Profiler.$(SHRLIB_EXT))
  
  trace:	$(FBTRACE)
-@@ -666,13 +695,13 @@ $(FBTRACE):	$(FBTRACE_UTIL_Objects) $(COMMON_LIB)
+@@ -666,13 +688,13 @@ $(FBTRACE):	$(FBTRACE_UTIL_Objects) $(COMMON_LIB)
  auth_debug:	$(AUTH_DEBUGGER)
  
  $(AUTH_DEBUGGER):	$(AUTH_DEBUGGER_Objects) $(COMMON_LIB)
@@ -142,29 +122,22 @@ index f5342bb..48f4a7b 100644
  
  udf_compat:	$(UDF_BACKWARD_COMPATIBILITY) $(COMPAT_SQL)
 diff --git a/builds/posix/Makefile.in.examples b/builds/posix/Makefile.in.examples
-index d0f8973..5f72d76 100644
+index d0f8973..86a9cf2 100644
 --- a/builds/posix/Makefile.in.examples
 +++ b/builds/posix/Makefile.in.examples
-@@ -67,8 +67,16 @@ export PATH
+@@ -67,8 +67,11 @@ export PATH
  #endif
  GPRE_FLAGS=	-m -z -n
  
--LIB_LINK_RPATH = $(call LIB_PLATFORM_RPATH,$(if $(subst intl,,$(1)),$(LIB),$(LIB)/../intl))
--LINK_DARWIN_RPATH = -Wl,-rpath,@loader_path/../$(TARGET)/firebird
-+ifeq (@USE_RPATH@,1)
-+    LIB_LINK_RPATH = $(call LIB_PLATFORM_RPATH,$(if $(subst intl,,$(1)),$(LIB),$(LIB)/../intl))
-+else
-+    LIB_LINK_RPATH =
-+endif
-+ifeq ($(PLATFORM),DARWIN)
-+    LINK_DARWIN_RPATH = -Wl,-rpath,@loader_path/../$(TARGET)/firebird
-+else
-+    LINK_DARWIN_RPATH =
++ifneq ($(PLATFORM),win32)
++LIB_PREFIX = lib
+ LIB_LINK_RPATH = $(call LIB_PLATFORM_RPATH,$(if $(subst intl,,$(1)),$(LIB),$(LIB)/../intl))
+ LINK_DARWIN_RPATH = -Wl,-rpath,@loader_path/../$(TARGET)/firebird
 +endif
  LIB_LINK_MAPFILE =
  
  EXAMPLES_DEST=	$(GEN_ROOT)/examples
-@@ -91,7 +99,7 @@ EMPLOYEE_DB=	$(EXAMPLES_DEST)/employee.fdb
+@@ -91,7 +94,7 @@ EMPLOYEE_DB=	$(EXAMPLES_DEST)/employee.fdb
  FINAL_EMPDB=	$(EXAMPLES_FB)/empbuild/employee.fdb
  INTLEMP_DB=	$(EXAMPLES_DEST)/intlemp.fdb
  
@@ -174,7 +147,7 @@ index d0f8973..5f72d76 100644
  .PHONY: all examples
  
 diff --git a/builds/posix/Makefile.in.plugins_examples b/builds/posix/Makefile.in.plugins_examples
-index 989e80d..4230624 100644
+index 989e80d..b9f6701 100644
 --- a/builds/posix/Makefile.in.plugins_examples
 +++ b/builds/posix/Makefile.in.plugins_examples
 @@ -54,6 +54,16 @@ include     $(ROOT)/gen/make.shared.variables
@@ -182,14 +155,14 @@ index 989e80d..4230624 100644
  all: udrcpp_example dc_example kh_example crypt_app
  
 +ifeq ($(PLATFORM),win32)
-+  PLUGIN_SONAME=$(notdir $@)
-+  PLUGINS_DIR=$(FIREBIRD)/examples/prebuilt/plugins
-+  SAMPLES_DIR=$(FIREBIRD)/examples/prebuilt/bin
-+  makePluginName=$(PLUGINS_DIR)/$(LIB_PREFIX)$(1).$(SHRLIB_EXT)
++PLUGIN_SONAME=$(notdir $@)
++PLUGINS_DIR=$(FIREBIRD)/examples/prebuilt/plugins
++SAMPLES_DIR=$(FIREBIRD)/examples/prebuilt/bin
++makePluginName=$(PLUGINS_DIR)/$(1).$(SHRLIB_EXT)
 +else
-+  PLUGIN_SONAME=$(notdir $@).0
-+  PLUGINS_DIR=$(PLUGINS)
-+  SAMPLES_DIR=$(BIN)
++PLUGIN_SONAME=$(notdir $@).0
++PLUGINS_DIR=$(PLUGINS)
++SAMPLES_DIR=$(BIN)
 +endif
  
  UDR_Objects = $(call dirObjects,../examples/udr)
@@ -231,7 +204,7 @@ index 989e80d..4230624 100644
  
  crypt_app: $(CRYPT_APP)
 diff --git a/builds/posix/make.defaults b/builds/posix/make.defaults
-index 2bbf905..15cf4e9 100755
+index 2bbf905..10649f6 100755
 --- a/builds/posix/make.defaults
 +++ b/builds/posix/make.defaults
 @@ -172,7 +172,7 @@ INLINE_EDIT_SED:= -i
@@ -251,17 +224,7 @@ index 2bbf905..15cf4e9 100755
  
  AC_CFLAGS = @CFLAGS@
  AC_CXXFLAGS = @CXXFLAGS@
-@@ -206,6 +207,9 @@ AC_LDFLAGS = @LDFLAGS@
- ifeq ($(PLATFORM),DARWIN)
- LIB_LINK = $(CXX) $(GLOB_OPTIONS) $(CXXFLAGS) $(WLDFLAGS)
- EXE_LINK = $(CXX) $(GLOB_OPTIONS) $(CXXFLAGS) $(WLDFLAGS)
-+else ifeq ($(PLATFORM),win32)
-+LIB_LINK = $(CXX) $(GLOB_OPTIONS)
-+EXE_LINK = $(CXX) $(GLOB_OPTIONS)
- else
- LIB_LINK = $(CXX) $(GLOB_OPTIONS) $(CXXFLAGS) $(WLDFLAGS) -static-libstdc++
- EXE_LINK = $(CXX) $(GLOB_OPTIONS) $(CXXFLAGS) $(WLDFLAGS) -static-libstdc++
-@@ -220,7 +224,7 @@ SO_LINK_LIBS = @LIBS@ $(DECLIB) $(I128LIB)
+@@ -220,7 +221,7 @@ SO_LINK_LIBS = @LIBS@ $(DECLIB) $(I128LIB)
  
  ARCH_EXT=		.a
  EXEC_EXT=		@EXEEXT@
@@ -270,7 +233,7 @@ index 2bbf905..15cf4e9 100755
  LIB_PREFIX=		lib
  SHRLIB_FOREIGN_EXT=	$(SHRLIB_EXT)
  
-@@ -238,7 +242,7 @@ include $(ROOT)/gen/Make.Version
+@@ -238,7 +239,7 @@ include $(ROOT)/gen/Make.Version
  
  vpath %.so $(LIB)
  vpath %.a $(LIB)
@@ -279,35 +242,16 @@ index 2bbf905..15cf4e9 100755
  
  #_____________________________________________________________________________
  
-@@ -338,7 +342,11 @@ UDR_SUPPORT_LIBS=
- ifeq ($(PLATFORM),DARWIN)
-     LIB_LINK_RPATH =
- else
-+    ifeq ($(PLATFORM),win32)
-+	LIB_PLATFORM_RPATH =
-+    else
- 	LIB_PLATFORM_RPATH = -Wl,-rpath,$(1)
-+    endif
- 
- ifeq (@USE_RPATH@,1)
-     ifeq ($(strip @BINRELOC_CFLAGS@),)
-@@ -360,9 +368,14 @@ else
- endif
- 
+@@ -362,7 +363,7 @@ endif
  LIB_PATH_OPTS = $(call LIB_LINK_RPATH,lib) $(call LIB_LINK_RPATH,intl)
-+ifeq ($(PLATFORM),win32)
-+LIB_LINK_SONAME= -Wl,--out-implib,$(LIB)/lib$(1)$(ARCH_EXT)
-+LIB_LINK_MAPFILE=
-+else
  LIB_LINK_SONAME= -Wl,-soname,$(1)
  LIB_LINK_MAPFILE= -Wl,--version-script,$(1)
 -FIREBIRD_LIBRARY_LINK= -L$(LIB) -L$(STATIC_LIB) -lfbclient $(MATHLIB) $(CRYPTLIB)
-+endif
 +FIREBIRD_LIBRARY_LINK= -L$(LIB) -L$(STATIC_LIB) -lfbclient $(CRYPTLIB) $(MATHLIB)
  
  EXE_LINK_OPTIONS= $(LDFLAGS) $(THR_FLAGS) $(UNDEF_FLAGS) $(LIB_PATH_OPTS) $(call LINK_DARWIN_RPATH,..) $(LINK_EMPTY_SYMBOLS)
  LIB_LINK_OPTIONS= $(LDFLAGS) $(THR_FLAGS) -shared
-@@ -388,7 +401,7 @@ LINK_TRACE_LIBS = -L$(LIB) -L$(STATIC_LIB) $(SO_LINK_LIBS)
+@@ -388,7 +389,7 @@ LINK_TRACE_LIBS = -L$(LIB) -L$(STATIC_LIB) $(SO_LINK_LIBS)
  
  LINK_FIREBIRD = $(LIB_LINK) $(LINK_FIREBIRD_SYMBOLS) $(LIB_LINK_OPTIONS) $(LIB_FIREBIRD_OPTIONS) $(UNDEF_FLAGS)\
   $(call LIB_LINK_SONAME,$(LibrarySoName)) $(call LIB_LINK_RPATH,lib) $(call LINK_DARWIN_RPATH,..)
@@ -316,7 +260,7 @@ index 2bbf905..15cf4e9 100755
  
  LINK_ENGINE = $(LIB_LINK) $(LINK_PLUGIN_SYMBOLS) $(LIB_LINK_OPTIONS) $(LIB_FIREBIRD_OPTIONS) $(UNDEF_FLAGS)\
   $(call LIB_LINK_SONAME,$(EngineSoName)) $(call LIB_LINK_RPATH,lib) $(call LINK_DARWIN_RPATH,..)
-@@ -419,6 +432,7 @@ RUN_GFIX	= $(RBIN)/gfix$(EXEC_EXT)
+@@ -419,6 +420,7 @@ RUN_GFIX	= $(RBIN)/gfix$(EXEC_EXT)
  FBGUARD		= $(BIN)/fbguard$(EXEC_EXT)
  INSTREG		= $(BIN)/instreg$(EXEC_EXT)
  INSTSVC		= $(BIN)/instsvc$(EXEC_EXT)
@@ -340,7 +284,7 @@ index 659830d..f15572a 100644
  # Rule for making gbak files when cross-compiling
  
 diff --git a/builds/posix/make.shared.targets b/builds/posix/make.shared.targets
-index 5fefbf1..532e78d 100644
+index 5fefbf1..de31475 100644
 --- a/builds/posix/make.shared.targets
 +++ b/builds/posix/make.shared.targets
 @@ -78,17 +78,39 @@ $(OBJ)/dsql/PackageNodes.cpp: $(SRC_ROOT)/dsql/PackageNodes.epp
@@ -351,10 +295,10 @@ index 5fefbf1..532e78d 100644
 -$(FilesToAddDialog): $(GEN_ROOT)/remote/os/win32/window.res
 -$(FilesToAddDialog2): $(GEN_ROOT)/iscguard/iscguard.res
 +$(FilesToAddVersionInfo): $(OBJ)/jrd/version.res
-+$(FilesToAddVersionInfo1): $(OBJ)/yvalve/config/os/win32/version.res
-+$(FilesToAddVersionInfo2): $(OBJ)/jrd/os/win32/version.res
-+$(FilesToAddVersionInfo3): $(OBJ)/intl/version.res
-+$(FilesToAddVersionInfo4): $(OBJ)/extlib/version.res
++$(FilesToAddVersionInfo2): $(OBJ)/yvalve/config/os/win32/version.res
++$(FilesToAddVersionInfo3): $(OBJ)/jrd/os/win32/version.res
++$(FilesToAddVersionInfo4): $(OBJ)/intl/version.res
++$(FilesToAddVersionInfo5): $(OBJ)/extlib/version.res
 +$(FilesToAddDialog): $(OBJ)/remote/server/os/win32/window.res
 +$(FilesToAddDialog2): $(OBJ)/iscguard/iscguard.res
  
@@ -443,52 +387,59 @@ index cccded7..bfcd638 100644
  LEGACY_USERS_MANAGE_Objects:= $(call makeObjects,auth/SecurityDatabase,LegacyManagement.epp)
  
 diff --git a/builds/posix/prefix.mingw b/builds/posix/prefix.mingw
-index b4ca1da..0ae99be 100644
+index b4ca1da..78b3550 100644
 --- a/builds/posix/prefix.mingw
 +++ b/builds/posix/prefix.mingw
-@@ -20,50 +20,74 @@
+@@ -20,50 +20,81 @@
  #
  
  # -Wno-unused-variable is used due to unused gpre generated variables
 -PROD_FLAGS=-O2  -DMINGW -Werror=delete-incomplete -Wall -Wshadow -Wundef -Wno-long-long -Wno-unused-variable -Wno-sign-compare -Wno-parentheses -Wno-switch -fmessage-length=0 -Dlint -DWIN32_LEAN_AND_MEAN -MMD -mthreads -Wno-non-virtual-dtor
 -DEV_FLAGS=-ggdb -DMINGW -Werror=delete-incomplete -Wall -Wshadow -Wundef -Wno-long-long -Wno-unused-variable -Wno-sign-compare -Wno-parentheses -Wno-switch -fmessage-length=0 -Dlint -DWIN32_LEAN_AND_MEAN -MMD -mthreads -Wno-non-virtual-dtor
- 
--PLATFORM_PATH=os/win32
 +PROD_FLAGS=-O2 -march=native -DNDEBUG $(COMMONFLAGS) $(EXTRAFLAGS)
-+DEV_FLAGS=-ggdb -march=native -DDEBUG $(COMMONFLAGS) $(EXTRAFLAGS)
- 
--# Override link command for implicit stdc++ linking
--LIB_LINK=$(LD)
-+COMMONFLAGS=-DMINGW -DWIN_NT $(PROC) -DWIN32_LEAN_AND_MEAN -MMD
-+COMMONFLAGS+=-DTTMATH_NOASM -DHAVE_CTIME_S -DHAVE_LOCALTIME_S
- 
--LIB_LINK_OPTIONS+=-Wl,--enable-stdcall-fixup
++DEV_FLAGS=-ggdb -march=native -DDEBUG -DCOMPRESS_DEBUG $(COMMONFLAGS) $(EXTRAFLAGS)
++
++COMMONFLAGS=-DMINGW -DWIN_NT $(PROC) -DWIN32_LEAN_AND_MEAN -MMD -DTTMATH_NOASM -DHAVE_CTIME_S -DHAVE_LOCALTIME_S
++EXTRAFLAGS=-Wno-format -Wno-null-conversion -Wno-long-long -Wno-unused-variable -Wno-sign-compare -Wno-parentheses -Wno-switch -Wno-non-virtual-dtor -Wno-write-strings -Wno-invalid-offsetof -Wno-shift-count-overflow -Wno-ignored-attributes -Wno-deprecated-declarations
++
 +ifeq ($(CpuType),x86_64)
-+PROC=-DAMD64
++PROC=-DAMD64 -DDECUSE64
 +else
 +PROC=-DI386
 +endif
++
++ifeq ($(TARGET),Debug)
++RCFLAGS=-DDEBUG
++else
++RCFLAGS=-DNDEBUG
++endif
+ 
+ PLATFORM_PATH=os/win32
+ 
+ # Override link command for implicit stdc++ linking
+-LIB_LINK=$(LD)
++EXE_LINK = $(CXX) $(GLOB_OPTIONS)
++LIB_LINK = $(CXX) $(GLOB_OPTIONS)
+ 
+-LIB_LINK_OPTIONS+=-Wl,--enable-stdcall-fixup
++LIB_GUI:= -mwindows -lcomctl32 -lgdi32
  
 -# Strip symbols from release versions to decrease size
 -ifeq ($(IsProdTypeBuild),Y)
 -EXE_LINK_OPTIONS+=-Wl,-s
 -LIB_LINK_OPTIONS+=-Wl,-s
-+ifeq ($(TARGET),Debug)
-+RCFLAGS=-DDEBUG
-+else
-+RCFLAGS=-DNDEBUG
- endif
+-endif
++# MinGW doesn't use mapfile or rpath
++LIB_LINK_MAPFILE=
++LIB_LINK_RPATH=
++LINK_DARWIN_RPATH=
++LIB_PLATFORM_RPATH=
  
 -# Generation of fbclient_ms.lib
 -LIB_LINK_IMPLIB:=-Wl,--out-implib,firebird/lib/fbclient_ms.lib
-+EXTRAFLAGS=-Werror=delete-incomplete -Wundef -Wno-format -Wno-long-long -Wno-unused-variable -Wno-sign-compare -Wno-parentheses -Wno-switch -Wno-non-virtual-dtor -Wno-write-strings -Wno-invalid-offsetof -Wno-shift-count-overflow -Wno-ignored-attributes -Wno-deprecated-declarations
-+
-+PLATFORM_PATH=os/win32
-+
-+# Override link command for implicit stdc++ linking
-+LIB_LINK=$(LD)
-+
- LIB_GUI:= -mwindows -lcomctl32 -lgdi32
+-LIB_GUI:= -mwindows -lcomctl32 -lgdi32
++# Output an export library
++LIB_LINK_SONAME= -Wl,--out-implib,$(LIB)/lib$(1)$(ARCH_EXT)
  
  # Add resources to some files
 -FilesToAddVersionInfo=$(LIBFBEMBED_SO) $(LIBFBCLIENT_SO) $(LIBFBINTL_SO) \
@@ -498,12 +449,10 @@ index b4ca1da..0ae99be 100644
 -# TODO: guardians also must be here
 -FilesToAddDialog=$(FB_SUPER_SERVER) $(FB_CLASSIC_SERVER)
 -FilesToAddDialog2=$(IBGUARD)
-+
-+FilesToAddVersionInfo1=$(LIBFIREBIRD_SO)
-+FilesToAddVersionInfo2=$(LIBENGINE_SO)
-+FilesToAddVersionInfo3=$(LIBFBINTL_SO)
-+FilesToAddVersionInfo4=$(LIBIBUTIL_SO)
-+
++FilesToAddVersionInfo2=$(LIBFIREBIRD_SO)
++FilesToAddVersionInfo3=$(LIBENGINE_SO)
++FilesToAddVersionInfo4=$(LIBFBINTL_SO)
++FilesToAddVersionInfo5=$(LIBIBUTIL_SO)
 +FilesToAddDialog=$(FB_DAEMON)
 +FilesToAddDialog2=$(FBGUARD)
  
@@ -519,17 +468,19 @@ index b4ca1da..0ae99be 100644
 +LibraryBaseName=$(LibraryFileName).${SHRLIB_EXT}
 +
 +LIBFIREBIRD_FULLNAME = $(BIN)/$(LibraryFullName)
-+LIBFIREBIRD_SONAME = $(BIN)/$(LibraryBaseName)
-+LIBFIREBIRD_BASENAME = $(BIN)/$(LibrarySoName)
++LIBFIREBIRD_SONAME = $(BIN)/$(LibrarySoName)
++LIBFIREBIRD_BASENAME = $(BIN)/$(LibraryBaseName)
 +
 +EngineFileName=engine${OdsVersion}
 +EngineSoName=$(EngineFileName).${SHRLIB_EXT}
- 
--# Looks like MinGW 3 does not support version scripts but support def-files
--LINK_FIREBIRD_SYMBOLS = $(BLD_ROOT)/win32/defs/fbclient_s.def $(BLD_ROOT)/win32/defs/fbclient.def
++
 +LIBFIREBIRD_SO = $(BIN)/$(LibraryFileName).${SHRLIB_EXT}
 +LIBENGINE_SO = $(PLUGINS)/$(EngineFileName).${SHRLIB_EXT}
 +LIBFBINTL_SO = $(FB_BUILD)/intl/fbintl.$(SHRLIB_EXT)
+ 
+-# Looks like MinGW 3 does not support version scripts but support def-files
+-LINK_FIREBIRD_SYMBOLS = $(BLD_ROOT)/win32/defs/fbclient_s.def $(BLD_ROOT)/win32/defs/fbclient.def
++PLUGIN_SONAME=$(notdir $@)
  
 -# This is required for newly built executable to find newly built shared
 -# libraries because on Win32 there is no such thing as LD_LIBRARY_PATH
@@ -542,10 +493,10 @@ index b4ca1da..0ae99be 100644
 -LINK_UDF = $(LIB_LINK) $(LIB_LINK_OPTIONS) $(call LIB_LINK_SONAME,$(1).$(SHRLIB_EXT)) -L$(LIB) -lib_util
 -LINK_UDF_LIBS =
 +# Library name differ from make.default
-+LINK_INTL = $(LIB_LINK) $(LINK_FBINTL_SYMBOLS) $(LIB_LINK_OPTIONS) $(UNDEF_FLAGS)\
-+ $(call LIB_LINK_SONAME,fbintl.$(SHRLIB_EXT))
++LINK_INTL = $(LIB_LINK) $(LINK_FBINTL_SYMBOLS) $(LIB_LINK_OPTIONS) $(UNDEF_FLAGS) \
++  $(call LIB_LINK_SONAME,fbintl.$(SHRLIB_EXT))
  
 -# Special options for trace plugin link
 -LINK_TRACE_LIBS = -L$(LIB) $(SO_LINK_LIBS)
-+LINK_TRACE = $(LIB_LINK) $(LINK_PLUGIN_SYMBOLS) $(LIB_LINK_OPTIONS) $(UNDEF_FLAGS)\
-+ $(call LIB_LINK_SONAME,fbtrace.$(SHRLIB_EXT))
++LINK_TRACE = $(LIB_LINK) $(LINK_PLUGIN_SYMBOLS) $(LIB_LINK_OPTIONS) $(UNDEF_FLAGS) \
++  $(call LIB_LINK_SONAME,fbtrace.$(SHRLIB_EXT))

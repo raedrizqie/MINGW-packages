@@ -52,10 +52,10 @@ index 9183d8b..6bd2694 100644
  
  	operator LPSECURITY_ATTRIBUTES()
 diff --git a/src/common/isc_sync.cpp b/src/common/isc_sync.cpp
-index 7916df5..4081fea 100644
+index 9a3d98b..ccc899e 100755
 --- a/src/common/isc_sync.cpp
 +++ b/src/common/isc_sync.cpp
-@@ -1786,7 +1786,11 @@ SharedMemoryBase::SharedMemoryBase(const TEXT* filename, ULONG length, IpcObject
+@@ -1847,7 +1847,11 @@ SharedMemoryBase::SharedMemoryBase(const TEXT* filename, ULONG length, IpcObject
  	}
  
  	PathName mappedName;
@@ -67,7 +67,7 @@ index 7916df5..4081fea 100644
  	{
  		UnmapViewOfFile(address);
  		CloseHandle(file_obj);
-@@ -2035,7 +2039,7 @@ static const int DEFAULT_INTERLOCKED_SPIN_COUNT_SMP	= 200;
+@@ -2096,7 +2100,7 @@ static const int DEFAULT_INTERLOCKED_SPIN_COUNT_SMP	= 200;
  
  static SLONG pid = 0;
  
@@ -76,21 +76,8 @@ index 7916df5..4081fea 100644
  static inline BOOL switchToThread()
  {
  	static pfnSwitchToThread fnSwitchToThread = NULL;
-diff --git a/src/common/os/guid.h b/src/common/os/guid.h
-index 74b1378..855d9cf 100644
---- a/src/common/os/guid.h
-+++ b/src/common/os/guid.h
-@@ -55,7 +55,7 @@ const int GUID_BODY_SIZE = 36;
- 
- // Some versions of MSVC cannot recognize hh specifier but MSVC 2015 has it
- const char* const GUID_FORMAT =
--	"{%08X-%04hX-%04hX-%02hhX%02hhX-%02hhX%02hhX%02hhX%02hhX%02hhX%02hhX}";
-+	"{%08lX-%04hX-%04hX-%02hhX%02hhX-%02hhX%02hhX%02hhX%02hhX%02hhX%02hhX}";
- const int GUID_FORMAT_ARGS = 11;
- 
- void GenerateRandomBytes(void* buffer, FB_SIZE_T size);
 diff --git a/src/common/unicode_util.cpp b/src/common/unicode_util.cpp
-index 40871dc..35623d0 100644
+index 86eec7d..2ebeb7e 100644
 --- a/src/common/unicode_util.cpp
 +++ b/src/common/unicode_util.cpp
 @@ -56,9 +56,12 @@
@@ -107,7 +94,7 @@ index 40871dc..35623d0 100644
  #elif defined(DARWIN)
  const char* const inTemplate = "lib/libicui18n.%s.dylib";
  const char* const ucTemplate = "lib/libicuuc.%s.dylib";
-@@ -1329,7 +1332,7 @@ UnicodeUtil::ConversionICU& UnicodeUtil::getConversionICU()
+@@ -1328,7 +1331,7 @@ UnicodeUtil::ConversionICU& UnicodeUtil::getConversionICU()
  
  	for (int major = 79; major >= 3;)
  	{
@@ -117,7 +104,7 @@ index 40871dc..35623d0 100644
  #else
  		int minor = 9;
 diff --git a/src/common/utils_proto.h b/src/common/utils_proto.h
-index e70e3c0..bc68121 100644
+index e70e3c0..6424391 100644
 --- a/src/common/utils_proto.h
 +++ b/src/common/utils_proto.h
 @@ -116,10 +116,10 @@ namespace fb_utils
@@ -128,10 +115,10 @@ index e70e3c0..bc68121 100644
 -		if (n1 == MININT64)
 -			return n2 == MININT64 ? 0 : 2;
 -		if (n2 == MININT64)
-+		const SINT64 minInt64 = 0x8000000000000000;
-+		if (n1 == minInt64)
-+			return n2 == minInt64 ? 0 : 2;
-+		if (n2 == minInt64)
++		const SINT64 MIN_INT64 = 0x8000000000000000;
++		if (n1 == MIN_INT64)
++			return n2 == MIN_INT64 ? 0 : 2;
++		if (n2 == MIN_INT64)
  			return -2;
  #endif
  
@@ -180,10 +167,10 @@ index 983a7ba..0b4f8ac 100644
  		{
  			while (WaitForSingleObject(procHandle, 500) == WAIT_OBJECT_0)
 diff --git a/src/jrd/jrd.cpp b/src/jrd/jrd.cpp
-index d43aba3..68aeebd 100644
+index 744db2d..3689c5f 100644
 --- a/src/jrd/jrd.cpp
 +++ b/src/jrd/jrd.cpp
-@@ -8852,7 +8852,7 @@ namespace
+@@ -8858,7 +8858,7 @@ namespace
  	THREAD_ENTRY_DECLARE attachmentShutdownThread(THREAD_ENTRY_PARAM arg)
  	{
  #ifdef WIN_NT
@@ -193,10 +180,10 @@ index d43aba3..68aeebd 100644
  
  		AttShutParams* params = static_cast<AttShutParams*>(arg);
 diff --git a/src/remote/inet.cpp b/src/remote/inet.cpp
-index 01bd67d..d2ec914 100644
+index 84bfc71..3aa8d63 100644
 --- a/src/remote/inet.cpp
 +++ b/src/remote/inet.cpp
-@@ -1205,7 +1205,7 @@ static rem_port* listener_socket(rem_port* port, USHORT flag, const addrinfo* pa
+@@ -1206,7 +1206,7 @@ static rem_port* listener_socket(rem_port* port, USHORT flag, const addrinfo* pa
  			forkEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
  			forkSockets = FB_NEW SocketsArray(*getDefaultMemoryPool());
  
@@ -205,43 +192,8 @@ index 01bd67d..d2ec914 100644
  		}
  		forkSockets->add(s);
  		SetEvent(forkEvent);
-@@ -3180,7 +3180,7 @@ static bool packet_send( rem_port* port, const SCHAR* buffer, SSHORT buffer_leng
- 		}
- #endif
- 		SSHORT n = send(port->port_handle, data, length, FB_SEND_FLAGS);
--#if COMPRESS_DEBUG > 1
-+#if defined(COMPRESS_DEBUG) && COMPRESS_DEBUG > 1
- 		fprintf(stderr, "send(%d, %p, %d, FB_SEND_FLAGS) == %d\n", port->port_handle, data, length, n);
- #endif
- #ifdef DEBUG
-diff --git a/src/remote/protocol.cpp b/src/remote/protocol.cpp
-index ef466b8..7135aaa 100644
---- a/src/remote/protocol.cpp
-+++ b/src/remote/protocol.cpp
-@@ -294,7 +294,7 @@ bool_t xdr_protocol(RemoteXdr* xdrs, PACKET* p)
- 	if (!xdr_enum(xdrs, reinterpret_cast<xdr_op*>(&p->p_operation)))
- 		return P_FALSE(xdrs, p);
- 
--#if COMPRESS_DEBUG > 1
-+#if defined(COMPRESS_DEBUG) && COMPRESS_DEBUG > 1
- 	if (xdrs->x_op != XDR_FREE)
- 	{
- 		fprintf(stderr, "operation=%d %c\n", p->p_operation,
-diff --git a/src/remote/remote.cpp b/src/remote/remote.cpp
-index d55b995..d796113 100644
---- a/src/remote/remote.cpp
-+++ b/src/remote/remote.cpp
-@@ -1538,7 +1538,7 @@ bool REMOTE_deflate(RemoteXdr* xdrs, ProtoWrite* proto_write, PacketSend* packet
- 		expectMoreOut = !strm.avail_out;
- 		if ((port->port_buff_size != strm.avail_out) && (flush || !strm.avail_out))
- 		{
--#if COMPRESS_DEBUG > 1
-+#if defined(COMPRESS_DEBUG) && COMPRESS_DEBUG > 1
- 			fprintf(stderr, "Send packet %d bytes size\n", port->port_buff_size - strm.avail_out);
- #endif
- 			if (!packet_send(port, (SCHAR*) &port->port_compressed[REM_SEND_OFFSET(port->port_buff_size)],
 diff --git a/src/yvalve/gds.cpp b/src/yvalve/gds.cpp
-index 6d5149e..64c5993 100644
+index 20dc78f..b0a4d84 100644
 --- a/src/yvalve/gds.cpp
 +++ b/src/yvalve/gds.cpp
 @@ -104,7 +104,7 @@

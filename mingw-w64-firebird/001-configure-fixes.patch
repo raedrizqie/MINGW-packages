@@ -13,7 +13,7 @@ index bedf51c..8b7271f 100644
  
  if test x"$acx_pthread_ok" = xno; then
 diff --git a/configure.ac b/configure.ac
-index 3d03ce3..9b44b45 100644
+index 1d8a2e2..fee06e1 100644
 --- a/configure.ac
 +++ b/configure.ac
 @@ -896,6 +896,7 @@ AC_CHECK_TOOL([OBJCOPY], [objcopy])
@@ -66,7 +66,7 @@ index 3d03ce3..9b44b45 100644
  
    *)
 diff --git a/src/misc/writeBuildNum.sh b/src/misc/writeBuildNum.sh
-index 4dd72c7..114c0eb 100755
+index 0724f72..5430e51 100755
 --- a/src/misc/writeBuildNum.sh
 +++ b/src/misc/writeBuildNum.sh
 @@ -105,12 +105,16 @@ grep ODS_VERSION $OdsH | grep -v ENCODE_ODS >$Mini
