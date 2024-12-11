@@ -195,6 +195,7 @@ build() {
     -DCMAKE_INSTALL_PREFIX=${MINGW_PREFIX}/qt5-static \
     "${_extra_config[@]}" \
     -DPORT=Qt \
+    -DQT_BUNDLED_PNG=ON \
     -DENABLE_API_TESTS=ON \
     -DUSE_THIN_ARCHIVES=OFF \
     -S ${_realname}-${_pkgver} \
