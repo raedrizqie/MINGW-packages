@@ -1,0 +1,35 @@
+diff --git a/src/3rdparty/chromium/third_party/dawn/scripts/dawn_features.gni b/src/3rdparty/chromium/third_party/dawn/scripts/dawn_features.gni
+index 6f4f01e..8fd1ad0 100644
+--- a/src/3rdparty/chromium/third_party/dawn/scripts/dawn_features.gni
++++ b/src/3rdparty/chromium/third_party/dawn/scripts/dawn_features.gni
+@@ -38,7 +38,7 @@ declare_args() {
+   dawn_complete_static_libs = false
+ 
+   # Enables the compilation of Dawn's D3D12 backend
+-  dawn_enable_d3d12 = is_win
++  dawn_enable_d3d12 = is_msvc
+ 
+   # Enables the compilation of Dawn's Metal backend
+   dawn_enable_metal = is_mac
+diff --git a/src/3rdparty/chromium/third_party/dawn/src/common/BUILD.gn b/src/3rdparty/chromium/third_party/dawn/src/common/BUILD.gn
+index 0a2e36f..344fdf8 100644
+--- a/src/3rdparty/chromium/third_party/dawn/src/common/BUILD.gn
++++ b/src/3rdparty/chromium/third_party/dawn/src/common/BUILD.gn
+@@ -121,7 +121,7 @@ config("dawn_internal") {
+     #   if (myUint64 > std::numeric_limits<size_t>::max()) {...}
+     cflags += [ "-Wno-tautological-type-limit-compare" ]
+ 
+-    if (is_win) {
++    if (is_msvc) {
+       cflags += [
+         # clang-cl doesn't know -pedantic, pass it explicitly to the clang driver
+         "/clang:-pedantic",
+@@ -134,7 +134,7 @@ config("dawn_internal") {
+     }
+   }
+ 
+-  if (!is_clang && is_win) {
++  if (!is_clang && is_msvc) {
+     # Dawn extends wgpu enums with internal enums.
+     # MSVC considers these invalid switch values. crbug.com/dawn/397.
+     cflags += [ "/wd4063" ]

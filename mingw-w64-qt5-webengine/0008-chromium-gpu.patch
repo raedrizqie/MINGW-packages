@@ -1,0 +1,41 @@
+diff --git a/src/3rdparty/chromium/gpu/command_buffer/service/BUILD.gn b/src/3rdparty/chromium/gpu/command_buffer/service/BUILD.gn
+index 56cb734..315a414 100644
+--- a/src/3rdparty/chromium/gpu/command_buffer/service/BUILD.gn
++++ b/src/3rdparty/chromium/gpu/command_buffer/service/BUILD.gn
+@@ -464,7 +464,7 @@ target(link_target_type, "gles2_sources") {
+     }
+   }
+ 
+-  if (is_win) {
++  if (is_msvc) {
+     sources += [
+       "shared_image_backing_d3d.cc",
+       "shared_image_backing_d3d.h",
+diff --git a/src/3rdparty/chromium/gpu/config/BUILD.gn b/src/3rdparty/chromium/gpu/config/BUILD.gn
+index 569657a..63d7699 100644
+--- a/src/3rdparty/chromium/gpu/config/BUILD.gn
++++ b/src/3rdparty/chromium/gpu/config/BUILD.gn
+@@ -212,8 +212,8 @@ source_set("config_sources") {
+ 
+   if (is_win) {
+     libs = [
+-      "dxgi.lib",
+-      "dxguid.lib",
++      "dxgi",
++      "dxguid",
+     ]
+ 
+     if (is_chrome_branded && is_official_build) {
+diff --git a/src/3rdparty/chromium/gpu/config/gpu_info_collector_win.cc b/src/3rdparty/chromium/gpu/config/gpu_info_collector_win.cc
+index 7296643..2e21646 100644
+--- a/src/3rdparty/chromium/gpu/config/gpu_info_collector_win.cc
++++ b/src/3rdparty/chromium/gpu/config/gpu_info_collector_win.cc
+@@ -257,7 +257,7 @@ uint32_t GetGpuSupportedD3D12Version() {
+     // Check to see if the adapter supports Direct3D 12, but don't create the
+     // actual device yet. (**ppDevice == nullptr)
+     for (auto level : feature_levels) {
+-      if (SUCCEEDED(D3D12CreateDevice(nullptr, level, _uuidof(ID3D12Device),
++      if (SUCCEEDED(D3D12CreateDevice(nullptr, level, __uuidof(ID3D12Device),
+                                       nullptr))) {
+         return level;
+       }

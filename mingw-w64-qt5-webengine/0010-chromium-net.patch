@@ -1,0 +1,95 @@
+diff --git a/src/3rdparty/chromium/net/BUILD.gn b/src/3rdparty/chromium/net/BUILD.gn
+index c399590..5d79c44 100644
+--- a/src/3rdparty/chromium/net/BUILD.gn
++++ b/src/3rdparty/chromium/net/BUILD.gn
+@@ -1522,17 +1522,19 @@ component("net") {
+ 
+   if (is_win) {
+     libs = [
+-      "crypt32.lib",
+-      "dhcpcsvc.lib",
+-      "iphlpapi.lib",
+-      "ncrypt.lib",
+-      "rpcrt4.lib",
+-      "secur32.lib",
+-      "urlmon.lib",
+-      "winhttp.lib",
++      "crypt32",
++      "dhcpcsvc",
++      "iphlpapi",
++      "ncrypt",
++      "rpcrt4",
++      "secur32",
++      "urlmon",
++      "winhttp",
+     ]
+ 
+-    ldflags = [ "/DELAYLOAD:urlmon.dll" ]
++    if (is_msvc) {
++      ldflags = [ "/DELAYLOAD:urlmon.dll" ]
++    }
+   }
+ 
+   if (!is_nacl) {
+@@ -4834,8 +4836,8 @@ test("net_unittests") {
+ 
+   if (is_win) {
+     libs = [
+-      "iphlpapi.lib",
+-      "ncrypt.lib",
++      "iphlpapi",
++      "ncrypt",
+     ]
+   }
+ 
+diff --git a/src/3rdparty/chromium/net/base/network_change_notifier.cc b/src/3rdparty/chromium/net/base/network_change_notifier.cc
+index fdb6612..04964c8 100644
+--- a/src/3rdparty/chromium/net/base/network_change_notifier.cc
++++ b/src/3rdparty/chromium/net/base/network_change_notifier.cc
+@@ -30,7 +30,7 @@
+ #include "net/url_request/url_request.h"
+ #include "url/gurl.h"
+ 
+-#if defined(OS_WIN)
++#if defined(IS_MSVC)
+ #include "net/base/network_change_notifier_win.h"
+ #elif defined(OS_LINUX) && !defined(OS_CHROMEOS)
+ #include "net/base/network_change_notifier_linux.h"
+@@ -227,7 +227,7 @@ std::unique_ptr<NetworkChangeNotifier> NetworkChangeNotifier::CreateIfNeeded(
+   if (g_network_change_notifier_factory)
+     return g_network_change_notifier_factory->CreateInstance();
+ 
+-#if defined(OS_WIN)
++#if defined(IS_MSVC)
+   std::unique_ptr<NetworkChangeNotifierWin> network_change_notifier =
+       std::make_unique<NetworkChangeNotifierWin>();
+   network_change_notifier->WatchForAddressChange();
+@@ -475,7 +475,7 @@ NetworkChangeNotifier::ConnectionTypeFromInterfaceList(
+   bool first = true;
+   ConnectionType result = CONNECTION_NONE;
+   for (size_t i = 0; i < interfaces.size(); ++i) {
+-#if defined(OS_WIN)
++#if defined(IS_MSVC)
+     if (interfaces[i].friendly_name == "Teredo Tunneling Pseudo-Interface")
+       continue;
+ #endif
+diff --git a/src/3rdparty/chromium/net/socket/udp_socket_win.cc b/src/3rdparty/chromium/net/socket/udp_socket_win.cc
+index 4fec002..4e40871 100644
+--- a/src/3rdparty/chromium/net/socket/udp_socket_win.cc
++++ b/src/3rdparty/chromium/net/socket/udp_socket_win.cc
+@@ -1301,6 +1301,7 @@ int DscpManager::PrepareForSend(const IPEndPoint& remote_address) {
+   // We won't try this address again if we get an error.
+   configured_.emplace(remote_address);
+ 
++#if defined(COMPILER_MSVC)
+   // We don't need to call SetFlow if we already have a qos flow.
+   bool new_flow = flow_id_ == 0;
+ 
+@@ -1329,6 +1330,7 @@ int DscpManager::PrepareForSend(const IPEndPoint& remote_address) {
+     api_->SetFlow(qos_handle_, flow_id_, QOSSetOutgoingDSCPValue, sizeof(buf),
+                   &buf, 0, nullptr);
+   }
++#endif
+ 
+   return OK;
+ }
