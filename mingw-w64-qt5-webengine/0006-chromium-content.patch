@@ -1,0 +1,218 @@
+diff --git a/src/3rdparty/chromium/content/app/content_main.cc b/src/3rdparty/chromium/content/app/content_main.cc
+index 2980fe8..fbea1b9 100644
+--- a/src/3rdparty/chromium/content/app/content_main.cc
++++ b/src/3rdparty/chromium/content/app/content_main.cc
+@@ -51,8 +51,10 @@
+ #include "base/win/process_startup_helper.h"
+ #include "base/win/win_util.h"
+ #include "base/win/windows_version.h"
++#if defined(IS_MSVC)
+ #include "ui/base/win/atl_module.h"
+ #endif
++#endif
+ 
+ #if defined(OS_POSIX) && !defined(OS_ANDROID)
+ #include <locale.h>
+@@ -248,7 +250,9 @@ int RunContentProcess(const ContentMainParams& params,
+ 
+ #if defined(OS_WIN)
+     base::win::RegisterInvalidParamHandler();
++#if defined(IS_MSVC)
+     ui::win::CreateATLModuleIfNeeded();
++#endif
+ #endif  // defined(OS_WIN)
+ 
+ #if !defined(OS_ANDROID)
+diff --git a/src/3rdparty/chromium/content/app/content_main_runner_impl.cc b/src/3rdparty/chromium/content/app/content_main_runner_impl.cc
+index a8c7d44..2d9b4a5 100644
+--- a/src/3rdparty/chromium/content/app/content_main_runner_impl.cc
++++ b/src/3rdparty/chromium/content/app/content_main_runner_impl.cc
+@@ -672,9 +672,9 @@ int ContentMainRunnerImpl::Initialize(const ContentMainParams& params) {
+   if (enable_startup_tracing)
+     tracing::EnableStartupTracingIfNeeded();
+ 
+-#if defined(OS_WIN)
++#if defined(IS_MSVC)
+   base::trace_event::TraceEventETWExport::EnableETWExport();
+-#endif  // OS_WIN
++#endif  // IS_MSVC
+ 
+   // Android tracing started at the beginning of the method.
+   // Other OSes have to wait till we get here in order for all the memory
+diff --git a/src/3rdparty/chromium/content/browser/BUILD.gn b/src/3rdparty/chromium/content/browser/BUILD.gn
+index 1466f33..c85d4a9 100644
+--- a/src/3rdparty/chromium/content/browser/BUILD.gn
++++ b/src/3rdparty/chromium/content/browser/BUILD.gn
+@@ -2281,6 +2281,16 @@ jumbo_static_library("browser") {
+       "renderer_host/virtual_keyboard_controller_win.h",
+       "utility_sandbox_delegate_win.cc",
+     ]
++    if (is_mingw) {
++      sources -= [
++        "installedapp/installed_app_provider_impl_win.cc",
++        "installedapp/installed_app_provider_impl_win.h",
++        "renderer_host/direct_manipulation_event_handler_win.cc",
++        "renderer_host/direct_manipulation_event_handler_win.h",
++        "renderer_host/direct_manipulation_helper_win.cc",
++        "renderer_host/direct_manipulation_helper_win.h",
++      ]
++    }
+     defines += [
+       # This prevents the inclusion of atlhost.h which paired
+       # with the windows 8 sdk it does the wrong thing.
+@@ -2292,15 +2302,15 @@ jumbo_static_library("browser") {
+       "//third_party/isimpledom",
+     ]
+     libs += [
+-      "comctl32.lib",
+-      "dinput8.lib",
+-      "dwmapi.lib",
+-      "dxguid.lib",
+-      "imm32.lib",
+-      "oleacc.lib",
+-      "portabledeviceguids.lib",
+-      "uiautomationcore.lib",
+-      "wtsapi32.lib",
++      "comctl32",
++      "dinput8",
++      "dwmapi",
++      "dxguid",
++      "imm32",
++      "oleacc",
++      "portabledeviceguids",
++      "uiautomationcore",
++      "wtsapi32",
+     ]
+   }
+ 
+diff --git a/src/3rdparty/chromium/content/browser/renderer_host/dwrite_font_proxy_impl_win.cc b/src/3rdparty/chromium/content/browser/renderer_host/dwrite_font_proxy_impl_win.cc
+index 7f1710b..d109e0a 100644
+--- a/src/3rdparty/chromium/content/browser/renderer_host/dwrite_font_proxy_impl_win.cc
++++ b/src/3rdparty/chromium/content/browser/renderer_host/dwrite_font_proxy_impl_win.cc
+@@ -37,7 +37,9 @@
+ #include "third_party/skia/include/core/SkTypeface.h"
+ #include "third_party/skia/include/ports/SkTypeface_win.h"
+ #include "ui/gfx/win/direct_write.h"
++#if defined(COMPILER_MSVC)
+ #include "ui/gfx/win/text_analysis_source.h"
++#endif
+ 
+ namespace mswr = Microsoft::WRL;
+ 
+@@ -307,6 +309,7 @@ void DWriteFontProxyImpl::MapCharacters(
+     }
+   }
+ 
++#if defined(COMPILER_MSVC)
+   mswr::ComPtr<IDWriteFont> mapped_font;
+ 
+   mswr::ComPtr<IDWriteNumberSubstitution> number_substitution;
+@@ -388,6 +391,7 @@ void DWriteFontProxyImpl::MapCharacters(
+   LogMessageFilterError(MessageFilterError::MAP_CHARACTERS_NO_FAMILY);
+   DCHECK_EQ(result->family_index, UINT32_MAX);
+   DCHECK_GT(result->mapped_length, 0u);
++#endif
+ }
+ 
+ void DWriteFontProxyImpl::GetUniqueNameLookupTableIfAvailable(
+diff --git a/src/3rdparty/chromium/content/browser/renderer_host/media/media_stream_manager.cc b/src/3rdparty/chromium/content/browser/renderer_host/media/media_stream_manager.cc
+index c627d89..73651c2 100644
+--- a/src/3rdparty/chromium/content/browser/renderer_host/media/media_stream_manager.cc
++++ b/src/3rdparty/chromium/content/browser/renderer_host/media/media_stream_manager.cc
+@@ -727,6 +727,7 @@ MediaStreamManager::MediaStreamManager(
+ 
+   DCHECK(audio_system_);
+ 
++#if !defined(IS_MINGW)
+   if (!video_capture_provider) {
+     scoped_refptr<base::SingleThreadTaskRunner> device_task_runner =
+ #if defined(OS_WIN)
+@@ -783,6 +784,7 @@ MediaStreamManager::MediaStreamManager(
+     }
+   }
+   InitializeMaybeAsync(std::move(video_capture_provider));
++#endif
+ 
+   audio_service_listener_ = std::make_unique<AudioServiceListener>();
+ 
+diff --git a/src/3rdparty/chromium/content/browser/speech/tts_platform_impl.cc b/src/3rdparty/chromium/content/browser/speech/tts_platform_impl.cc
+index 2246c9f..f2be891 100644
+--- a/src/3rdparty/chromium/content/browser/speech/tts_platform_impl.cc
++++ b/src/3rdparty/chromium/content/browser/speech/tts_platform_impl.cc
+@@ -20,7 +20,7 @@ TtsPlatform* TtsPlatform::GetInstance() {
+     return result;
+ #endif
+ 
+-#if defined(OS_CHROMEOS)
++#if defined(OS_CHROMEOS) || defined(IS_MINGW)
+   // On Chrome OS, the platform TTS definition is provided by the content
+   // client.
+   //
+diff --git a/src/3rdparty/chromium/content/child/BUILD.gn b/src/3rdparty/chromium/content/child/BUILD.gn
+index cdaf2b2..259bad4 100644
+--- a/src/3rdparty/chromium/content/child/BUILD.gn
++++ b/src/3rdparty/chromium/content/child/BUILD.gn
+@@ -158,7 +158,7 @@ target(link_target_type, "child") {
+   }
+ 
+   if (is_win) {
+-    libs = [ "dwrite.lib" ]
++    libs = [ "dwrite" ]
+   }
+ 
+   if (enable_plugins) {
+diff --git a/src/3rdparty/chromium/content/ppapi_plugin/ppapi_plugin_main.cc b/src/3rdparty/chromium/content/ppapi_plugin/ppapi_plugin_main.cc
+index dc737cb..609669e 100644
+--- a/src/3rdparty/chromium/content/ppapi_plugin/ppapi_plugin_main.cc
++++ b/src/3rdparty/chromium/content/ppapi_plugin/ppapi_plugin_main.cc
+@@ -142,7 +142,7 @@ int PpapiPluginMain(const MainFunctionParams& parameters) {
+     tracing::EnableStartupTracingIfNeeded();
+ #endif  // OS_POSIX && !OS_ANDROID && !OS_MAC
+ 
+-#if defined(OS_WIN)
++#if defined(IS_MSVC)
+   if (!base::win::IsUser32AndGdi32Available())
+     gfx::win::InitializeDirectWrite();
+   InitializeDWriteFontProxy();
+@@ -164,7 +164,7 @@ int PpapiPluginMain(const MainFunctionParams& parameters) {
+ 
+   run_loop.Run();
+ 
+-#if defined(OS_WIN)
++#if defined(IS_MSVC)
+   UninitializeDWriteFontProxy();
+ #endif
+   return 0;
+diff --git a/src/3rdparty/chromium/content/renderer/renderer_main_platform_delegate_win.cc b/src/3rdparty/chromium/content/renderer/renderer_main_platform_delegate_win.cc
+index 4fb80f4..ebfd3fd 100644
+--- a/src/3rdparty/chromium/content/renderer/renderer_main_platform_delegate_win.cc
++++ b/src/3rdparty/chromium/content/renderer/renderer_main_platform_delegate_win.cc
+@@ -53,11 +53,15 @@ void RendererMainPlatformDelegate::PlatformInitialize() {
+     std::unique_ptr<icu::TimeZone> zone(icu::TimeZone::createDefault());
+   }
+ 
++#if defined(COMPILER_MSVC)
+   InitializeDWriteFontProxy();
++#endif
+ }
+ 
+ void RendererMainPlatformDelegate::PlatformUninitialize() {
++#if defined(COMPILER_MSVC)
+   UninitializeDWriteFontProxy();
++#endif
+ }
+ 
+ bool RendererMainPlatformDelegate::EnableSandbox() {
+diff --git a/src/3rdparty/chromium/content/shell/BUILD.gn b/src/3rdparty/chromium/content/shell/BUILD.gn
+index 56c0e8b..2eadb8b 100644
+--- a/src/3rdparty/chromium/content/shell/BUILD.gn
++++ b/src/3rdparty/chromium/content/shell/BUILD.gn
+@@ -797,7 +797,7 @@ group("content_shell_crash_test") {
+       "//components/crash/content/tools/dmp2minidump.py",
+     ]
+   }
+-  if (is_win) {
++  if (is_msvc) {
+     data_deps += [ "//build/win:copy_cdb_to_output" ]
+   }
+   if (is_posix) {
