@@ -1,0 +1,188 @@
+diff --git a/src/3rdparty/chromium/sandbox/win/BUILD.gn b/src/3rdparty/chromium/sandbox/win/BUILD.gn
+index e5db1a5..05dddf4 100644
+--- a/src/3rdparty/chromium/sandbox/win/BUILD.gn
++++ b/src/3rdparty/chromium/sandbox/win/BUILD.gn
+@@ -308,7 +308,7 @@ test("sbox_validation_tests") {
+     "//testing/gtest",
+   ]
+ 
+-  libs = [ "shlwapi.lib" ]
++  libs = [ "shlwapi" ]
+ }
+ 
+ test("sbox_unittests") {
+diff --git a/src/3rdparty/chromium/sandbox/win/src/interception_agent.cc b/src/3rdparty/chromium/sandbox/win/src/interception_agent.cc
+index 26e65df..8596965 100644
+--- a/src/3rdparty/chromium/sandbox/win/src/interception_agent.cc
++++ b/src/3rdparty/chromium/sandbox/win/src/interception_agent.cc
+@@ -45,7 +45,7 @@ InterceptionAgent* InterceptionAgent::GetInterceptionAgent() {
+ 
+     size_t array_bytes = g_interceptions->num_intercepted_dlls * sizeof(void*);
+     s_singleton = reinterpret_cast<InterceptionAgent*>(
+-        new (NT_ALLOC) char[array_bytes + sizeof(InterceptionAgent)]);
++        new char[array_bytes + sizeof(InterceptionAgent)]);
+ 
+     bool success = s_singleton->Init(g_interceptions);
+     if (!success) {
+@@ -112,7 +112,7 @@ bool InterceptionAgent::OnDllLoad(const UNICODE_STRING* full_path,
+   size_t buffer_bytes = offsetof(DllInterceptionData, thunks) +
+                         dll_info->num_functions * sizeof(ThunkData);
+   dlls_[i] = reinterpret_cast<DllInterceptionData*>(
+-      new (NT_PAGE, base_address) char[buffer_bytes]);
++      new char[buffer_bytes]);
+ 
+   DCHECK_NT(dlls_[i]);
+   if (!dlls_[i])
+diff --git a/src/3rdparty/chromium/sandbox/win/src/nt_internals.h b/src/3rdparty/chromium/sandbox/win/src/nt_internals.h
+index 6041566..a9fd004 100644
+--- a/src/3rdparty/chromium/sandbox/win/src/nt_internals.h
++++ b/src/3rdparty/chromium/sandbox/win/src/nt_internals.h
+@@ -173,12 +173,14 @@ typedef enum _FILE_INFORMATION_CLASS {
+ } FILE_INFORMATION_CLASS,
+     *PFILE_INFORMATION_CLASS;
+ 
++#ifdef _MSC_VER
+ typedef struct _FILE_RENAME_INFORMATION {
+   BOOLEAN ReplaceIfExists;
+   HANDLE RootDirectory;
+   ULONG FileNameLength;
+   WCHAR FileName[1];
+ } FILE_RENAME_INFORMATION, *PFILE_RENAME_INFORMATION;
++#endif
+ 
+ typedef NTSTATUS(WINAPI* NtSetInformationFileFunction)(
+     IN HANDLE FileHandle,
+@@ -187,6 +189,7 @@ typedef NTSTATUS(WINAPI* NtSetInformationFileFunction)(
+     IN ULONG Length,
+     IN FILE_INFORMATION_CLASS FileInformationClass);
+ 
++#ifdef _MSC_VER
+ typedef struct FILE_BASIC_INFORMATION {
+   LARGE_INTEGER CreationTime;
+   LARGE_INTEGER LastAccessTime;
+@@ -194,11 +197,13 @@ typedef struct FILE_BASIC_INFORMATION {
+   LARGE_INTEGER ChangeTime;
+   ULONG FileAttributes;
+ } FILE_BASIC_INFORMATION, *PFILE_BASIC_INFORMATION;
++#endif
+ 
+ typedef NTSTATUS(WINAPI* NtQueryAttributesFileFunction)(
+     IN POBJECT_ATTRIBUTES ObjectAttributes,
+     OUT PFILE_BASIC_INFORMATION FileAttributes);
+ 
++#ifdef _MSC_VER
+ typedef struct _FILE_NETWORK_OPEN_INFORMATION {
+   LARGE_INTEGER CreationTime;
+   LARGE_INTEGER LastAccessTime;
+@@ -208,6 +213,7 @@ typedef struct _FILE_NETWORK_OPEN_INFORMATION {
+   LARGE_INTEGER EndOfFile;
+   ULONG FileAttributes;
+ } FILE_NETWORK_OPEN_INFORMATION, *PFILE_NETWORK_OPEN_INFORMATION;
++#endif
+ 
+ typedef NTSTATUS(WINAPI* NtQueryFullAttributesFileFunction)(
+     IN POBJECT_ATTRIBUTES ObjectAttributes,
+@@ -527,8 +533,10 @@ typedef NTSTATUS(WINAPI* NtSetValueKeyFunction)(IN HANDLE KeyHandle,
+ // -----------------------------------------------------------------------
+ // Memory
+ 
++#ifdef _MSC_VER
+ // Don't really need this structure right now.
+ typedef PVOID PRTL_HEAP_PARAMETERS;
++#endif
+ 
+ typedef PVOID(WINAPI* RtlCreateHeapFunction)(IN ULONG Flags,
+                                              IN PVOID HeapBase OPTIONAL,
+@@ -628,6 +636,7 @@ typedef enum _POOL_TYPE {
+   NonPagedPoolCacheAlignedMustS
+ } POOL_TYPE;
+ 
++#ifdef _MSC_VER
+ typedef struct _OBJECT_BASIC_INFORMATION {
+   ULONG Attributes;
+   ACCESS_MASK GrantedAccess;
+@@ -689,6 +698,7 @@ typedef struct _SYSTEM_HANDLE_INFORMATION_EX {
+ typedef struct _OBJECT_NAME_INFORMATION {
+   UNICODE_STRING ObjectName;
+ } OBJECT_NAME_INFORMATION, *POBJECT_NAME_INFORMATION;
++#endif
+ 
+ typedef NTSTATUS(WINAPI* NtQueryObjectFunction)(
+     IN HANDLE Handle,
+diff --git a/src/3rdparty/chromium/sandbox/win/src/sandbox_nt_util.cc b/src/3rdparty/chromium/sandbox/win/src/sandbox_nt_util.cc
+index d7f6f03..74d6c14 100644
+--- a/src/3rdparty/chromium/sandbox/win/src/sandbox_nt_util.cc
++++ b/src/3rdparty/chromium/sandbox/win/src/sandbox_nt_util.cc
+@@ -14,6 +14,13 @@
+ #include "sandbox/win/src/sandbox_factory.h"
+ #include "sandbox/win/src/target_services.h"
+ 
++#ifndef _MSC_VER
++#undef __try
++#define __try try
++#undef __except
++#define __except(x) catch(...)
++#endif
++
+ namespace sandbox {
+ 
+ // This is the list of all imported symbols from ntdll.dll.
+@@ -314,7 +321,7 @@ NTSTATUS AllocAndCopyName(const OBJECT_ATTRIBUTES* in_object,
+         break;
+ 
+       size_t size = in_object->ObjectName->Length + sizeof(wchar_t);
+-      out_name->reset(new (NT_ALLOC) wchar_t[size / sizeof(wchar_t)]);
++      out_name->reset(new wchar_t[size / sizeof(wchar_t)]);
+       if (!*out_name)
+         break;
+ 
+@@ -420,7 +427,7 @@ UNICODE_STRING* AnsiToUnicode(const char* string) {
+       ansi_string.MaximumLength * sizeof(wchar_t) + sizeof(UNICODE_STRING);
+ 
+   UNICODE_STRING* out_string =
+-      reinterpret_cast<UNICODE_STRING*>(new (NT_ALLOC) char[name_bytes]);
++      reinterpret_cast<UNICODE_STRING*>(new char[name_bytes]);
+   if (!out_string)
+     return nullptr;
+ 
+@@ -503,7 +510,7 @@ UNICODE_STRING* GetBackingFilePath(PVOID address) {
+ 
+   for (;;) {
+     MEMORY_SECTION_NAME* section_name = reinterpret_cast<MEMORY_SECTION_NAME*>(
+-        new (NT_ALLOC) char[buffer_bytes]);
++        new char[buffer_bytes]);
+ 
+     if (!section_name)
+       return nullptr;
+@@ -559,7 +566,7 @@ UNICODE_STRING* ExtractModuleName(const UNICODE_STRING* module_path) {
+   // Based on the code above, size_bytes should always be small enough
+   // to make the static_cast below safe.
+   DCHECK_NT(UINT16_MAX > size_bytes);
+-  char* str_buffer = new (NT_ALLOC) char[size_bytes + sizeof(UNICODE_STRING)];
++  char* str_buffer = new char[size_bytes + sizeof(UNICODE_STRING)];
+   if (!str_buffer)
+     return nullptr;
+ 
+@@ -663,7 +670,7 @@ bool NtGetPathFromHandle(HANDLE handle,
+   std::unique_ptr<BYTE[], NtAllocDeleter> name_ptr;
+   if (!size)
+     return false;
+-  name_ptr.reset(new (NT_ALLOC) BYTE[size]);
++  name_ptr.reset(new BYTE[size]);
+   name = reinterpret_cast<OBJECT_NAME_INFORMATION*>(name_ptr.get());
+ 
+   // Query the name information a second time to get the name of the
+@@ -672,10 +679,10 @@ bool NtGetPathFromHandle(HANDLE handle,
+ 
+   if (STATUS_SUCCESS != status)
+     return false;
+-  size_t num_path_wchars = (name->ObjectName.Length / sizeof(wchar_t)) + 1;
+-  path->reset(new (NT_ALLOC) wchar_t[num_path_wchars]);
++  size_t num_path_wchars = (name->Name.Length / sizeof(wchar_t)) + 1;
++  path->reset(new wchar_t[num_path_wchars]);
+   status =
+-      CopyData(path->get(), name->ObjectName.Buffer, name->ObjectName.Length);
++      CopyData(path->get(), name->Name.Buffer, name->Name.Length);
+   path->get()[num_path_wchars - 1] = L'\0';
+   if (STATUS_SUCCESS != status)
+     return false;

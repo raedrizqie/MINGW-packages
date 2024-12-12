@@ -1,0 +1,289 @@
+diff --git a/src/3rdparty/chromium/net/BUILD.gn b/src/3rdparty/chromium/net/BUILD.gn
+index c399590..5d79c44 100644
+--- a/src/3rdparty/chromium/net/BUILD.gn
++++ b/src/3rdparty/chromium/net/BUILD.gn
+@@ -1522,17 +1522,19 @@ component("net") {
+ 
+   if (is_win) {
+     libs = [
+-      "crypt32.lib",
+-      "dhcpcsvc.lib",
+-      "iphlpapi.lib",
+-      "ncrypt.lib",
+-      "rpcrt4.lib",
+-      "secur32.lib",
+-      "urlmon.lib",
+-      "winhttp.lib",
++      "crypt32",
++      "dhcpcsvc",
++      "iphlpapi",
++      "ncrypt",
++      "rpcrt4",
++      "secur32",
++      "urlmon",
++      "winhttp",
+     ]
+ 
+-    ldflags = [ "/DELAYLOAD:urlmon.dll" ]
++    if (is_msvc) {
++      ldflags = [ "/DELAYLOAD:urlmon.dll" ]
++    }
+   }
+ 
+   if (!is_nacl) {
+@@ -4834,8 +4836,8 @@ test("net_unittests") {
+ 
+   if (is_win) {
+     libs = [
+-      "iphlpapi.lib",
+-      "ncrypt.lib",
++      "iphlpapi",
++      "ncrypt",
+     ]
+   }
+ 
+diff --git a/src/3rdparty/chromium/net/base/network_change_notifier.cc b/src/3rdparty/chromium/net/base/network_change_notifier.cc
+index fdb6612..04964c8 100644
+--- a/src/3rdparty/chromium/net/base/network_change_notifier.cc
++++ b/src/3rdparty/chromium/net/base/network_change_notifier.cc
+@@ -30,7 +30,7 @@
+ #include "net/url_request/url_request.h"
+ #include "url/gurl.h"
+ 
+-#if defined(OS_WIN)
++#if defined(IS_MSVC)
+ #include "net/base/network_change_notifier_win.h"
+ #elif defined(OS_LINUX) && !defined(OS_CHROMEOS)
+ #include "net/base/network_change_notifier_linux.h"
+@@ -227,7 +227,7 @@ std::unique_ptr<NetworkChangeNotifier> NetworkChangeNotifier::CreateIfNeeded(
+   if (g_network_change_notifier_factory)
+     return g_network_change_notifier_factory->CreateInstance();
+ 
+-#if defined(OS_WIN)
++#if defined(IS_MSVC)
+   std::unique_ptr<NetworkChangeNotifierWin> network_change_notifier =
+       std::make_unique<NetworkChangeNotifierWin>();
+   network_change_notifier->WatchForAddressChange();
+@@ -475,7 +475,7 @@ NetworkChangeNotifier::ConnectionTypeFromInterfaceList(
+   bool first = true;
+   ConnectionType result = CONNECTION_NONE;
+   for (size_t i = 0; i < interfaces.size(); ++i) {
+-#if defined(OS_WIN)
++#if defined(IS_MSVC)
+     if (interfaces[i].friendly_name == "Teredo Tunneling Pseudo-Interface")
+       continue;
+ #endif
+diff --git a/src/3rdparty/chromium/net/dns/dns_config_service_win.cc b/src/3rdparty/chromium/net/dns/dns_config_service_win.cc
+index 37fd844..666aeff 100644
+--- a/src/3rdparty/chromium/net/dns/dns_config_service_win.cc
++++ b/src/3rdparty/chromium/net/dns/dns_config_service_win.cc
+@@ -7,6 +7,7 @@
+ #include <algorithm>
+ #include <memory>
+ #include <string>
++#include <string_view>
+ 
+ #include "base/bind.h"
+ #include "base/callback.h"
+@@ -230,9 +231,9 @@ HostsParseWinResult AddLocalhostEntries(DnsHosts* hosts) {
+ 
+   wchar_t buffer[MAX_PATH];
+   DWORD size = MAX_PATH;
+-  std::string localname;
++  std::string localname = ParseDomainASCII(buffer);
+   if (!GetComputerNameExW(ComputerNameDnsHostname, buffer, &size) ||
+-      !ParseDomainASCII(buffer, &localname)) {
++      localname.empty()) {
+     return HOSTS_PARSE_WIN_COMPUTER_NAME_FAILED;
+   }
+   localname = base::ToLowerASCII(localname);
+@@ -346,15 +347,17 @@ void ConfigureSuffixSearch(const DnsSystemSettings& settings,
+                            DnsConfig* config) {
+   // SearchList takes precedence, so check it first.
+   if (settings.policy_search_list.set) {
+-    std::vector<std::string> search;
+-    if (ParseSearchList(settings.policy_search_list.value, &search)) {
++    std::vector<std::string> search =
++        ParseSearchList(settings.policy_search_list.value);
++    if (!search.empty()) {
+       config->search.swap(search);
+       return;
+     }
+     // Even if invalid, the policy disables the user-specified setting below.
+   } else if (settings.tcpip_search_list.set) {
+-    std::vector<std::string> search;
+-    if (ParseSearchList(settings.tcpip_search_list.value, &search)) {
++    std::vector<std::string> search =
++        ParseSearchList(settings.tcpip_search_list.value);
++    if (!search.empty()) {
+       config->search.swap(search);
+       return;
+     }
+@@ -372,15 +375,12 @@ void ConfigureSuffixSearch(const DnsSystemSettings& settings,
+   // The user setting (tcpip_domain) can be configurred at Computer Name in
+   // System Settings
+   std::string primary_suffix;
+-  if ((settings.primary_dns_suffix.set &&
+-       ParseDomainASCII(settings.primary_dns_suffix.value, &primary_suffix)) ||
+-      (settings.tcpip_domain.set &&
+-       ParseDomainASCII(settings.tcpip_domain.value, &primary_suffix))) {
+-    // Primary suffix goes in front.
+-    config->search.insert(config->search.begin(), primary_suffix);
+-  } else {
++  if (settings.primary_dns_suffix.set)
++    primary_suffix = ParseDomainASCII(settings.primary_dns_suffix.value);
++  if (primary_suffix.empty() && settings.tcpip_domain.set)
++    primary_suffix = ParseDomainASCII(settings.tcpip_domain.value);
++  if (primary_suffix.empty())
+     return;  // No primary suffix, hence no devolution.
+-  }
+ 
+   // Devolution is determined by precedence: policy > dnscache > tcpip.
+   // |enabled|: UseDomainNameDevolution and |level|: DomainNameDevolutionLevel
+@@ -455,54 +455,51 @@ DnsSystemSettings::DnsSystemSettings()
+ DnsSystemSettings::~DnsSystemSettings() {
+ }
+ 
+-bool ParseDomainASCII(base::WStringPiece widestr, std::string* domain) {
+-  DCHECK(domain);
++std::string ParseDomainASCII(std::wstring_view widestr) {
+   if (widestr.empty())
+-    return false;
++    return "";
+ 
+   // Check if already ASCII.
+   if (base::IsStringASCII(base::AsStringPiece16(widestr))) {
+-    domain->assign(widestr.begin(), widestr.end());
+-    return true;
++    return std::string(widestr.begin(), widestr.end());
+   }
+ 
+   // Otherwise try to convert it from IDN to punycode.
+   const int kInitialBufferSize = 256;
+   url::RawCanonOutputT<base::char16, kInitialBufferSize> punycode;
+-  if (!url::IDNToASCII(base::as_u16cstr(widestr), widestr.length(), &punycode))
+-    return false;
++  if (!url::IDNToASCII(base::AsStringPiece16(widestr), widestr.length(), &punycode))
++    return "";
+ 
+   // |punycode_output| should now be ASCII; convert it to a std::string.
+   // (We could use UTF16ToASCII() instead, but that requires an extra string
+   // copy. Since ASCII is a subset of UTF8 the following is equivalent).
+-  bool success = base::UTF16ToUTF8(punycode.data(), punycode.length(), domain);
++  std::string converted;
++  bool success = base::UTF16ToUTF8(punycode.data(), punycode.length(), &converted);
+   DCHECK(success);
+-  DCHECK(base::IsStringASCII(*domain));
+-  return success && !domain->empty();
++  DCHECK(base::IsStringASCII(converted));
++  return converted;
+ }
+ 
+-bool ParseSearchList(const std::wstring& value,
+-                     std::vector<std::string>* output) {
+-  DCHECK(output);
++std::vector<std::string> ParseSearchList(std::wstring_view value) {
+   if (value.empty())
+-    return false;
++    return {};
+ 
+-  output->clear();
++  std::vector<std::string> output;
+ 
+   // If the list includes an empty hostname (",," or ", ,"), it is terminated.
+   // Although nslookup and network connection property tab ignore such
+   // fragments ("a,b,,c" becomes ["a", "b", "c"]), our reference is getaddrinfo
+   // (which sees ["a", "b"]). WMI queries also return a matching search list.
+-  for (base::WStringPiece t : base::SplitStringPiece(
++  for (std::wstring_view t : base::SplitStringPiece(
+            value, L",", base::TRIM_WHITESPACE, base::SPLIT_WANT_ALL)) {
+     // Convert non-ASCII to punycode, although getaddrinfo does not properly
+     // handle such suffixes.
+-    std::string parsed;
+-    if (!ParseDomainASCII(t, &parsed))
++    std::string parsed = ParseDomainASCII(t);
++    if (parsed.empty())
+       break;
+-    output->push_back(parsed);
++    output.push_back(std::move(parsed));
+   }
+-  return !output->empty();
++  return output;
+ }
+ 
+ ConfigParseWinResult ConvertSettingsToDnsConfig(
+@@ -552,8 +549,8 @@ ConfigParseWinResult ConvertSettingsToDnsConfig(
+     // |DnsSuffix| stores the effective connection-specific suffix, which is
+     // obtained via DHCP (regkey: Tcpip\Parameters\Interfaces\{XXX}\DhcpDomain)
+     // or specified by the user (regkey: Tcpip\Parameters\Domain).
+-    std::string dns_suffix;
+-    if (ParseDomainASCII(adapter->DnsSuffix, &dns_suffix))
++    std::string dns_suffix = ParseDomainASCII(adapter->DnsSuffix);
++    if (!dns_suffix.empty())
+       config->search.push_back(dns_suffix);
+   }
+ 
+diff --git a/src/3rdparty/chromium/net/dns/dns_config_service_win.h b/src/3rdparty/chromium/net/dns/dns_config_service_win.h
+index 6c7e3df..d03bd88 100644
+--- a/src/3rdparty/chromium/net/dns/dns_config_service_win.h
++++ b/src/3rdparty/chromium/net/dns/dns_config_service_win.h
+@@ -13,6 +13,7 @@
+ 
+ #include <memory>
+ #include <string>
++#include <string_view>
+ #include <vector>
+ 
+ #include "base/macros.h"
+@@ -39,17 +40,14 @@ namespace net {
+ namespace internal {
+ 
+ // Converts a UTF-16 domain name to ASCII, possibly using punycode.
+-// Returns true if the conversion succeeds and output is not empty. In case of
+-// failure, |domain| might become dirty.
+-bool NET_EXPORT_PRIVATE ParseDomainASCII(base::WStringPiece widestr,
+-                                         std::string* domain);
++// Returns empty string on failure.
++std::string NET_EXPORT_PRIVATE ParseDomainASCII(std::wstring_view widestr);
+ 
+ // Parses |value| as search list (comma-delimited list of domain names) from
+ // a registry key and stores it in |out|. Returns true on success. Empty
+ // entries (e.g., "chromium.org,,org") terminate the list. Non-ascii hostnames
+ // are converted to punycode.
+-bool NET_EXPORT_PRIVATE ParseSearchList(const std::wstring& value,
+-                                        std::vector<std::string>* out);
++std::vector<std::string> NET_EXPORT_PRIVATE ParseSearchList(std::wstring_view value);
+ 
+ // All relevant settings read from registry and IP Helper. This isolates our
+ // logic from system calls and is exposed for unit tests. Keep it an aggregate
+diff --git a/src/3rdparty/chromium/net/third_party/quiche/src/quic/core/quic_interval_deque.h b/src/3rdparty/chromium/net/third_party/quiche/src/quic/core/quic_interval_deque.h
+index 252d99c..8d8b1f9 100644
+--- a/src/3rdparty/chromium/net/third_party/quiche/src/quic/core/quic_interval_deque.h
++++ b/src/3rdparty/chromium/net/third_party/quiche/src/quic/core/quic_interval_deque.h
+@@ -198,12 +198,12 @@ class QUIC_NO_EXPORT QuicIntervalDeque {
+     Iterator operator+(difference_type amount) const {
+       Iterator copy = *this;
+       copy.index_ += amount;
+-      DCHECK(copy.index_ < copy.deque_->size());
++      DCHECK(copy.index_ < copy.deque_->Size());
+       return copy;
+     }
+     Iterator& operator+=(difference_type amount) {
+       index_ += amount;
+-      DCHECK(index_ < deque_->size());
++      DCHECK(index_ < deque_->Size());
+       return *this;
+     }
+     difference_type operator-(const Iterator& rhs) const {
+diff --git a/src/3rdparty/chromium/net/third_party/quiche/src/quic/platform/api/quic_ip_address.h b/src/3rdparty/chromium/net/third_party/quiche/src/quic/platform/api/quic_ip_address.h
+index 3585970..79dc7e4 100644
+--- a/src/3rdparty/chromium/net/third_party/quiche/src/quic/platform/api/quic_ip_address.h
++++ b/src/3rdparty/chromium/net/third_party/quiche/src/quic/platform/api/quic_ip_address.h
+@@ -15,6 +15,7 @@
+ #include <sys/types.h>
+ #endif
+ 
++#include <cstdint>
+ #include <ostream>
+ #include <string>
+ 

@@ -1,0 +1,57 @@
+diff --git a/src/3rdparty/chromium/third_party/protobuf/BUILD.gn b/src/3rdparty/chromium/third_party/protobuf/BUILD.gn
+index 4ebf457..b926700 100644
+--- a/src/3rdparty/chromium/third_party/protobuf/BUILD.gn
++++ b/src/3rdparty/chromium/third_party/protobuf/BUILD.gn
+@@ -117,7 +117,7 @@ protobuf_lite_sources = [
+ ]
+ 
+ protobuf_lite_cflags = []
+-if (is_win) {
++if (is_msvc) {
+   protobuf_lite_cflags = [
+     "/wd4018",  # signed/unsigned mismatch in comparison
+     "/wd4065",  # switch statement contains 'default' but no 'case' labels
+diff --git a/src/3rdparty/chromium/third_party/protobuf/proto_library.gni b/src/3rdparty/chromium/third_party/protobuf/proto_library.gni
+index e41ae5f..3dfb675 100644
+--- a/src/3rdparty/chromium/third_party/protobuf/proto_library.gni
++++ b/src/3rdparty/chromium/third_party/protobuf/proto_library.gni
+@@ -512,7 +512,7 @@ template("proto_library") {
+           public_deps += [ "//third_party/protobuf:protobuf_lite" ]
+         }
+ 
+-        if (is_win) {
++        if (is_msvc) {
+           cflags = [
+             # disable: C4125 decimal digit terminates octal escape sequence
+             # Protoc generates such sequences frequently, there's no obvious
+diff --git a/src/3rdparty/chromium/third_party/protobuf/src/google/protobuf/port_def.inc b/src/3rdparty/chromium/third_party/protobuf/src/google/protobuf/port_def.inc
+index f1bd85d..a4180bb 100644
+--- a/src/3rdparty/chromium/third_party/protobuf/src/google/protobuf/port_def.inc
++++ b/src/3rdparty/chromium/third_party/protobuf/src/google/protobuf/port_def.inc
+@@ -510,8 +510,10 @@
+ 
+ PROTOBUF_EXPORT_TEMPLATE_TEST(DEFAULT, );
+ PROTOBUF_EXPORT_TEMPLATE_TEST(DEFAULT, __attribute__((visibility("default"))));
++#ifdef _MSC_VER
+ PROTOBUF_EXPORT_TEMPLATE_TEST(MSVC_HACK, __declspec(dllexport));
+ PROTOBUF_EXPORT_TEMPLATE_TEST(DEFAULT, __declspec(dllimport));
++#endif
+ 
+ #undef PROTOBUF_EXPORT_TEMPLATE_TEST
+ #undef PROTOBUF_EXPORT_TEMPLATE_TEST_DEFAULT_DEFAULT
+diff --git a/src/3rdparty/chromium/third_party/protobuf/third_party/six/six.py b/src/3rdparty/chromium/third_party/protobuf/third_party/six/six.py
+index 89b2188..d486ac9 100644
+--- a/src/3rdparty/chromium/third_party/protobuf/third_party/six/six.py
++++ b/src/3rdparty/chromium/third_party/protobuf/third_party/six/six.py
+@@ -186,6 +186,11 @@ class _SixMetaPathImporter(object):
+             return self
+         return None
+ 
++    def find_spec(self, fullname, path, target=None):
++        if fullname in self.known_modules:
++            return None
++        return None
++
+     def __get_module(self, fullname):
+         try:
+             return self.known_modules[fullname]
