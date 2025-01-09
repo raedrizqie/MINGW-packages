@@ -1,0 +1,40 @@
+diff --git a/cmake/config-ix.cmake b/cmake/config-ix.cmake
+index 2ca18eb..4fb5583 100644
+--- a/cmake/config-ix.cmake
++++ b/cmake/config-ix.cmake
+@@ -29,6 +29,9 @@ if (COMPILER_RT_USE_BUILTINS_LIBRARY)
+ else()
+   if (ANDROID)
+     check_library_exists(gcc __gcc_personality_v0 "" COMPILER_RT_HAS_GCC_LIB)
++  elseif (MINGW)
++    check_library_exists(gcc __absvdi2 "" COMPILER_RT_HAS_GCC_LIB)
++    check_library_exists(gcc_eh _Unwind_GetRegionStart "" COMPILER_RT_HAS_GCC_EH_LIB)
+   else()
+     check_library_exists(gcc_s __gcc_personality_v0 "" COMPILER_RT_HAS_GCC_S_LIB)
+   endif()
+@@ -50,20 +53,23 @@ if (C_SUPPORTS_NODEFAULTLIBS_FLAG)
+   elseif (COMPILER_RT_HAS_GCC_LIB)
+     list(APPEND CMAKE_REQUIRED_LIBRARIES gcc)
+   endif ()
++  if (COMPILER_RT_HAS_GCC_EH_LIB)
++    list(APPEND CMAKE_REQUIRED_LIBRARIES gcc_eh)
++  endif ()
+   if (MINGW)
+     # Mingw64 requires quite a few "C" runtime libraries in order for basic
+     # programs to link successfully with -nodefaultlibs.
+     if (COMPILER_RT_USE_BUILTINS_LIBRARY)
+       set(MINGW_RUNTIME ${COMPILER_RT_BUILTINS_LIBRARY})
+     else ()
+-      set(MINGW_RUNTIME gcc_s gcc)
++      set(MINGW_RUNTIME gcc gcc_eh)
+     endif()
+     set(MINGW_LIBRARIES mingw32 ${MINGW_RUNTIME} moldname mingwex msvcrt advapi32
+                         shell32 user32 kernel32 mingw32 ${MINGW_RUNTIME}
+                         moldname mingwex msvcrt)
+     list(APPEND CMAKE_REQUIRED_LIBRARIES ${MINGW_LIBRARIES})
+   endif()
+-  if (NOT TARGET unwind)
++  if (NOT COMPILER_RT_HAS_GCC_EH_LIB AND NOT TARGET unwind)
+     # Don't check for a library named unwind, if there's a target with that name within
+     # the same build.
+     check_library_exists(unwind _Unwind_GetRegionStart "" COMPILER_RT_HAS_LIBUNWIND)

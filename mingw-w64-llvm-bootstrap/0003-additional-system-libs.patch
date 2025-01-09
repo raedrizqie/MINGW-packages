@@ -1,0 +1,35 @@
+diff --git a/cmake/modules/AddLLVM.cmake b/cmake/modules/AddLLVM.cmake
+index 03f4e1f..170c2d7 100644
+--- a/cmake/modules/AddLLVM.cmake
++++ b/cmake/modules/AddLLVM.cmake
+@@ -610,7 +610,11 @@ function(llvm_add_library name)
+ 
+   if(ARG_SHARED AND ARG_STATIC)
+     # static
+-    set(name_static "${name}_static")
++    if(MSVC)
++      set(name_static "${name}_static")
++    else()
++      set(name_static "${name}")
++    endif()
+     if(ARG_OUTPUT_NAME)
+       set(output_name OUTPUT_NAME "${ARG_OUTPUT_NAME}")
+     endif()
+diff --git a/lib/Support/CMakeLists.txt b/lib/Support/CMakeLists.txt
+index f653379..ff02565 100644
+--- a/lib/Support/CMakeLists.txt
++++ b/lib/Support/CMakeLists.txt
+@@ -38,6 +38,13 @@ if(LLVM_ENABLE_ZSTD)
+ endif()
+ 
+ if( WIN32 )
++  if( MINGW )
++    check_library_exists(gcc __absvdi2 "" LLVM_HAS_GCC_LIB)
++    if( LLVM_HAS_GCC_LIB )
++      set(system_libs ${system_libs} gcc gcc_eh)
++    endif()
++    set(system_libs ${system_libs} pthread)
++  endif()
+   # libuuid required for FOLDERID_Profile usage in lib/Support/Windows/Path.inc.
+   # advapi32 required for CryptAcquireContextW in lib/Support/Windows/Path.inc.
+   # ntdll required for RtlGetLastNtStatus in lib/Support/ErrorHandling.cpp.
