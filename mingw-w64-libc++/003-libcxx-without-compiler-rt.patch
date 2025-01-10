@@ -1,0 +1,68 @@
+diff --git a/cmake/config-ix.cmake b/cmake/config-ix.cmake
+index 9988196..efe2932 100644
+--- a/cmake/config-ix.cmake
++++ b/cmake/config-ix.cmake
+@@ -21,7 +21,7 @@ if (NOT LIBCXX_USE_COMPILER_RT)
+   else()
+     if(ANDROID)
+       check_library_exists(gcc __gcc_personality_v0 "" LIBCXX_HAS_GCC_LIB)
+-    else()
++    elseif(NOT MINGW)
+       check_library_exists(gcc_s __gcc_personality_v0 "" LIBCXX_HAS_GCC_S_LIB)
+     endif()
+   endif()
+@@ -42,16 +42,15 @@ check_cxx_compiler_flag(-nolibc CXX_SUPPORTS_NOLIBC_FLAG)
+ check_cxx_compiler_flag(-nostdlib++ CXX_SUPPORTS_NOSTDLIBXX_FLAG)
+ if (CXX_SUPPORTS_NOSTDLIBXX_FLAG)
+   set(CMAKE_REQUIRED_FLAGS "${CMAKE_REQUIRED_FLAGS} -nostdlib++")
+-else()
+-  check_c_compiler_flag(-nodefaultlibs C_SUPPORTS_NODEFAULTLIBS_FLAG)
+-  if (C_SUPPORTS_NODEFAULTLIBS_FLAG)
+-    set(CMAKE_REQUIRED_FLAGS "${CMAKE_REQUIRED_FLAGS} -nodefaultlibs")
+-  endif()
++endif()
++check_c_compiler_flag(-nodefaultlibs C_SUPPORTS_NODEFAULTLIBS_FLAG)
++if (C_SUPPORTS_NODEFAULTLIBS_FLAG)
++  set(CMAKE_REQUIRED_FLAGS "${CMAKE_REQUIRED_FLAGS} -nodefaultlibs")
+ endif()
+ 
+ # Only link against compiler-rt manually if we use -nodefaultlibs, since
+ # otherwise the compiler will do the right thing on its own.
+-if (NOT CXX_SUPPORTS_NOSTDLIBXX_FLAG AND C_SUPPORTS_NODEFAULTLIBS_FLAG)
++if (C_SUPPORTS_NODEFAULTLIBS_FLAG)
+   if (LIBCXX_USE_COMPILER_RT)
+     include(HandleCompilerRT)
+     find_compiler_rt_library(builtins LIBCXX_BUILTINS_LIBRARY
+@@ -72,7 +71,7 @@ if (NOT CXX_SUPPORTS_NOSTDLIBXX_FLAG AND C_SUPPORTS_NODEFAULTLIBS_FLAG)
+     if (LIBCXX_USE_COMPILER_RT)
+       set(MINGW_RUNTIME ${LIBCXX_BUILTINS_LIBRARY})
+     else ()
+-      set(MINGW_RUNTIME gcc_s gcc)
++      set(MINGW_RUNTIME gcc_s gcc pthread)
+     endif()
+     set(MINGW_LIBRARIES mingw32 ${MINGW_RUNTIME} moldname mingwex msvcrt advapi32
+                         shell32 user32 kernel32 mingw32 ${MINGW_RUNTIME}
+@@ -104,7 +103,7 @@ endif()
+ check_symbol_exists(__PICOLIBC__ "string.h" PICOLIBC)
+ 
+ # Check libraries
+-if(WIN32 AND NOT MINGW)
++if(WIN32)
+   # TODO(compnerd) do we want to support an emulation layer that allows for the
+   # use of pthread-win32 or similar libraries to emulate pthreads on Windows?
+   set(LIBCXX_HAS_PTHREAD_LIB NO)
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 674082c..0f7b71c 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -678,6 +678,10 @@ function(cxx_link_system_libraries target)
+     target_link_libraries(${target} PRIVATE "-nostdlib++")
+   endif()
+ 
++  if (C_SUPPORTS_NODEFAULTLIBS_FLAG)
++    target_link_libraries(${target} PRIVATE "-nodefaultlibs")
++  endif()
++
+   if (CXX_SUPPORTS_UNWINDLIB_EQ_NONE_FLAG AND LIBCXXABI_USE_LLVM_UNWINDER)
+     # If we're linking directly against the libunwind that we're building
+     # in the same invocation, don't try to link in the toolchain's

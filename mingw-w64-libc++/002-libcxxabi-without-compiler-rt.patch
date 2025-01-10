@@ -1,0 +1,77 @@
+diff --git a/cmake/config-ix.cmake b/cmake/config-ix.cmake
+index 10f2087..8a42bfd 100644
+--- a/cmake/config-ix.cmake
++++ b/cmake/config-ix.cmake
+@@ -8,7 +8,7 @@ check_library_exists(c fopen "" LIBCXXABI_HAS_C_LIB)
+ if (NOT LIBCXXABI_USE_COMPILER_RT)
+   if (ANDROID)
+     check_library_exists(gcc __gcc_personality_v0 "" LIBCXXABI_HAS_GCC_LIB)
+-  else ()
++  elseif (NOT MINGW)
+     check_library_exists(gcc_s __gcc_personality_v0 "" LIBCXXABI_HAS_GCC_S_LIB)
+     check_library_exists(gcc __aeabi_uldivmod "" LIBCXXABI_HAS_GCC_LIB)
+   endif ()
+@@ -26,16 +26,15 @@ endif ()
+ check_cxx_compiler_flag(-nostdlib++ CXX_SUPPORTS_NOSTDLIBXX_FLAG)
+ if (CXX_SUPPORTS_NOSTDLIBXX_FLAG)
+   set(CMAKE_REQUIRED_FLAGS "${CMAKE_REQUIRED_FLAGS} -nostdlib++")
+-else()
+-  check_c_compiler_flag(-nodefaultlibs C_SUPPORTS_NODEFAULTLIBS_FLAG)
+-  if (C_SUPPORTS_NODEFAULTLIBS_FLAG)
+-    set(CMAKE_REQUIRED_FLAGS "${CMAKE_REQUIRED_FLAGS} -nodefaultlibs")
+-  endif()
++endif()
++check_c_compiler_flag(-nodefaultlibs C_SUPPORTS_NODEFAULTLIBS_FLAG)
++if (C_SUPPORTS_NODEFAULTLIBS_FLAG)
++  set(CMAKE_REQUIRED_FLAGS "${CMAKE_REQUIRED_FLAGS} -nodefaultlibs")
+ endif()
+ 
+ # Only link against compiler-rt manually if we use -nodefaultlibs, since
+ # otherwise the compiler will do the right thing on its own.
+-if (NOT CXX_SUPPORTS_NOSTDLIBXX_FLAG AND C_SUPPORTS_NODEFAULTLIBS_FLAG)
++if (C_SUPPORTS_NODEFAULTLIBS_FLAG)
+   if (LIBCXXABI_HAS_C_LIB)
+     list(APPEND CMAKE_REQUIRED_LIBRARIES c)
+   endif ()
+@@ -62,7 +61,7 @@ if (NOT CXX_SUPPORTS_NOSTDLIBXX_FLAG AND C_SUPPORTS_NODEFAULTLIBS_FLAG)
+     if (LIBCXXABI_USE_COMPILER_RT)
+       set(MINGW_RUNTIME ${LIBCXXABI_BUILTINS_LIBRARY})
+     else ()
+-      set(MINGW_RUNTIME gcc_s gcc)
++      set(MINGW_RUNTIME gcc_s gcc pthread)
+     endif()
+     set(MINGW_LIBRARIES mingw32 ${MINGW_RUNTIME} moldname mingwex msvcrt advapi32
+                         shell32 user32 kernel32 mingw32 ${MINGW_RUNTIME}
+@@ -95,7 +94,7 @@ endif()
+ check_cxx_compiler_flag(-nostdinc++ CXX_SUPPORTS_NOSTDINCXX_FLAG)
+ 
+ # Check libraries
+-if(FUCHSIA)
++if(FUCHSIA OR MINGW)
+   set(LIBCXXABI_HAS_DL_LIB NO)
+   set(LIBCXXABI_HAS_PTHREAD_LIB NO)
+   check_library_exists(c __cxa_thread_atexit_impl ""
+diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
+index 1e06b8c..0569c3f 100644
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -93,7 +93,8 @@ endif()
+ # Setup flags.
+ if (CXX_SUPPORTS_NOSTDLIBXX_FLAG)
+   add_link_flags_if_supported(-nostdlib++)
+-else()
++endif()
++if (C_SUPPORTS_NODEFAULTLIBS_FLAG)
+   add_link_flags_if_supported(-nodefaultlibs)
+ endif()
+ 
+@@ -186,6 +187,9 @@ target_compile_options(cxxabi_shared_objects PRIVATE "${LIBCXXABI_ADDITIONAL_COM
+ 
+ if (LIBCXXABI_ENABLE_SHARED)
+   add_library(cxxabi_shared SHARED)
++  if (MINGW)
++    target_link_libraries(cxxabi_shared PUBLIC cxx_static)
++  endif()
+   set_target_properties(cxxabi_shared
+     PROPERTIES
+       LINK_FLAGS "${LIBCXXABI_LINK_FLAGS}"
