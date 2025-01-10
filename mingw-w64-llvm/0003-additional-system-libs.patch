@@ -1,0 +1,18 @@
+diff --git a/lib/Support/CMakeLists.txt b/lib/Support/CMakeLists.txt
+index f653379..457ef9e 100644
+--- a/lib/Support/CMakeLists.txt
++++ b/lib/Support/CMakeLists.txt
+@@ -38,6 +38,13 @@ if(LLVM_ENABLE_ZSTD)
+ endif()
+ 
+ if( WIN32 )
++  if( MINGW )
++    check_library_exists(gcc ___chkstk "" LLVM_HAS_GCC_LIB)
++    if( LLVM_HAS_GCC_LIB )
++      set(system_libs ${system_libs} gcc)
++    endif()
++    set(system_libs ${system_libs} pthread)
++  endif()
+   # libuuid required for FOLDERID_Profile usage in lib/Support/Windows/Path.inc.
+   # advapi32 required for CryptAcquireContextW in lib/Support/Windows/Path.inc.
+   # ntdll required for RtlGetLastNtStatus in lib/Support/ErrorHandling.cpp.
