@@ -1,0 +1,73 @@
+diff --git a/cmake/config-ix.cmake b/cmake/config-ix.cmake
+index 126c872..d6fd1bc 100644
+--- a/cmake/config-ix.cmake
++++ b/cmake/config-ix.cmake
+@@ -20,7 +20,7 @@ endif()
+ if (NOT LIBUNWIND_USE_COMPILER_RT)
+   if (ANDROID)
+     check_library_exists(gcc __gcc_personality_v0 "" LIBUNWIND_HAS_GCC_LIB)
+-  else ()
++  elseif (NOT MINGW)
+     check_library_exists(gcc_s __gcc_personality_v0 "" LIBUNWIND_HAS_GCC_S_LIB)
+     check_library_exists(gcc __absvdi2 "" LIBUNWIND_HAS_GCC_LIB)
+   endif ()
+@@ -35,19 +35,19 @@ endif()
+ # required for the link to go through. We remove sanitizers from the
+ # configuration checks to avoid spurious link errors.
+ 
+-llvm_check_compiler_linker_flag(CXX "-nostdlib++" CXX_SUPPORTS_NOSTDLIBXX_FLAG)
++check_cxx_compiler_flag(-nostdlib++ CXX_SUPPORTS_NOSTDLIBXX_FLAG)
+ if (CXX_SUPPORTS_NOSTDLIBXX_FLAG)
+   set(CMAKE_REQUIRED_FLAGS "${CMAKE_REQUIRED_FLAGS} -nostdlib++")
+-else()
+-  llvm_check_compiler_linker_flag(C "-nodefaultlibs" C_SUPPORTS_NODEFAULTLIBS_FLAG)
+-  if (C_SUPPORTS_NODEFAULTLIBS_FLAG)
+-    set(CMAKE_REQUIRED_FLAGS "${CMAKE_REQUIRED_FLAGS} -nodefaultlibs")
+-  endif()
+ endif()
++check_c_compiler_flag(-nodefaultlibs C_SUPPORTS_NODEFAULTLIBS_FLAG)
++if (C_SUPPORTS_NODEFAULTLIBS_FLAG)
++  set(CMAKE_REQUIRED_FLAGS "${CMAKE_REQUIRED_FLAGS} -nodefaultlibs")
++endif()
++
+ 
+ # Only link against compiler-rt manually if we use -nodefaultlibs, since
+ # otherwise the compiler will do the right thing on its own.
+-if (NOT CXX_SUPPORTS_NOSTDLIBXX_FLAG AND C_SUPPORTS_NODEFAULTLIBS_FLAG)
++if (C_SUPPORTS_NODEFAULTLIBS_FLAG)
+   if (LIBUNWIND_HAS_C_LIB)
+     list(APPEND CMAKE_REQUIRED_LIBRARIES c)
+   endif ()
+@@ -73,7 +73,7 @@ if (NOT CXX_SUPPORTS_NOSTDLIBXX_FLAG AND C_SUPPORTS_NODEFAULTLIBS_FLAG)
+     if (LIBUNWIND_USE_COMPILER_RT)
+       set(MINGW_RUNTIME ${LIBUNWIND_BUILTINS_LIBRARY})
+     else ()
+-      set(MINGW_RUNTIME gcc_s gcc)
++      set(MINGW_RUNTIME gcc_s gcc pthread)
+     endif()
+     set(MINGW_LIBRARIES mingw32 ${MINGW_RUNTIME} moldname mingwex msvcrt advapi32
+                         shell32 user32 kernel32 mingw32 ${MINGW_RUNTIME}
+@@ -116,7 +116,7 @@ if(LIBUNWIND_TARGET_ARM AND NOT LIBUNWIND_USES_SJLJ_EXCEPTIONS AND NOT LIBUNWIND
+ endif()
+ 
+ # Check libraries
+-if(FUCHSIA)
++if(FUCHSIA OR MINGW)
+   set(LIBUNWIND_HAS_DL_LIB NO)
+   set(LIBUNWIND_HAS_PTHREAD_LIB NO)
+ else()
+diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
+index 780430b..9fe1afa 100644
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -68,7 +68,9 @@ set(LIBUNWIND_SOURCES
+ # Generate library list.
+ if (CXX_SUPPORTS_NOSTDLIBXX_FLAG)
+   add_link_flags_if_supported(-nostdlib++)
+-else()
++endif()
++if (C_SUPPORTS_NODEFAULTLIBS_FLAG)
++  add_link_flags_if_supported(-nodefaultlibs)
+   if (LIBUNWIND_USE_COMPILER_RT)
+     add_library_flags("${LIBUNWIND_BUILTINS_LIBRARY}")
+   else()
