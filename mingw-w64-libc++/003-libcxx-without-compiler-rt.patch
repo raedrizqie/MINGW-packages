@@ -1,0 +1,75 @@
+diff --git a/cmake/config-ix.cmake b/cmake/config-ix.cmake
+index 9988196..af54af6 100644
+--- a/cmake/config-ix.cmake
++++ b/cmake/config-ix.cmake
+@@ -21,6 +21,8 @@ if (NOT LIBCXX_USE_COMPILER_RT)
+   else()
+     if(ANDROID)
+       check_library_exists(gcc __gcc_personality_v0 "" LIBCXX_HAS_GCC_LIB)
++    elseif(MINGW)
++      check_library_exists(gcc_eh _Unwind_GetRegionStart "" LIBCXX_HAS_GCC_EH_LIB)
+     else()
+       check_library_exists(gcc_s __gcc_personality_v0 "" LIBCXX_HAS_GCC_S_LIB)
+     endif()
+@@ -42,16 +44,15 @@ check_cxx_compiler_flag(-nolibc CXX_SUPPORTS_NOLIBC_FLAG)
+ check_cxx_compiler_flag(-nostdlib++ CXX_SUPPORTS_NOSTDLIBXX_FLAG)
+ if (CXX_SUPPORTS_NOSTDLIBXX_FLAG)
+   set(CMAKE_REQUIRED_FLAGS "${CMAKE_REQUIRED_FLAGS} -nostdlib++")
+-else()
+-  check_c_compiler_flag(-nodefaultlibs C_SUPPORTS_NODEFAULTLIBS_FLAG)
+-  if (C_SUPPORTS_NODEFAULTLIBS_FLAG)
+-    set(CMAKE_REQUIRED_FLAGS "${CMAKE_REQUIRED_FLAGS} -nodefaultlibs")
+-  endif()
++endif()
++check_c_compiler_flag(-nodefaultlibs C_SUPPORTS_NODEFAULTLIBS_FLAG)
++if (C_SUPPORTS_NODEFAULTLIBS_FLAG)
++  set(CMAKE_REQUIRED_FLAGS "${CMAKE_REQUIRED_FLAGS} -nodefaultlibs")
+ endif()
+ 
+ # Only link against compiler-rt manually if we use -nodefaultlibs, since
+ # otherwise the compiler will do the right thing on its own.
+-if (NOT CXX_SUPPORTS_NOSTDLIBXX_FLAG AND C_SUPPORTS_NODEFAULTLIBS_FLAG)
++if (C_SUPPORTS_NODEFAULTLIBS_FLAG)
+   if (LIBCXX_USE_COMPILER_RT)
+     include(HandleCompilerRT)
+     find_compiler_rt_library(builtins LIBCXX_BUILTINS_LIBRARY
+@@ -65,6 +66,8 @@ if (NOT CXX_SUPPORTS_NOSTDLIBXX_FLAG AND C_SUPPORTS_NODEFAULTLIBS_FLAG)
+     list(APPEND CMAKE_REQUIRED_LIBRARIES gcc)
+   elseif (LIBCXX_HAS_GCC_S_LIB)
+     list(APPEND CMAKE_REQUIRED_LIBRARIES gcc_s)
++  elseif (LIBCXX_HAS_GCC_EH_LIB)
++    list(APPEND CMAKE_REQUIRED_LIBRARIES gcc_eh)
+   endif ()
+   if (MINGW)
+     # Mingw64 requires quite a few "C" runtime libraries in order for basic
+@@ -72,7 +75,7 @@ if (NOT CXX_SUPPORTS_NOSTDLIBXX_FLAG AND C_SUPPORTS_NODEFAULTLIBS_FLAG)
+     if (LIBCXX_USE_COMPILER_RT)
+       set(MINGW_RUNTIME ${LIBCXX_BUILTINS_LIBRARY})
+     else ()
+-      set(MINGW_RUNTIME gcc_s gcc)
++      set(MINGW_RUNTIME gcc_eh gcc)
+     endif()
+     set(MINGW_LIBRARIES mingw32 ${MINGW_RUNTIME} moldname mingwex msvcrt advapi32
+                         shell32 user32 kernel32 mingw32 ${MINGW_RUNTIME}
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 674082c..f298186 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -685,7 +685,7 @@ function(cxx_link_system_libraries target)
+     target_add_link_flags_if_supported(${target} PRIVATE "--unwindlib=none")
+   endif()
+ 
+-  if (MSVC)
++  if (C_SUPPORTS_NODEFAULTLIBS_FLAG)
+     if (LIBCXX_USE_COMPILER_RT)
+       find_compiler_rt_library(builtins LIBCXX_BUILTINS_LIBRARY)
+       if (LIBCXX_BUILTINS_LIBRARY)
+@@ -695,6 +695,8 @@ function(cxx_link_system_libraries target)
+       target_link_libraries(${target} PRIVATE gcc)
+     elseif (LIBCXX_HAS_GCC_S_LIB)
+       target_link_libraries(${target} PRIVATE gcc_s)
++    elseif (LIBCXX_HAS_GCC_EH_LIB)
++      target_link_libraries(${target} PRIVATE gcc_eh)
+     endif()
+   endif()
+ 
