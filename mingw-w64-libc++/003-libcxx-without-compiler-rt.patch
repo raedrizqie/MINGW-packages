@@ -1,0 +1,39 @@
+diff --git a/cmake/config-ix.cmake b/cmake/config-ix.cmake
+index 9988196..e6d7229 100644
+--- a/cmake/config-ix.cmake
++++ b/cmake/config-ix.cmake
+@@ -42,16 +42,15 @@ check_cxx_compiler_flag(-nolibc CXX_SUPPORTS_NOLIBC_FLAG)
+ check_cxx_compiler_flag(-nostdlib++ CXX_SUPPORTS_NOSTDLIBXX_FLAG)
+ if (CXX_SUPPORTS_NOSTDLIBXX_FLAG)
+   set(CMAKE_REQUIRED_FLAGS "${CMAKE_REQUIRED_FLAGS} -nostdlib++")
+-else()
+-  check_c_compiler_flag(-nodefaultlibs C_SUPPORTS_NODEFAULTLIBS_FLAG)
+-  if (C_SUPPORTS_NODEFAULTLIBS_FLAG)
+-    set(CMAKE_REQUIRED_FLAGS "${CMAKE_REQUIRED_FLAGS} -nodefaultlibs")
+-  endif()
++endif()
++check_c_compiler_flag(-nodefaultlibs C_SUPPORTS_NODEFAULTLIBS_FLAG)
++if (C_SUPPORTS_NODEFAULTLIBS_FLAG)
++  set(CMAKE_REQUIRED_FLAGS "${CMAKE_REQUIRED_FLAGS} -nodefaultlibs")
+ endif()
+ 
+ # Only link against compiler-rt manually if we use -nodefaultlibs, since
+ # otherwise the compiler will do the right thing on its own.
+-if (NOT CXX_SUPPORTS_NOSTDLIBXX_FLAG AND C_SUPPORTS_NODEFAULTLIBS_FLAG)
++if (C_SUPPORTS_NODEFAULTLIBS_FLAG)
+   if (LIBCXX_USE_COMPILER_RT)
+     include(HandleCompilerRT)
+     find_compiler_rt_library(builtins LIBCXX_BUILTINS_LIBRARY
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 674082c..22d2eb1 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -685,7 +685,7 @@ function(cxx_link_system_libraries target)
+     target_add_link_flags_if_supported(${target} PRIVATE "--unwindlib=none")
+   endif()
+ 
+-  if (MSVC)
++  if (C_SUPPORTS_NODEFAULTLIBS_FLAG)
+     if (LIBCXX_USE_COMPILER_RT)
+       find_compiler_rt_library(builtins LIBCXX_BUILTINS_LIBRARY)
+       if (LIBCXX_BUILTINS_LIBRARY)
