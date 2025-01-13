@@ -1,14 +1,18 @@
 # Maintainer:  Matheus Catarino <matheus-catarino@hotmail.com>
 
+if [[ $MINGW_PACKAGE_PREFIX == *-clang-* ]]; then
+  _clangprefix=1
+fi
+
 _realname=zig
 pkgbase=mingw-w64-${_realname}
 pkgname="${MINGW_PACKAGE_PREFIX}-${_realname}"
-_pkgver=0.14.0-dev.2487+af89bb05d
+_pkgver=0.14.0-dev.2599+ff4f2753e
 pkgver=${_pkgver/-/}
 pkgrel=1
 pkgdesc='A general-purpose programming language and toolchain for maintaining robust, optimal, and reusable software (mingw-w64)'
 arch=('any')
-mingw_arch=('clang64')
+mingw_arch=('mingw64' 'ucrt64')
 url='https://ziglang.org'
 msys2_repository_url='https://github.com/ziglang/zig/'
 msys2_documentation_url='https://github.com/ziglang/zig?tab=readme-ov-file#readme'
@@ -22,10 +26,11 @@ makedepends=("${MINGW_PACKAGE_PREFIX}-clang"
              "${MINGW_PACKAGE_PREFIX}-lld")
 depends=("${MINGW_PACKAGE_PREFIX}-clang-libs"
          "${MINGW_PACKAGE_PREFIX}-llvm-libs"
+         $( (( _clangprefix )) || echo "${MINGW_PACKAGE_PREFIX}-gcc" )
          "${MINGW_PACKAGE_PREFIX}-zlib"
          "${MINGW_PACKAGE_PREFIX}-zstd")
 source=("https://ziglang.org/builds/${_realname}-${_pkgver}.tar.xz")
-sha256sums=('3f5143efa587a4146a428d9efaf729f0883241be5719c80c2665e502ea151040')
+sha256sums=('274c8aa4c341836b27655e64f1c5c8f0df5743ef95192d8911dd650520fa640f')
 
 build() {
   declare -a _extra_config
@@ -35,25 +40,25 @@ build() {
     _extra_config+=("-DCMAKE_BUILD_TYPE=Debug")
   fi
 
+  CFLAGS+=" -Wno-incompatible-pointer-types" \
   MSYS2_ARG_CONV_EXCL="-DCMAKE_INSTALL_PREFIX=" \
   cmake -Wno-dev \
     -GNinja \
     -DCMAKE_INSTALL_PREFIX=${MINGW_PREFIX} \
     -DCMAKE_C_COMPILER=clang \
     -DCMAKE_CXX_COMPILER=clang++ \
-    -DZIG_HOST_TARGET_TRIPLE=x86_64-windows-gnu \
-    -DZIG_TARGET_TRIPLE=x86_64-windows-gnu \
+    -DZIG_HOST_TARGET_TRIPLE=${CARCH}-windows-gnu \
+    -DZIG_TARGET_TRIPLE=${CARCH}-windows-gnu \
     -DZIG_SHARED_LLVM=ON \
     -DZIG_STATIC_ZLIB=OFF \
     -DZIG_STATIC_ZSTD=OFF \
-    -DZIG_SYSTEM_LIBCXX=c++ \
     -DZIG_TARGET_MCPU=baseline \
     -DZIG_USE_LLVM_CONFIG=ON \
     "${_extra_config[@]}" \
     -S ${_realname}-${_pkgver} \
     -B build-${MSYSTEM}
 
-  cmake --build build-${MSYSTEM}
+  cmake --build build-${MSYSTEM} -v
 }
 
 package() {
