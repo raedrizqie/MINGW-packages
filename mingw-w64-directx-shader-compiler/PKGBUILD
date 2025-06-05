@@ -59,8 +59,8 @@ build() {
     -DCMAKE_INSTALL_PREFIX=${MINGW_PREFIX} \
     -DCMAKE_C_COMPILER=clang \
     -DCMAKE_CXX_COMPILER=clang++ \
-    -DCMAKE_AR=llvm-ar \
-    -DCMAKE_RC_COMPILER=llvm-rc \
+    -DCMAKE_AR=${MINGW_PREFIX}/bin/llvm-ar \
+    -DCMAKE_RC_COMPILER=${MINGW_PREFIX}/bin/llvm-rc \
     -DCMAKE_LINKER_TYPE=LLD \
     -DPython3_EXECUTABLE=${MINGW_PREFIX}/bin/python \
     -DHLSL_BUILD_DXILCONV=OFF \
