@@ -92,17 +92,17 @@ package() {
   fi
 
   mkdir -p ${pkgdir}${MINGW_PREFIX}/bin
-  install -Dm755 bin/dx*.exe                          ${pkgdir}${MINGW_PREFIX}/bin
-  install -Dm755 bin/dxcompiler.dll                   ${pkgdir}${MINGW_PREFIX}/bin/dxcompiler.dll
-  install -Dm755 bin/dxil.dll                   	${pkgdir}${MINGW_PREFIX}/bin/dxil.dll
+  install -Dm755 bin/dx*.exe        ${pkgdir}${MINGW_PREFIX}/bin
+  install -Dm755 bin/dxcompiler.dll ${pkgdir}${MINGW_PREFIX}/bin/dxcompiler.dll
+  install -Dm755 bin/dxil.dll       ${pkgdir}${MINGW_PREFIX}/bin/dxil.dll
 
-  install -Dm755 lib/libdxcompiler.dll.a              ${pkgdir}${MINGW_PREFIX}/lib/libdxcompiler.dll.a
+  install -Dm755 lib/libdxcompiler.dll.a ${pkgdir}${MINGW_PREFIX}/lib/libdxcompiler.dll.a
 
-  install -Dm644 ${srcdir}/${_pkgname}-${pkgver}/include/dxc/dxcapi.h     ${pkgdir}${MINGW_PREFIX}/include/dxc/dxcapi.h
-  install -Dm644 ${srcdir}/${_pkgname}-${pkgver}/include/dxc/dxcerrors.h  ${pkgdir}${MINGW_PREFIX}/include/dxc/dxcerrors.h
-  install -Dm644 ${srcdir}/${_pkgname}-${pkgver}/include/dxc/dxcisense.h  ${pkgdir}${MINGW_PREFIX}/include/dxc/dxcisense.h
+  install -Dm644 ${srcdir}/${_pkgname}-${pkgver}/include/dxc/dxcapi.h    ${pkgdir}${MINGW_PREFIX}/include/dxc/dxcapi.h
+  install -Dm644 ${srcdir}/${_pkgname}-${pkgver}/include/dxc/dxcerrors.h ${pkgdir}${MINGW_PREFIX}/include/dxc/dxcerrors.h
+  install -Dm644 ${srcdir}/${_pkgname}-${pkgver}/include/dxc/dxcisense.h ${pkgdir}${MINGW_PREFIX}/include/dxc/dxcisense.h
 
-  install -Dm644 ${srcdir}/dxc/LICENSE-LLVM.TXT  ${pkgdir}${MINGW_PREFIX}/share/licenses/${_realname}/LICENSE-LLVM.TXT
-  install -Dm644 ${srcdir}/dxc/LICENSE-MIT.TXT   ${pkgdir}${MINGW_PREFIX}/share/licenses/${_realname}/LICENSE-MIT.TXT
-  install -Dm644 ${srcdir}/dxc/LICENSE-MS.TXT    ${pkgdir}${MINGW_PREFIX}/share/licenses/${_realname}/LICENSE-MS.TXT
+  #install -Dm644 ${srcdir}/dxc/LICENSE-LLVM.TXT  ${pkgdir}${MINGW_PREFIX}/share/licenses/${_realname}/LICENSE-LLVM.TXT
+  #install -Dm644 ${srcdir}/dxc/LICENSE-MIT.TXT   ${pkgdir}${MINGW_PREFIX}/share/licenses/${_realname}/LICENSE-MIT.TXT
+  #install -Dm644 ${srcdir}/dxc/LICENSE-MS.TXT    ${pkgdir}${MINGW_PREFIX}/share/licenses/${_realname}/LICENSE-MS.TXT
 }
