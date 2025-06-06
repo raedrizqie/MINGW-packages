@@ -64,10 +64,10 @@ index d02ad1ac..c00f1968 100644
 +//#define UNREFERENCED_PARAMETER(P) (void)(P)
 +
 +//#ifndef ERROR_NOT_CAPABLE
-+#define ERROR_NOT_CAPABLE __MSABI_LONG(775)
++//#define ERROR_NOT_CAPABLE __MSABI_LONG(775)
 +//#endif
 +//#ifndef ERROR_UNHANDLED_EXCEPTION
-+#define ERROR_UNHANDLED_EXCEPTION __MSABI_LONG(574)
++//#define ERROR_UNHANDLED_EXCEPTION __MSABI_LONG(574)
 +//#endif
 +
 +#define EventRegisterMicrosoft_Windows_DXCompiler_API()
@@ -105,8 +105,8 @@ index d02ad1ac..c00f1968 100644
 +#define UInt32Mult UIntMult
 +
 +// FIXME: missing from winerror.h
-+#define E_BOUNDS _HRESULT_TYPEDEF_(0x8000000B)
-+#define E_NOT_VALID_STATE HRESULT_FROM_WIN32(ERROR_INVALID_STATE)
++//#define E_BOUNDS _HRESULT_TYPEDEF_(0x8000000B)
++//#define E_NOT_VALID_STATE HRESULT_FROM_WIN32(ERROR_INVALID_STATE)
 +
 +// FIXME: missing from sal.h
 +#define _Maybenull_
