@@ -97,7 +97,7 @@ index d02ad1ac..c00f1968 100644
 +#define ATLASSERT assert
 +
 +// Disable calling convention attributes
-+#define __cdecl
++//#define __cdecl
 +
 +// FIXME: missing from intsafe.h
 +#define Int32ToUInt32 IntToUInt
