@@ -6,8 +6,8 @@
 _realname=pywin32
 pkgbase=mingw-w64-python-${_realname}
 pkgname=${MINGW_PACKAGE_PREFIX}-python-${_realname}
-pkgver=308
-pkgrel=3
+pkgver=310
+pkgrel=1
 pkgdesc='Python for Windows Extensions (mingw-w64)'
 arch=('any')
 mingw_arch=('mingw32' 'mingw64' 'ucrt64' 'clang64' 'clangarm64')
@@ -30,7 +30,7 @@ source=(https://github.com/mhammond/pywin32/archive/b${pkgver}/${_realname}-${pk
         004-isapi-fix.patch
         005-swig-fix.patch
         006-mapi-headers-fix.patch)
-sha256sums=('8aa09d39739764bec2378cfbd45940264c8b7f5a24caa17f04a01f7b750799ce'
+sha256sums=('SKIP'
             '6cf1981d8484b9874891b582e3c71ba9409d6c180a6f4e7fd84ec3307bfd746e'
             'af050c9c1e9c92c5ed3be73b606a4b931c78d6bb01175ecf5db503ba688d64ba'
             '0e4aadf7b6dec6baf1c347664396787110ad756d53720f2c1bb0eba48c733169'
