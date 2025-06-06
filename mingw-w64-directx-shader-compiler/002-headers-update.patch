@@ -60,8 +60,8 @@ index d02ad1ac..c00f1968 100644
 +#undef MemoryFence
 +#undef ReplaceText
 +
-+#undef UNREFERENCED_PARAMETER
-+#define UNREFERENCED_PARAMETER(P) (void)(P)
++//#undef UNREFERENCED_PARAMETER
++//#define UNREFERENCED_PARAMETER(P) (void)(P)
 +
 +#ifndef ERROR_NOT_CAPABLE
 +#define ERROR_NOT_CAPABLE __MSABI_LONG(775)
