@@ -63,12 +63,12 @@ index d02ad1ac..c00f1968 100644
 +//#undef UNREFERENCED_PARAMETER
 +//#define UNREFERENCED_PARAMETER(P) (void)(P)
 +
-+#ifndef ERROR_NOT_CAPABLE
++//#ifndef ERROR_NOT_CAPABLE
 +#define ERROR_NOT_CAPABLE __MSABI_LONG(775)
-+#endif
-+#ifndef ERROR_UNHANDLED_EXCEPTION
++//#endif
++//#ifndef ERROR_UNHANDLED_EXCEPTION
 +#define ERROR_UNHANDLED_EXCEPTION __MSABI_LONG(574)
-+#endif
++//#endif
 +
 +#define EventRegisterMicrosoft_Windows_DXCompiler_API()
 +#define EventRegisterMicrosoft_Windows_DxcRuntime_API()
