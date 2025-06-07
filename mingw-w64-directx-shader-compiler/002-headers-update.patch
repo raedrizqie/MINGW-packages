@@ -6,7 +6,7 @@ index b1c25ec3..854e3615 100644
  
  #include "dxc/WinAdapter.h"
  
-+#ifndef __MINGW32__
++//#ifndef __MINGW32__
  #ifdef __cplusplus
  #if !defined(DEFINE_ENUM_FLAG_OPERATORS)
  // Define operator overloads to enable bit operations on enum values that are
@@ -14,7 +14,7 @@ index b1c25ec3..854e3615 100644
  #else
  #define DEFINE_ENUM_FLAG_OPERATORS(ENUMTYPE) // NOP, C allows these operators.
  #endif
-+#endif // __MINGW32__
++//#endif // __MINGW32__
  
  #endif // _MSC_VER
  
