@@ -103,7 +103,7 @@ package() {
   install -Dm644 ${srcdir}/${_pkgname}-${pkgver}/include/dxc/dxcerrors.h ${pkgdir}${MINGW_PREFIX}/include/dxc/dxcerrors.h
   install -Dm644 ${srcdir}/${_pkgname}-${pkgver}/include/dxc/dxcisense.h ${pkgdir}${MINGW_PREFIX}/include/dxc/dxcisense.h
 
-  #install -Dm644 ${srcdir}/dxc/LICENSE-LLVM.TXT  ${pkgdir}${MINGW_PREFIX}/share/licenses/${_realname}/LICENSE-LLVM.TXT
-  #install -Dm644 ${srcdir}/dxc/LICENSE-MIT.TXT   ${pkgdir}${MINGW_PREFIX}/share/licenses/${_realname}/LICENSE-MIT.TXT
-  #install -Dm644 ${srcdir}/dxc/LICENSE-MS.TXT    ${pkgdir}${MINGW_PREFIX}/share/licenses/${_realname}/LICENSE-MS.TXT
+  install -Dm644 ${srcdir}/${_pkgname}-${pkgver}/LICENSE-LLVM.TXT ${pkgdir}${MINGW_PREFIX}/share/licenses/${_realname}/LICENSE-LLVM.TXT
+  install -Dm644 ${srcdir}/${_pkgname}-${pkgver}/LICENSE-MIT.TXT  ${pkgdir}${MINGW_PREFIX}/share/licenses/${_realname}/LICENSE-MIT.TXT
+  install -Dm644 ${srcdir}/${_pkgname}-${pkgver}/LICENSE-MS.TXT   ${pkgdir}${MINGW_PREFIX}/share/licenses/${_realname}/LICENSE-MS.TXT
 }
