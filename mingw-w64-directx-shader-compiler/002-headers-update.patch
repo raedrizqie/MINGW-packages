@@ -94,7 +94,7 @@ index d02ad1ac..c00f1968 100644
 +#define DxcRuntimeEtw_DxcRuntimeShutdown_Start()
 +#define DxcRuntimeEtw_DxcRuntimeShutdown_Stop(S_OK)
 +
-+//#define ATLASSERT assert
++#define ATLASSERT assert
 +
 +// Disable calling convention attributes
 +//#define __cdecl
