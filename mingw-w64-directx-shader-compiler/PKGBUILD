@@ -8,7 +8,7 @@ pkgver=1.8.2505
 pkgrel=1
 pkgdesc='A compiler for HLSL to DXIL (mingw-w64)'
 arch=('any')
-mingw_arch=('ucrt64' 'clang64' 'clangarm64')
+mingw_arch=('ucrt64' 'clang64')
 url='https://github.com/microsoft/DirectXShaderCompiler'
 license=('spdx:MIT AND MS-PL AND LLVM-exceptions')
 makedepends=("${MINGW_PACKAGE_PREFIX}-clang"
@@ -97,6 +97,7 @@ package() {
   install -Dm755 bin/dxil.dll       ${pkgdir}${MINGW_PREFIX}/bin/dxil.dll
 
   install -Dm755 lib/libdxcompiler.dll.a ${pkgdir}${MINGW_PREFIX}/lib/libdxcompiler.dll.a
+  install -Dm755 lib/libdxil.dll.a       ${pkgdir}${MINGW_PREFIX}/lib/libdxil.dll.a
 
   install -Dm644 ${srcdir}/${_pkgname}-${pkgver}/include/dxc/dxcapi.h    ${pkgdir}${MINGW_PREFIX}/include/dxc/dxcapi.h
   install -Dm644 ${srcdir}/${_pkgname}-${pkgver}/include/dxc/dxcerrors.h ${pkgdir}${MINGW_PREFIX}/include/dxc/dxcerrors.h
