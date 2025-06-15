@@ -34,7 +34,7 @@ index 9d97467d..df22cefd 100644
        OutputDebugFormatA(                                                      \
            "Error: \t%s\nFile:\n%s(%d)\nFunc:\t%s.\n\t" fmt "\n",               \
 -          "!(" #exp ")", __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__);       \
-+          "!(" #exp ")", __FILE__, __LINE__, __FUNCTION__, ##__VA_ARGS__);     \
++          "!(" #exp ")", __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__);     \
        __debugbreak();                                                          \
      }                                                                          \
    } while (0)
