@@ -7,7 +7,7 @@ index 52107180..0cc6c1f1 100644
      add_link_options(/guard:cf)
    else()
 -    add_compile_options(-fcf-protection)
-+    if(CMAKE_C_COMPILER_ARCHITECTURE_ID MATCHES "aarch64")
++    if(CMAKE_C_COMPILER_ARCHITECTURE_ID MATCHES "arm64")
 +      add_compile_options(-fcf-protection=none)
 +    elseif(CMAKE_C_COMPILER_ARCHITECTURE_ID MATCHES "x86_64")
 +      add_compile_options(-fcf-protection=return)
