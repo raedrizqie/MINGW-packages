@@ -1,0 +1,172 @@
+--- a/configure.ac	2025-06-01 09:15:32.000000000 +0800
++++ b/configure.ac	2025-06-28 19:31:54.481657800 +0800
+@@ -359,6 +359,24 @@
+   GIHDIR="$withval",
+   GIHDIR="$pkgdatadir/$VERSION_MAJOR")
+ 
++gihfile="$pkgdatadir/$VERSION_MAJOR/gnuplot.gih"
++AC_DEFINE_UNQUOTED(HELPFILE, ["$gihfile"], [ Default help file location ])
++
++driverdir="$prefix/bin"
++AC_DEFINE_UNQUOTED(GNUPLOT_DRIVER_DIR, ["$driverdir"], [ Generic default driver location ])
++
++sharedir="$pkgdatadir/$VERSION_MAJOR"
++AC_DEFINE_UNQUOTED(GNUPLOT_SHARE_DIR, ["$sharedir"], [ System-wide initialization file ])
++
++luadir="$pkgdatadir/$VERSION_MAJOR/lua"
++AC_DEFINE_UNQUOTED(GNUPLOT_LUA_DIR, ["$luadir"], [ Default lua driver location ])
++
++jsdir="$pkgdatadir/$VERSION_MAJOR/js"
++AC_DEFINE_UNQUOTED(GNUPLOT_JS_DIR, ["$jsdir"], [ Default javascript location ])
++
++psdir="$pkgdatadir/$VERSION_MAJOR/PostScript"
++AC_DEFINE_UNQUOTED(GNUPLOT_PS_DIR, ["$psdir"], [ Default PostScript prologues location ])
++
+ dnl Use builtin readline or GNU readline or NetBSD editline
+ AC_ARG_WITH(readline,dnl
+ [  --with-readline=builtin  use the built-in readline
+--- a/src/Makefile.am	2025-05-12 08:44:55.000000000 +0800
++++ b/src/Makefile.am	2025-06-28 18:21:51.920914600 +0800
+@@ -2,7 +2,7 @@
+ AUTOMAKE_OPTIONS = foreign subdir-objects
+ 
+ # in the spirit of automake ...
+-pkglibexecdir = $(libexecdir)/@PACKAGE@/@VERSION_MAJOR@
++pkglibexecdir = $(libexecdir)
+ 
+ # Where to send email about bugs and comments (locally)
+ EMAIL = gnuplot-bugs@lists.sourceforge.net
+@@ -40,7 +40,7 @@
+ transform = @program_transform_name@
+ GNUPLOT_X11 = `echo gnuplot_x11 | sed '$(transform)'`$(EXEEXT)
+ 
+-AM_CPPFLAGS = -I../term -I$(top_srcdir)/term -DBINDIR=\"$(bindir)\" -DX11_DRIVER_DIR=\"$(X11_DRIVER_DIR)\" -DQT_DRIVER_DIR=\"$(QT_DRIVER_DIR)\" -DGNUPLOT_SHARE_DIR=\"$(GNUPLOT_SHARE_DIR)\" -DGNUPLOT_PS_DIR=\"$(GNUPLOT_PS_DIR)\" -DGNUPLOT_JS_DIR=\"$(GNUPLOT_JS_DIR)\" -DGNUPLOT_LUA_DIR=\"$(GNUPLOT_LUA_DIR)\"  -DCONTACT=\"$(EMAIL)\" -DHELPFILE=\"$(HELPFILE)\" -DGNUPLOT_X11=\"$(GNUPLOT_X11)\" -DGNUPLOT_DRIVER_DIR=\"$(GNUPLOT_DRIVER_DIR)\"
++AM_CPPFLAGS = -I../term -I$(top_srcdir)/term -DBINDIR=\"$(bindir)\" -DX11_DRIVER_DIR=\"$(X11_DRIVER_DIR)\" -DQT_DRIVER_DIR=\"$(QT_DRIVER_DIR)\" -DGNUPLOT_X11=\"$(GNUPLOT_X11)\"
+ 
+ gnuplot_SOURCES = alloc.c alloc.h amos_airy.c amos_airy.h axis.c axis.h \
+ breaders.c breaders.h bitmap.h  boundary.c boundary.h \
+--- a/src/plot.c	2025-05-12 08:44:55.000000000 +0800
++++ b/src/plot.c	2025-06-29 00:47:54.906003000 +0800
+@@ -262,7 +262,7 @@
+ 
+ 
+ /* init progpath and get helpfile from executable directory */
+-#if defined(MSDOS) || defined(OS2)
++#if defined(MSDOS) || defined(OS2) || defined(__MINGW32__)
+     {
+ 	char *s;
+ 
+@@ -283,8 +283,13 @@
+ 	    s = progpath;
+ 	*s = NUL;
+ 	/* init HelpFile */
++#ifdef __MINGW32__
++	strcpy(GNUPLOT_SHARE_DIR, progpath);
++	strcat(GNUPLOT_SHARE_DIR, "gnuplot.gih");
++#else
+ 	strcpy(HelpFile, progpath);
+ 	strcat(HelpFile, "gnuplot.gih");
++#endif
+ 	/* remove trailing "bin/" from progpath */
+ 	if ((s != NULL) && (s - progpath >= 4)) {
+ 	    s -= 4;
+@@ -1087,7 +1092,7 @@
+ }
+ 
+ 
+-#if defined(MSDOS) || defined(OS2)
++#if defined(MSDOS) || defined(OS2) || defined(__MINGW32__)
+ /* retrieve path relative to gnuplot executable */
+ char *
+ RelativePathToGnuplot(const char * path)
+--- a/src/plot.h	2025-05-03 00:16:43.000000000 +0800
++++ b/src/plot.h	2025-06-27 19:12:47.003347200 +0800
+@@ -88,7 +88,7 @@
+ #define cancel_history()  {}
+ #endif
+ 
+-#if defined(MSDOS) || defined(OS2)
++#if defined(MSDOS) || defined(OS2) || defined(__MINGW32__)
+ /* retrieve path relative to gnuplot executable */
+ char * RelativePathToGnuplot(const char * path);
+ #endif
+--- a/src/show.c	2025-05-31 12:28:55.000000000 +0800
++++ b/src/show.c	2025-06-28 17:27:37.757806900 +0800
+@@ -1182,7 +1182,7 @@
+ 	}
+ 
+ 	{
+-#ifndef _WIN32
++#ifndef _MSC_VER
+ 	    char *helpfile = NULL;
+ 	    if ((helpfile = getenv("GNUHELP")) == NULL)
+ # if defined(MSDOS) || defined(OS2)
+@@ -1191,7 +1191,7 @@
+ 		helpfile = HELPFILE;
+ # endif
+ 	fprintf(stderr, "HELPFILE           = \"%s\"\n", helpfile);
+-#else /* _WIN32 */
++#else /* _MSC_VER */
+ 	    fprintf(stderr, "HELPFILE           = \"" TCHARFMT "\"\n", winhelpname);
+ #endif
+ 	}
+--- a/src/syscfg.h	2025-05-12 08:44:55.000000000 +0800
++++ b/src/syscfg.h	2025-06-29 00:49:31.994305600 +0800
+@@ -103,13 +103,18 @@
+ # if !defined(__WATCOMC__) || (__WATCOMC__ <= 1290)
+ #  define S_IFIFO  _S_IFIFO
+ # endif
+-# define HOME    "GNUPLOT"
+-# define PLOTRC  "gnuplot.ini"
+-# define SHELL   "\\command.com"
+-# define DIRSEP1 '\\'
+-# define DIRSEP2 '/'
+-# define PATHSEP ';'
+-# define GNUPLOT_HISTORY_FILE "~\\gnuplot_history"
++# ifdef _MSC_VER
++#  define HOME    "GNUPLOT"
++#  define PLOTRC  "gnuplot.ini"
++#  define SHELL   "\\command.com"
++#  define DIRSEP1 '\\'
++#  define DIRSEP2 '/'
++#  define PATHSEP ';'
++#  define GNUPLOT_HISTORY_FILE "~\\gnuplot_history"
++# else
++#  define DIRSEP1 '\\'
++#  define DIRSEP2 '/'
++# endif
+ /* Flags for windows.h:
+    Minimal required platform is Windows 7, see
+    https://msdn.microsoft.com/en-us/library/windows/desktop/aa383745.aspx
+--- a/src/win/winmain.c	2025-05-13 00:02:23.000000000 +0800
++++ b/src/win/winmain.c	2025-06-27 19:11:59.606340600 +0800
+@@ -304,6 +304,7 @@
+ }
+ 
+ 
++#ifdef _MSC_VER
+ /* retrieve path relative to gnuplot executable */
+ LPSTR
+ RelativePathToGnuplot(const char * path)
+@@ -323,6 +324,7 @@
+     strcat(rel_path, path);
+     return rel_path;
+ }
++#endif
+ 
+ 
+ static void
+--- a/src/win/winmain.h	2022-05-27 03:35:50.000000000 +0800
++++ b/src/win/winmain.h	2025-06-27 20:37:56.731603000 +0800
+@@ -74,7 +74,11 @@
+ LPWSTR UnicodeText(LPCSTR str, enum set_encoding_id encoding);
+ LPSTR AnsiText(LPCWSTR strw,  enum set_encoding_id encoding);
+ void MultiByteAccumulate(BYTE ch, LPWSTR wstr, int * count);
++#ifdef _MSC_VER
+ LPSTR RelativePathToGnuplot(const char * path);
++#else
++char * RelativePathToGnuplot(const char * path);
++#endif
+ 
+ int ConsoleReadCh(void);
+ HANDLE init_pipe_input(void);
