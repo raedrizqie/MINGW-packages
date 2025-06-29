@@ -81,7 +81,7 @@ index bfc2a38..8ff25be 100644
 +                implib = os.path.join(build_ext.build_temp, self.implib_name)
 +                suffix = "_d" if build_ext.debug else ""
 +                self.extra_link_args.append(
-+                    "-Wl,--out-implib,lib%s%s.dll.a" % (implib, suffix)
++                    "-Wl,--out-implib,%s%s.dll.a" % (implib, suffix)
 +                )
 +
 +            if "64 bit" in sys.version:
