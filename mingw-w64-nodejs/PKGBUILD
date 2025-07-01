@@ -8,7 +8,7 @@
 _realname=nodejs
 pkgbase=mingw-w64-${_realname}
 pkgname="${MINGW_PACKAGE_PREFIX}-${_realname}"
-pkgver=24.1.0
+pkgver=24.3.0
 pkgrel=1
 pkgdesc="An open-source, cross-platform JavaScript runtime environment (mingw-w64)"
 arch=('any')
