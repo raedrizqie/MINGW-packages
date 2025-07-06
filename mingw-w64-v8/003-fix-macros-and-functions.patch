@@ -1,8 +1,8 @@
 diff --git a/src/base/macros.h b/src/base/macros.h
-index 25a533c..fe2f37a 100644
+index e5e020d9..53af2187 100644
 --- a/src/base/macros.h
 +++ b/src/base/macros.h
-@@ -266,8 +266,12 @@ V8_INLINE A implicit_cast(A x) {
+@@ -316,8 +316,12 @@ V8_INLINE A implicit_cast(A x) {
  # else
  #  define V8_PTR_PREFIX   ""
  # endif  // V8_HOST_ARCH_64_BIT
@@ -18,10 +18,10 @@ index 25a533c..fe2f37a 100644
  # define V8_PTR_PREFIX    "l"
  #else
 diff --git a/src/base/platform/platform-win32.cc b/src/base/platform/platform-win32.cc
-index 152fbbf..e711182 100644
+index 11402689..ae2d7c08 100644
 --- a/src/base/platform/platform-win32.cc
 +++ b/src/base/platform/platform-win32.cc
-@@ -77,7 +77,6 @@ inline void MemoryFence() {
+@@ -81,7 +81,6 @@ inline void MemoryFence() {
    __asm__ __volatile__("xchgl %%eax,%0 ":"=r" (barrier));
  }
  
@@ -29,7 +29,7 @@ index 152fbbf..e711182 100644
  
  
  int localtime_s(tm* out_tm, const time_t* time) {
-@@ -130,6 +129,7 @@ int strncpy_s(char* dest, size_t dest_size, const char* source, size_t count) {
+@@ -134,6 +133,7 @@ int strncpy_s(char* dest, size_t dest_size, const char* source, size_t count) {
    return 0;
  }
  
