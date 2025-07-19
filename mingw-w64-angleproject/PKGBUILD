@@ -5,7 +5,7 @@
 _realname=angleproject
 pkgbase=mingw-w64-${_realname}
 pkgname="${MINGW_PACKAGE_PREFIX}-${_realname}"
-pkgver=2.1.r25741.db3e7490
+pkgver=2.1.r25745.c03b2d59
 pkgrel=1
 pkgdesc='A conformant OpenGL ES implementation for Windows, Mac, Linux, iOS and Android (mingw-w64)'
 arch=('any')
@@ -26,7 +26,7 @@ makedepends=("${MINGW_PACKAGE_PREFIX}-cc"
              "${MINGW_PACKAGE_PREFIX}-python"
              "git"
              "unzip")
-_commit=("0691b92ea0d7914e642766bb60be5fd0fa593f54")
+_commit=("c03b2d5973da1520e1044248b87c7bc3c13959d4")
 source=("${_realname}::git+https://chromium.googlesource.com/angle/angle.git#commit=${_commit}"
         "swiftshader.zip::https://github.com/google/swiftshader/archive/c1f7fbbec4e17769c0182daae185466cb806d0d5.zip"
         "bare-clones/build::git+https://chromium.googlesource.com/chromium/src/build.git#commit=70c150bc0ae989d00c15ab1ed67464198e4890d0"
@@ -89,12 +89,12 @@ apply_patch_with_msg() {
   done
 }
 
-#pkgver() {
-#  cd ${_realname}
-#  local _major=$(head -n 14 src/common/angle_version.h | grep 'ANGLE_MAJOR_VERSION' | sed -e 's/.* //' | tr '\n' '.' | sed 's/.$/\n/')
-#  local _minor=$(head -n 15 src/common/angle_version.h | grep 'ANGLE_MINOR_VERSION' | sed -e 's/.* //' | tr '\n' '.' | sed 's/.$/\n/')
-#  printf "%s.%s.r%s.%s" "$_major" "$_minor" "$(git rev-list --count HEAD)" "$(git rev-parse --short=8 "${_commit}")"
-#}
+pkgver() {
+  cd ${_realname}
+  local _major=$(head -n 14 src/common/angle_version.h | grep 'ANGLE_MAJOR_VERSION' | sed -e 's/.* //' | tr '\n' '.' | sed 's/.$/\n/')
+  local _minor=$(head -n 15 src/common/angle_version.h | grep 'ANGLE_MINOR_VERSION' | sed -e 's/.* //' | tr '\n' '.' | sed 's/.$/\n/')
+  printf "%s.%s.r%s.%s" "$_major" "$_minor" "$(git rev-list --count HEAD)" "$(git rev-parse --short=8 "${_commit}")"
+}
 
 prepare() {
   echo ":: Patching build directory"
