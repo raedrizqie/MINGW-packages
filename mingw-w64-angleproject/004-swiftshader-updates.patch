@@ -16,7 +16,7 @@ index 67dfeb0ec..5df50ba8a 100644
        include_dirs += [ "../../third_party/llvm-subzero/build/MacOS/include/" ]
      }
 +
-+    if (is_clang) {
++    if (is_mingw) {
 +      defines += [
 +        "__STDC_CONSTANT_MACROS",
 +        "__STDC_LIMIT_MACROS"
