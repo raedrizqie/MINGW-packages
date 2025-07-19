@@ -197,7 +197,7 @@ build() {
     angle_enable_abseil=false
     angle_enable_cl=false
     angle_enable_metal=false
-    angle_enable_swiftshader=${_swiftshader}
+    angle_enable_swiftshader=true
     angle_shared_libvulkan=false
     chrome_pgo_phase=0
     enable_rust=false
