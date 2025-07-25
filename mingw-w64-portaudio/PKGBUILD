@@ -6,19 +6,22 @@ pkgname="${MINGW_PACKAGE_PREFIX}-${_realname}"
 epoch=1
 pkgver=19.7.0
 _tarver=190700_20210406
-pkgrel=4
+pkgrel=5
 pkgdesc="A free, cross-platform, open source, audio I/O library (mingw-w64)"
 arch=('any')
 mingw_arch=('mingw32' 'mingw64' 'ucrt64' 'clang64' 'clangarm64')
 url="http://www.portaudio.com"
-license=("custom")
+msys2_repository_url='https://github.com/PortAudio/portaudio'
+msys2_documentation_url='http://www.portaudio.com/docs/'
+license=('spdx:MIT')
 makedepends=(
   "${MINGW_PACKAGE_PREFIX}-cc"
   "${MINGW_PACKAGE_PREFIX}-pkgconf"
   "${MINGW_PACKAGE_PREFIX}-cmake"
   "${MINGW_PACKAGE_PREFIX}-ninja"
 )
-depends=("${MINGW_PACKAGE_PREFIX}-cc-libs")
+depends=("${MINGW_PACKAGE_PREFIX}-cc-libs"
+         "${MINGW_PACKAGE_PREFIX}-jack2")
 source=("http://files.portaudio.com/archives/pa_stable_v${_tarver}.tgz"
         0001-clang-fix.patch
         0002-cmake-add-cpp-binding.patch
@@ -32,20 +35,27 @@ sha256sums=('47efbf42c77c19a05d22e627d42873e991ec0c1357219c0d74ce6a2948cb2def'
             '6af7c2c023483af698edd5063a0dce7cebb65eb40a256e6269ffd6ad32895dd4'
             'e48867fb8eb4ceda8e646879a03525b9bacbbaf154585c81478b06eef1c9d6a5')
 
+apply_patch_with_msg() {
+  for _patch in "$@"
+  do
+    msg2 "Applying $_patch"
+    patch -Nbp1 -i "${srcdir}/$_patch"
+  done
+}
+
 prepare() {
-  cd "${srcdir}/${_realname}"
+  cd ${_realname}
   mkdir -v bindings/cpp/cmake
   cp -v "${srcdir}/CMakeLists.txt" bindings/cpp
   cp -v "${srcdir}/portaudiocpp.pc.in" bindings/cpp/cmake
 
-  patch -p1 -i "${srcdir}/0001-clang-fix.patch"
-  patch -p1 -i "${srcdir}/0002-cmake-add-cpp-binding.patch"
-  patch -p1 -i "${srcdir}/0003-pa_getversioninfo-fix.patch"
+  apply_patch_with_msg \
+    0001-clang-fix.patch \
+    0002-cmake-add-cpp-binding.patch \
+    0003-pa_getversioninfo-fix.patch
 }
 
 build() {
-  mkdir -p "${srcdir}/build-${MSYSTEM}" && cd "${srcdir}/build-${MSYSTEM}"
-
   declare -a extra_config
   if check_option "debug" "n"; then
     extra_config+=("-DCMAKE_BUILD_TYPE=Release")
@@ -54,17 +64,17 @@ build() {
   fi
 
   MSYS2_ARG_CONV_EXCL="-DCMAKE_INSTALL_PREFIX=" \
-    ${MINGW_PREFIX}/bin/cmake \
+    cmake -Wno-dev \
       -GNinja \
+      -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
       -DCMAKE_INSTALL_PREFIX=${MINGW_PREFIX} \
       "${extra_config[@]}" \
-      ../${_realname}
+      -S ${_realname} \
+      -B build-${MSYSTEM}
 
-  ${MINGW_PREFIX}/bin/cmake --build .
+  cmake --build build-${MSYSTEM}
 }
 
 package() {
-  cd "${srcdir}/build-${MSYSTEM}"
-
-  DESTDIR="${pkgdir}" ${MINGW_PREFIX}/bin/cmake --build . --target install
+  DESTDIR="${pkgdir}" cmake --install build-${MSYSTEM}
 }
