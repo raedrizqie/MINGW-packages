@@ -406,7 +406,7 @@ index cf7860c..68b7bfc 100644
            Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>,
            IInitializeSpy> {
 +#else
-+    : public IInitializeSpy {
++    {
 +#endif
   public:
    // Constructs a COM initialize balancer. |co_init| defines the apartment's
@@ -550,7 +550,7 @@ index 352c22b..f6025f0 100644
 +  PROPVARIANT var2;
 +  VariantToPropVariant(&var_, &var1);
 +  VariantToPropVariant(&other, &var2);
-+  return PropVariantCompareEx(var1, var2, PVCU_DEFAULT, PVCHF_DEFAULT);
++  return ::PropVariantCompareEx(var1, var2, PVCU_DEFAULT, PVCHF_DEFAULT);
 +#else
    return ::VariantCompare(var_, other);
 +#endif
