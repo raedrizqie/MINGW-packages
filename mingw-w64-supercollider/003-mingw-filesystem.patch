@@ -1,0 +1,43 @@
+diff --git a/common/SC_Filesystem_win.cpp b/common/SC_Filesystem_win.cpp
+index 9873a05..bc5a7e7 100644
+--- a/common/SC_Filesystem_win.cpp
++++ b/common/SC_Filesystem_win.cpp
+@@ -124,15 +124,24 @@ bool SC_Filesystem::isNonHostPlatformDirectoryName(const std::string& s) {
+ }
+ 
+ Path SC_Filesystem::defaultSystemAppSupportDirectory() {
++#ifdef SC_DATA_DIR
++    return Path(SC_DATA_DIR);
++#else
+     PWSTR wptr = nullptr;
+     const HRESULT hr = SHGetKnownFolderPath(FOLDERID_ProgramData, 0, nullptr, &wptr);
+     return FAILED(hr) ? Path() : Path(wptr) / SC_FOLDERNAME_APPLICATION_NAME;
++#endif
+ }
+ 
+ Path SC_Filesystem::defaultUserHomeDirectory() {
++#ifdef _MSC_VER
+     PWSTR wptr = nullptr;
+     const HRESULT hr = SHGetKnownFolderPath(FOLDERID_Profile, 0, nullptr, &wptr);
+     return FAILED(hr) ? Path() : Path(wptr);
++#else
++    const char* home = getenv("HOME");
++    return Path(home ? home : "");
++#endif
+ }
+ 
+ Path SC_Filesystem::defaultUserAppSupportDirectory() {
+@@ -150,9 +159,13 @@ Path SC_Filesystem::defaultMyDocumentsDirectory() {
+ }
+ 
+ Path SC_Filesystem::defaultResourceDirectory() {
++#ifdef SC_DATA_DIR
++    return Path(SC_DATA_DIR);
++#else
+     WCHAR buf[MAX_PATH];
+     GetModuleFileNameW(nullptr, buf, MAX_PATH);
+     return Path(buf).parent_path();
++#endif
+ }
+ 
+ #endif // _WIN32

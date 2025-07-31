@@ -1,0 +1,73 @@
+diff --git a/editors/sc-ide/widgets/settings/editor_page.cpp b/editors/sc-ide/widgets/settings/editor_page.cpp
+index 9cf3e78..7605a53 100644
+--- a/editors/sc-ide/widgets/settings/editor_page.cpp
++++ b/editors/sc-ide/widgets/settings/editor_page.cpp
+@@ -39,7 +39,7 @@ EditorPage::EditorPage(QWidget* parent):
+     QWidget(parent),
+ #if (QT_VERSION < QT_VERSION_CHECK(6, 0, 0))
+     fontDatabase(new QFontDatabase),
+-#endif()
++#endif
+     ui(new Ui::EditorConfigPage) {
+     ui->setupUi(this);
+ 
+diff --git a/lang/LangPrimSource/SC_PortMIDI.cpp b/lang/LangPrimSource/SC_PortMIDI.cpp
+index fe84fde..3bb773c 100644
+--- a/lang/LangPrimSource/SC_PortMIDI.cpp
++++ b/lang/LangPrimSource/SC_PortMIDI.cpp
+@@ -28,8 +28,8 @@ added prRestartMIDI
+ 04/feb/03 prListMIDIEndpoints modification by Ron Kuivila added jt.
+ */
+ 
+-#include "PortMIDI.h"
+-#include "PortTime.h"
++#include "portmidi.h"
++#include "porttime.h"
+ 
+ #include "SCBase.h"
+ #include "VMGlobals.h"
+diff --git a/lang/LangSource/DumpParseNode.cpp b/lang/LangSource/DumpParseNode.cpp
+index ef03671..0e3bfb8 100644
+--- a/lang/LangSource/DumpParseNode.cpp
++++ b/lang/LangSource/DumpParseNode.cpp
+@@ -29,7 +29,7 @@
+ #include <stdarg.h>
+ #include <ctype.h>
+ 
+-#ifdef _WIN32
++#ifndef PATH_MAX
+ #    define PATH_MAX _MAX_PATH
+ #endif
+ 
+diff --git a/server/supernova/audio_backend/portaudio_backend.hpp b/server/supernova/audio_backend/portaudio_backend.hpp
+index 00bc5f0..37a76b4 100644
+--- a/server/supernova/audio_backend/portaudio_backend.hpp
++++ b/server/supernova/audio_backend/portaudio_backend.hpp
+@@ -298,12 +298,13 @@ private:
+             super::fetch_inputs(inputs, blocksize_, input_channels);
+             engine_functor::run_tick();
+             super::deliver_outputs(outputs, blocksize_, m_hwOutputChannels);
+-            if (IsClipping)
++            if (IsClipping) {
+                 for (uint16_t i = 0; i != m_hwOutputChannels; ++i)
+                     if (super::is_aligned(out[i]))
+                         clip2_vec_simd(out[i], out[i], safety_clip_threshold_, blocksize_);
+                     else
+                         clip2_vec(out[i], out[i], safety_clip_threshold_, blocksize_);
++            }
+             processed += blocksize_;
+         }
+ 
+diff --git a/server/supernova/utilities/callback_interpreter.hpp b/server/supernova/utilities/callback_interpreter.hpp
+index aab9c09..7aaeaef 100644
+--- a/server/supernova/utilities/callback_interpreter.hpp
++++ b/server/supernova/utilities/callback_interpreter.hpp
+@@ -104,7 +104,7 @@ public:
+     void start_thread(void) {
+         semaphore sync_sem;
+         std::thread thr([&]() { this->run_thread(sync_sem); });
+-        callback_thread = move(thr);
++        callback_thread = std::move(thr);
+         sync_sem.wait();
+     }
+ 
