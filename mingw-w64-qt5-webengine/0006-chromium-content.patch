@@ -1,0 +1,485 @@
+diff --git a/src/3rdparty/chromium/content/app/content_main_runner_impl.cc b/src/3rdparty/chromium/content/app/content_main_runner_impl.cc
+index a8c7d44..e60db92 100644
+--- a/src/3rdparty/chromium/content/app/content_main_runner_impl.cc
++++ b/src/3rdparty/chromium/content/app/content_main_runner_impl.cc
+@@ -672,9 +672,9 @@ int ContentMainRunnerImpl::Initialize(const ContentMainParams& params) {
+   if (enable_startup_tracing)
+     tracing::EnableStartupTracingIfNeeded();
+ 
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+   base::trace_event::TraceEventETWExport::EnableETWExport();
+-#endif  // OS_WIN
++#endif  // COMPILER_MSVC
+ 
+   // Android tracing started at the beginning of the method.
+   // Other OSes have to wait till we get here in order for all the memory
+diff --git a/src/3rdparty/chromium/content/browser/BUILD.gn b/src/3rdparty/chromium/content/browser/BUILD.gn
+index ae459c2..b40d35d 100644
+--- a/src/3rdparty/chromium/content/browser/BUILD.gn
++++ b/src/3rdparty/chromium/content/browser/BUILD.gn
+@@ -36,6 +36,7 @@ jumbo_static_library("devtools_protocol") {
+ 
+   deps = [
+     "//base",
++    "//components/spellcheck:buildflags",
+     "//content/browser/devtools:devtools_background_services_proto",
+     "//content/browser/devtools:protocol_sources",
+     "//content/common:buildflags",
+@@ -2282,6 +2283,19 @@ jumbo_static_library("browser") {
+       "renderer_host/virtual_keyboard_controller_win.h",
+       "utility_sandbox_delegate_win.cc",
+     ]
++    if (is_mingw) {
++      sources -= [
++        "accessibility/accessibility_event_recorder_uia_win.cc",
++        "accessibility/accessibility_event_recorder_uia_win.h",
++        "accessibility/accessibility_event_recorder_win.cc",
++        "installedapp/installed_app_provider_impl_win.cc",
++        "installedapp/installed_app_provider_impl_win.h",
++        "renderer_host/direct_manipulation_event_handler_win.cc",
++        "renderer_host/direct_manipulation_event_handler_win.h",
++        "renderer_host/direct_manipulation_helper_win.cc",
++        "renderer_host/direct_manipulation_helper_win.h",
++      ]
++    }
+     defines += [
+       # This prevents the inclusion of atlhost.h which paired
+       # with the windows 8 sdk it does the wrong thing.
+@@ -2293,15 +2307,15 @@ jumbo_static_library("browser") {
+       "//third_party/isimpledom",
+     ]
+     libs += [
+-      "comctl32.lib",
+-      "dinput8.lib",
+-      "dwmapi.lib",
+-      "dxguid.lib",
+-      "imm32.lib",
+-      "oleacc.lib",
+-      "portabledeviceguids.lib",
+-      "uiautomationcore.lib",
+-      "wtsapi32.lib",
++      "comctl32",
++      "dinput8",
++      "dwmapi",
++      "dxguid",
++      "imm32",
++      "oleacc",
++      "portabledeviceguids",
++      "uiautomationcore",
++      "wtsapi32",
+     ]
+   }
+ 
+diff --git a/src/3rdparty/chromium/content/browser/accessibility/accessibility_event_recorder_uia_win.h b/src/3rdparty/chromium/content/browser/accessibility/accessibility_event_recorder_uia_win.h
+index 338f15a..e398cc9 100644
+--- a/src/3rdparty/chromium/content/browser/accessibility/accessibility_event_recorder_uia_win.h
++++ b/src/3rdparty/chromium/content/browser/accessibility/accessibility_event_recorder_uia_win.h
+@@ -23,6 +23,8 @@
+ 
+ namespace content {
+ 
++#if defined(COMPILER_MSVC)
++
+ class AccessibilityEventRecorderUia : public AccessibilityEventRecorder {
+  public:
+   AccessibilityEventRecorderUia(
+@@ -140,6 +142,8 @@ class AccessibilityEventRecorderUia : public AccessibilityEventRecorder {
+   DISALLOW_COPY_AND_ASSIGN(AccessibilityEventRecorderUia);
+ };
+ 
++#endif // COMPILER_MSVC
++
+ }  // namespace content
+ 
+ #endif
+diff --git a/src/3rdparty/chromium/content/browser/accessibility/accessibility_tree_formatter_utils_win.cc b/src/3rdparty/chromium/content/browser/accessibility/accessibility_tree_formatter_utils_win.cc
+index a1d1624..d73c064 100644
+--- a/src/3rdparty/chromium/content/browser/accessibility/accessibility_tree_formatter_utils_win.cc
++++ b/src/3rdparty/chromium/content/browser/accessibility/accessibility_tree_formatter_utils_win.cc
+@@ -320,6 +320,7 @@ base::string16 IAccessible2StateToString(int32_t ia2_state) {
+   return base::JoinString(strings, base::ASCIIToUTF16(","));
+ }
+ 
++#if defined(COMPILER_MSVC)
+ CONTENT_EXPORT base::string16 UiaIdentifierToString(int32_t identifier) {
+   static const PlatformConstantToNameEntry id_table[] = {
+       // Patterns
+@@ -675,6 +676,7 @@ CONTENT_EXPORT base::string16 UiaLiveSettingToString(int32_t identifier) {
+       QUOTE(LiveSetting::Assertive)};
+   return GetNameForPlatformConstant(id_table, base::size(id_table), identifier);
+ }
++#endif // COMPILER_MSVC
+ 
+ CONTENT_EXPORT std::string BstrToUTF8(BSTR bstr) {
+   base::string16 str16(bstr, SysStringLen(bstr));
+diff --git a/src/3rdparty/chromium/content/browser/accessibility/browser_accessibility_com_win.h b/src/3rdparty/chromium/content/browser/accessibility/browser_accessibility_com_win.h
+index 46b96f4..d7d6974 100644
+--- a/src/3rdparty/chromium/content/browser/accessibility/browser_accessibility_com_win.h
++++ b/src/3rdparty/chromium/content/browser/accessibility/browser_accessibility_com_win.h
+@@ -44,6 +44,8 @@ const GUID GUID_IAccessibleContentDocument = {
+ namespace content {
+ class BrowserAccessibilityWin;
+ 
++#if defined(COMPILER_MSVC)
++
+ ////////////////////////////////////////////////////////////////////////////////
+ //
+ // BrowserAccessibilityComWin
+@@ -451,6 +453,8 @@ class __declspec(uuid("562072fe-3390-43b1-9e2c-dd4118f5ac79"))
+ CONTENT_EXPORT BrowserAccessibilityComWin* ToBrowserAccessibilityComWin(
+     BrowserAccessibility* obj);
+ 
++#endif // COMPILER_MSVC
++
+ }  // namespace content
+ 
+ #endif  // CONTENT_BROWSER_ACCESSIBILITY_BROWSER_ACCESSIBILITY_COM_WIN_H_
+diff --git a/src/3rdparty/chromium/content/browser/accessibility/browser_accessibility_win.h b/src/3rdparty/chromium/content/browser/accessibility/browser_accessibility_win.h
+index f7dcfab..da34b3a 100644
+--- a/src/3rdparty/chromium/content/browser/accessibility/browser_accessibility_win.h
++++ b/src/3rdparty/chromium/content/browser/accessibility/browser_accessibility_win.h
+@@ -47,7 +47,9 @@ class CONTENT_EXPORT BrowserAccessibilityWin : public BrowserAccessibility {
+   bool ShouldHideChildrenForUIA() const;
+ 
+  private:
++#if defined(COMPILER_MSVC)
+   CComObject<BrowserAccessibilityComWin>* browser_accessibility_com_;
++#endif
+   // Give BrowserAccessibility::Create access to our constructor.
+   friend class BrowserAccessibility;
+   DISALLOW_COPY_AND_ASSIGN(BrowserAccessibilityWin);
+diff --git a/src/3rdparty/chromium/content/browser/code_cache/generated_code_cache.h b/src/3rdparty/chromium/content/browser/code_cache/generated_code_cache.h
+index c8770b9..bf9e456 100644
+--- a/src/3rdparty/chromium/content/browser/code_cache/generated_code_cache.h
++++ b/src/3rdparty/chromium/content/browser/code_cache/generated_code_cache.h
+@@ -53,7 +53,7 @@ class CONTENT_EXPORT GeneratedCodeCache {
+   enum CodeCacheType { kJavaScript, kWebAssembly };
+ 
+   // Used for collecting statistics about cache behaviour.
+-  enum CacheEntryStatus {
++  enum CacheEntryStatus : uint8_t {
+     kHit,
+     kMiss,
+     kClear,
+diff --git a/src/3rdparty/chromium/content/browser/renderer_host/dwrite_font_proxy_impl_win.cc b/src/3rdparty/chromium/content/browser/renderer_host/dwrite_font_proxy_impl_win.cc
+index 7f1710b..d109e0a 100644
+--- a/src/3rdparty/chromium/content/browser/renderer_host/dwrite_font_proxy_impl_win.cc
++++ b/src/3rdparty/chromium/content/browser/renderer_host/dwrite_font_proxy_impl_win.cc
+@@ -37,7 +37,9 @@
+ #include "third_party/skia/include/core/SkTypeface.h"
+ #include "third_party/skia/include/ports/SkTypeface_win.h"
+ #include "ui/gfx/win/direct_write.h"
++#if defined(COMPILER_MSVC)
+ #include "ui/gfx/win/text_analysis_source.h"
++#endif
+ 
+ namespace mswr = Microsoft::WRL;
+ 
+@@ -307,6 +309,7 @@ void DWriteFontProxyImpl::MapCharacters(
+     }
+   }
+ 
++#if defined(COMPILER_MSVC)
+   mswr::ComPtr<IDWriteFont> mapped_font;
+ 
+   mswr::ComPtr<IDWriteNumberSubstitution> number_substitution;
+@@ -388,6 +391,7 @@ void DWriteFontProxyImpl::MapCharacters(
+   LogMessageFilterError(MessageFilterError::MAP_CHARACTERS_NO_FAMILY);
+   DCHECK_EQ(result->family_index, UINT32_MAX);
+   DCHECK_GT(result->mapped_length, 0u);
++#endif
+ }
+ 
+ void DWriteFontProxyImpl::GetUniqueNameLookupTableIfAvailable(
+diff --git a/src/3rdparty/chromium/content/browser/renderer_host/media/media_stream_manager.cc b/src/3rdparty/chromium/content/browser/renderer_host/media/media_stream_manager.cc
+index c627d89..781bd39 100644
+--- a/src/3rdparty/chromium/content/browser/renderer_host/media/media_stream_manager.cc
++++ b/src/3rdparty/chromium/content/browser/renderer_host/media/media_stream_manager.cc
+@@ -729,7 +729,7 @@ MediaStreamManager::MediaStreamManager(
+ 
+   if (!video_capture_provider) {
+     scoped_refptr<base::SingleThreadTaskRunner> device_task_runner =
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+         // Windows unconditionally requires its own thread (see below).
+         nullptr;
+ #else
+@@ -739,7 +739,7 @@ MediaStreamManager::MediaStreamManager(
+ 
+     if (!device_task_runner) {
+       video_capture_thread_.emplace("VideoCaptureThread");
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+       // Use an STA Video Capture Thread to try to avoid crashes on enumeration
+       // of buggy third party Direct Show modules, http://crbug.com/428958.
+       video_capture_thread_->init_com_with_mta(false);
+diff --git a/src/3rdparty/chromium/content/browser/resolve_proxy_helper.h b/src/3rdparty/chromium/content/browser/resolve_proxy_helper.h
+index ec64f87..51294ed 100644
+--- a/src/3rdparty/chromium/content/browser/resolve_proxy_helper.h
++++ b/src/3rdparty/chromium/content/browser/resolve_proxy_helper.h
+@@ -77,7 +77,7 @@ class CONTENT_EXPORT ResolveProxyHelper
+    public:
+     PendingRequest(const GURL& url, ResolveProxyCallback callback);
+     PendingRequest(PendingRequest&& pending_request) noexcept;
+-    ~PendingRequest();
++    ~PendingRequest() noexcept;
+ 
+     PendingRequest& operator=(PendingRequest&& pending_request) noexcept;
+ 
+diff --git a/src/3rdparty/chromium/content/browser/scheduler/browser_task_executor.cc b/src/3rdparty/chromium/content/browser/scheduler/browser_task_executor.cc
+index 82801d3..2ce4c00 100644
+--- a/src/3rdparty/chromium/content/browser/scheduler/browser_task_executor.cc
++++ b/src/3rdparty/chromium/content/browser/scheduler/browser_task_executor.cc
+@@ -84,14 +84,14 @@ BaseBrowserTaskExecutor::CreateSingleThreadTaskRunner(
+   return GetTaskRunner(ExtractBrowserThreadId(traits), traits);
+ }
+ 
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+ scoped_refptr<base::SingleThreadTaskRunner>
+ BaseBrowserTaskExecutor::CreateCOMSTATaskRunner(
+     const base::TaskTraits& traits,
+     base::SingleThreadTaskRunnerThreadMode thread_mode) {
+   return GetTaskRunner(ExtractBrowserThreadId(traits), traits);
+ }
+-#endif  // defined(OS_WIN)
++#endif  // defined(COMPILER_MSVC)
+ 
+ scoped_refptr<base::SingleThreadTaskRunner>
+ BaseBrowserTaskExecutor::GetTaskRunner(BrowserThread::ID identifier,
+diff --git a/src/3rdparty/chromium/content/browser/scheduler/browser_task_executor.h b/src/3rdparty/chromium/content/browser/scheduler/browser_task_executor.h
+index cefddbd..7fdd798 100644
+--- a/src/3rdparty/chromium/content/browser/scheduler/browser_task_executor.h
++++ b/src/3rdparty/chromium/content/browser/scheduler/browser_task_executor.h
+@@ -52,11 +52,11 @@ class CONTENT_EXPORT BaseBrowserTaskExecutor : public base::TaskExecutor {
+       const base::TaskTraits& traits,
+       base::SingleThreadTaskRunnerThreadMode thread_mode) override;
+ 
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+   scoped_refptr<base::SingleThreadTaskRunner> CreateCOMSTATaskRunner(
+       const base::TaskTraits& traits,
+       base::SingleThreadTaskRunnerThreadMode thread_mode) override;
+-#endif  // defined(OS_WIN)
++#endif  // defined(COMPILER_MSVC)
+ 
+   // Returns the task runner for |traits| under |identifier|. Note: during the
+   // migration away from task traits extension, |traits| may also contain a
+diff --git a/src/3rdparty/chromium/content/browser/screenlock_monitor/screenlock_monitor_device_source_win.cc b/src/3rdparty/chromium/content/browser/screenlock_monitor/screenlock_monitor_device_source_win.cc
+index 6d696b2..d6afdfb 100644
+--- a/src/3rdparty/chromium/content/browser/screenlock_monitor/screenlock_monitor_device_source_win.cc
++++ b/src/3rdparty/chromium/content/browser/screenlock_monitor/screenlock_monitor_device_source_win.cc
+@@ -27,8 +27,13 @@ ScreenlockMonitorDeviceSource::SessionMessageWindow::SessionMessageWindow() {
+       base::BindOnce(base::IgnoreResult(&::WTSRegisterSessionNotification),
+                      window_->hwnd(), NOTIFY_FOR_ALL_SESSIONS);
+ 
++#if defined(COMPILER_MSVC)
+   base::ThreadPool::CreateCOMSTATaskRunner({})->PostTask(
+       FROM_HERE, std::move(wts_register));
++#else
++  base::ThreadPool::CreateTaskRunner({})->PostTask(
++      FROM_HERE, std::move(wts_register));
++#endif
+ }
+ 
+ ScreenlockMonitorDeviceSource::SessionMessageWindow::~SessionMessageWindow() {
+diff --git a/src/3rdparty/chromium/content/browser/speech/tts_platform_impl.cc b/src/3rdparty/chromium/content/browser/speech/tts_platform_impl.cc
+index 2246c9f..e90f848 100644
+--- a/src/3rdparty/chromium/content/browser/speech/tts_platform_impl.cc
++++ b/src/3rdparty/chromium/content/browser/speech/tts_platform_impl.cc
+@@ -20,7 +20,7 @@ TtsPlatform* TtsPlatform::GetInstance() {
+     return result;
+ #endif
+ 
+-#if defined(OS_CHROMEOS)
++#if defined(OS_CHROMEOS) || (defined(OS_WIN) && defined(COMPILER_GCC))
+   // On Chrome OS, the platform TTS definition is provided by the content
+   // client.
+   //
+diff --git a/src/3rdparty/chromium/content/browser/startup_helper.cc b/src/3rdparty/chromium/content/browser/startup_helper.cc
+index 982546b..9f72579 100644
+--- a/src/3rdparty/chromium/content/browser/startup_helper.cc
++++ b/src/3rdparty/chromium/content/browser/startup_helper.cc
+@@ -78,7 +78,7 @@ void StartBrowserThreadPool() {
+       base::RecommendedMaxNumberOfThreadsInThreadGroup(
+           min, kThreadPoolMax, kThreadPoolCoresMultiplier, kThreadPoolOffset)};
+ 
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+   thread_pool_init_params.common_thread_pool_environment = base::
+       ThreadPoolInstance::InitParams::CommonThreadPoolEnvironment::COM_MTA;
+ #endif
+diff --git a/src/3rdparty/chromium/content/browser/video_capture_service.cc b/src/3rdparty/chromium/content/browser/video_capture_service.cc
+index c408d3b..8927b03 100644
+--- a/src/3rdparty/chromium/content/browser/video_capture_service.cc
++++ b/src/3rdparty/chromium/content/browser/video_capture_service.cc
+@@ -22,7 +22,7 @@
+ #include "services/video_capture/public/uma/video_capture_service_event.h"
+ #include "services/video_capture/video_capture_service_impl.h"
+ 
+-#if defined(OS_WIN)
++#if defined(OS_WIN) && defined(COMPILER_MSVC)
+ #define CREATE_IN_PROCESS_TASK_RUNNER base::ThreadPool::CreateCOMSTATaskRunner
+ #else
+ #define CREATE_IN_PROCESS_TASK_RUNNER \
+diff --git a/src/3rdparty/chromium/content/child/BUILD.gn b/src/3rdparty/chromium/content/child/BUILD.gn
+index cdaf2b2..cd79626 100644
+--- a/src/3rdparty/chromium/content/child/BUILD.gn
++++ b/src/3rdparty/chromium/content/child/BUILD.gn
+@@ -157,8 +157,21 @@ target(link_target_type, "child") {
+     ]
+   }
+ 
++  if (is_mingw) {
++    sources -= [
++      "dwrite_font_proxy/dwrite_font_proxy_init_impl_win.cc",
++      "dwrite_font_proxy/dwrite_font_proxy_init_impl_win.h",
++      "dwrite_font_proxy/dwrite_font_proxy_win.cc",
++      "dwrite_font_proxy/dwrite_font_proxy_win.h",
++      "dwrite_font_proxy/dwrite_localized_strings_win.cc",
++      "dwrite_font_proxy/dwrite_localized_strings_win.h",
++      "dwrite_font_proxy/font_fallback_win.cc",
++      "dwrite_font_proxy/font_fallback_win.h",
++    ]
++  }
++
+   if (is_win) {
+-    libs = [ "dwrite.lib" ]
++    libs = [ "dwrite" ]
+   }
+ 
+   if (enable_plugins) {
+diff --git a/src/3rdparty/chromium/content/child/dwrite_font_proxy/dwrite_font_proxy_win.h b/src/3rdparty/chromium/content/child/dwrite_font_proxy/dwrite_font_proxy_win.h
+index 0e14fa0..c851b57 100644
+--- a/src/3rdparty/chromium/content/child/dwrite_font_proxy/dwrite_font_proxy_win.h
++++ b/src/3rdparty/chromium/content/child/dwrite_font_proxy/dwrite_font_proxy_win.h
+@@ -5,6 +5,8 @@
+ #ifndef CONTENT_CHILD_DWRITE_FONT_PROXY_DWRITE_FONT_PROXY_WIN_H_
+ #define CONTENT_CHILD_DWRITE_FONT_PROXY_DWRITE_FONT_PROXY_WIN_H_
+ 
++#if defined(COMPILER_MSVC)
++
+ #include <dwrite.h>
+ #include <wrl.h>
+ 
+@@ -228,4 +230,7 @@ class FontFileStream
+ };
+ 
+ }  // namespace content
++
++#endif // COMPILER_MSVC
++
+ #endif  // CONTENT_CHILD_DWRITE_FONT_PROXY_DWRITE_FONT_PROXY_WIN_H_
+diff --git a/src/3rdparty/chromium/content/child/dwrite_font_proxy/dwrite_localized_strings_win.h b/src/3rdparty/chromium/content/child/dwrite_font_proxy/dwrite_localized_strings_win.h
+index 796f435..e987acd 100644
+--- a/src/3rdparty/chromium/content/child/dwrite_font_proxy/dwrite_localized_strings_win.h
++++ b/src/3rdparty/chromium/content/child/dwrite_font_proxy/dwrite_localized_strings_win.h
+@@ -5,6 +5,8 @@
+ #ifndef CONTENT_CHILD_DWRITE_FONT_PROXY_DWRITE_LOCALIZED_STRINGS_WIN_H_
+ #define CONTENT_CHILD_DWRITE_FONT_PROXY_DWRITE_LOCALIZED_STRINGS_WIN_H_
+ 
++#if defined(COMPILER_MSVC)
++
+ #include <dwrite.h>
+ #include <wrl.h>
+ #include <utility>
+@@ -54,4 +56,7 @@ class DWriteLocalizedStrings
+ };
+ 
+ }  // namespace content
++
++#endif // COMPILER_MSVC
++
+ #endif  // CONTENT_CHILD_DWRITE_FONT_PROXY_DWRITE_LOCALIZED_STRINGS_WIN_H_
+diff --git a/src/3rdparty/chromium/content/child/dwrite_font_proxy/font_fallback_win.h b/src/3rdparty/chromium/content/child/dwrite_font_proxy/font_fallback_win.h
+index b6f604a..c5e08d2 100644
+--- a/src/3rdparty/chromium/content/child/dwrite_font_proxy/font_fallback_win.h
++++ b/src/3rdparty/chromium/content/child/dwrite_font_proxy/font_fallback_win.h
+@@ -5,6 +5,8 @@
+ #ifndef CONTENT_CHILD_DWRITE_FONT_PROXY_FONT_FALLBACK_WIN_H_
+ #define CONTENT_CHILD_DWRITE_FONT_PROXY_FONT_FALLBACK_WIN_H_
+ 
++#if defined(COMPILER_MSVC)
++
+ #include <dwrite.h>
+ #include <dwrite_2.h>
+ #include <wrl.h>
+@@ -83,4 +85,6 @@ class FontFallback
+ 
+ }  // namespace content
+ 
++#endif // COMPILER_MSVC
++
+ #endif  // CONTENT_CHILD_DWRITE_FONT_PROXY_FONT_FALLBACK_WIN_H_
+diff --git a/src/3rdparty/chromium/content/ppapi_plugin/ppapi_plugin_main.cc b/src/3rdparty/chromium/content/ppapi_plugin/ppapi_plugin_main.cc
+index dc737cb..e5e5e2d 100644
+--- a/src/3rdparty/chromium/content/ppapi_plugin/ppapi_plugin_main.cc
++++ b/src/3rdparty/chromium/content/ppapi_plugin/ppapi_plugin_main.cc
+@@ -142,7 +142,7 @@ int PpapiPluginMain(const MainFunctionParams& parameters) {
+     tracing::EnableStartupTracingIfNeeded();
+ #endif  // OS_POSIX && !OS_ANDROID && !OS_MAC
+ 
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+   if (!base::win::IsUser32AndGdi32Available())
+     gfx::win::InitializeDirectWrite();
+   InitializeDWriteFontProxy();
+@@ -164,7 +164,7 @@ int PpapiPluginMain(const MainFunctionParams& parameters) {
+ 
+   run_loop.Run();
+ 
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+   UninitializeDWriteFontProxy();
+ #endif
+   return 0;
+diff --git a/src/3rdparty/chromium/content/renderer/loader/web_url_request_util.cc b/src/3rdparty/chromium/content/renderer/loader/web_url_request_util.cc
+index 2e90983..4ccec5c 100644
+--- a/src/3rdparty/chromium/content/renderer/loader/web_url_request_util.cc
++++ b/src/3rdparty/chromium/content/renderer/loader/web_url_request_util.cc
+@@ -233,9 +233,11 @@ scoped_refptr<network::ResourceRequestBody> GetRequestBodyForWebHTTPBody(
+   return request_body;
+ }
+ 
++#ifndef STATIC_ASSERT_ENUM
+ #define STATIC_ASSERT_ENUM(a, b)                            \
+   static_assert(static_cast<int>(a) == static_cast<int>(b), \
+                 "mismatching enums: " #a)
++#endif
+ 
+ blink::mojom::RequestContextType GetRequestContextTypeForWebURLRequest(
+     const WebURLRequest& request) {
+diff --git a/src/3rdparty/chromium/content/renderer/renderer_main_platform_delegate_win.cc b/src/3rdparty/chromium/content/renderer/renderer_main_platform_delegate_win.cc
+index 4fb80f4..ebfd3fd 100644
+--- a/src/3rdparty/chromium/content/renderer/renderer_main_platform_delegate_win.cc
++++ b/src/3rdparty/chromium/content/renderer/renderer_main_platform_delegate_win.cc
+@@ -53,11 +53,15 @@ void RendererMainPlatformDelegate::PlatformInitialize() {
+     std::unique_ptr<icu::TimeZone> zone(icu::TimeZone::createDefault());
+   }
+ 
++#if defined(COMPILER_MSVC)
+   InitializeDWriteFontProxy();
++#endif
+ }
+ 
+ void RendererMainPlatformDelegate::PlatformUninitialize() {
++#if defined(COMPILER_MSVC)
+   UninitializeDWriteFontProxy();
++#endif
+ }
+ 
+ bool RendererMainPlatformDelegate::EnableSandbox() {
+diff --git a/src/3rdparty/chromium/content/shell/BUILD.gn b/src/3rdparty/chromium/content/shell/BUILD.gn
+index 56c0e8b..2eadb8b 100644
+--- a/src/3rdparty/chromium/content/shell/BUILD.gn
++++ b/src/3rdparty/chromium/content/shell/BUILD.gn
+@@ -797,7 +797,7 @@ group("content_shell_crash_test") {
+       "//components/crash/content/tools/dmp2minidump.py",
+     ]
+   }
+-  if (is_win) {
++  if (is_msvc) {
+     data_deps += [ "//build/win:copy_cdb_to_output" ]
+   }
+   if (is_posix) {

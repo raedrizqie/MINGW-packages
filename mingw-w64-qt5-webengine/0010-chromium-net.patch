@@ -1,0 +1,164 @@
+diff --git a/src/3rdparty/chromium/net/BUILD.gn b/src/3rdparty/chromium/net/BUILD.gn
+index c399590..5d79c44 100644
+--- a/src/3rdparty/chromium/net/BUILD.gn
++++ b/src/3rdparty/chromium/net/BUILD.gn
+@@ -1522,17 +1522,19 @@ component("net") {
+ 
+   if (is_win) {
+     libs = [
+-      "crypt32.lib",
+-      "dhcpcsvc.lib",
+-      "iphlpapi.lib",
+-      "ncrypt.lib",
+-      "rpcrt4.lib",
+-      "secur32.lib",
+-      "urlmon.lib",
+-      "winhttp.lib",
++      "crypt32",
++      "dhcpcsvc",
++      "iphlpapi",
++      "ncrypt",
++      "rpcrt4",
++      "secur32",
++      "urlmon",
++      "winhttp",
+     ]
+ 
+-    ldflags = [ "/DELAYLOAD:urlmon.dll" ]
++    if (is_msvc) {
++      ldflags = [ "/DELAYLOAD:urlmon.dll" ]
++    }
+   }
+ 
+   if (!is_nacl) {
+@@ -4834,8 +4836,8 @@ test("net_unittests") {
+ 
+   if (is_win) {
+     libs = [
+-      "iphlpapi.lib",
+-      "ncrypt.lib",
++      "iphlpapi",
++      "ncrypt",
+     ]
+   }
+ 
+diff --git a/src/3rdparty/chromium/net/base/network_change_notifier.cc b/src/3rdparty/chromium/net/base/network_change_notifier.cc
+index fdb6612..1adeafb 100644
+--- a/src/3rdparty/chromium/net/base/network_change_notifier.cc
++++ b/src/3rdparty/chromium/net/base/network_change_notifier.cc
+@@ -30,7 +30,7 @@
+ #include "net/url_request/url_request.h"
+ #include "url/gurl.h"
+ 
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+ #include "net/base/network_change_notifier_win.h"
+ #elif defined(OS_LINUX) && !defined(OS_CHROMEOS)
+ #include "net/base/network_change_notifier_linux.h"
+@@ -227,7 +227,7 @@ std::unique_ptr<NetworkChangeNotifier> NetworkChangeNotifier::CreateIfNeeded(
+   if (g_network_change_notifier_factory)
+     return g_network_change_notifier_factory->CreateInstance();
+ 
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+   std::unique_ptr<NetworkChangeNotifierWin> network_change_notifier =
+       std::make_unique<NetworkChangeNotifierWin>();
+   network_change_notifier->WatchForAddressChange();
+@@ -475,7 +475,7 @@ NetworkChangeNotifier::ConnectionTypeFromInterfaceList(
+   bool first = true;
+   ConnectionType result = CONNECTION_NONE;
+   for (size_t i = 0; i < interfaces.size(); ++i) {
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+     if (interfaces[i].friendly_name == "Teredo Tunneling Pseudo-Interface")
+       continue;
+ #endif
+diff --git a/src/3rdparty/chromium/net/cookies/cookie_monster.h b/src/3rdparty/chromium/net/cookies/cookie_monster.h
+index 2b8ea03..c8a8bdb 100644
+--- a/src/3rdparty/chromium/net/cookies/cookie_monster.h
++++ b/src/3rdparty/chromium/net/cookies/cookie_monster.h
+@@ -314,7 +314,7 @@ class NET_EXPORT CookieMonster : public CookieStore {
+   // of scheme. This enum should not be used when cookies are *cleared*,
+   // because its purpose is to understand if Chrome can deprecate the
+   // ability of HTTP urls to set/overwrite Secure cookies.
+-  enum CookieSource {
++  enum CookieSource : uint8_t {
+     COOKIE_SOURCE_SECURE_COOKIE_CRYPTOGRAPHIC_SCHEME = 0,
+     COOKIE_SOURCE_SECURE_COOKIE_NONCRYPTOGRAPHIC_SCHEME,
+     COOKIE_SOURCE_NONSECURE_COOKIE_CRYPTOGRAPHIC_SCHEME,
+diff --git a/src/3rdparty/chromium/net/quic/quic_stream_factory.cc b/src/3rdparty/chromium/net/quic/quic_stream_factory.cc
+index ad845cb..dbddbcd 100644
+--- a/src/3rdparty/chromium/net/quic/quic_stream_factory.cc
++++ b/src/3rdparty/chromium/net/quic/quic_stream_factory.cc
+@@ -1034,7 +1034,7 @@ QuicStreamRequest::ReleaseSessionHandle() {
+ 
+ void QuicStreamRequest::SetSession(
+     std::unique_ptr<QuicChromiumClientSession::Handle> session) {
+-  session_ = move(session);
++  session_ = std::move(session);
+ }
+ 
+ QuicStreamFactory::QuicSessionAliasKey::QuicSessionAliasKey(
+diff --git a/src/3rdparty/chromium/net/spdy/spdy_http_stream.cc b/src/3rdparty/chromium/net/spdy/spdy_http_stream.cc
+index 92de83a..adec597 100644
+--- a/src/3rdparty/chromium/net/spdy/spdy_http_stream.cc
++++ b/src/3rdparty/chromium/net/spdy/spdy_http_stream.cc
+@@ -354,7 +354,7 @@ int SpdyHttpStream::SendRequest(const HttpRequestHeaders& request_headers,
+   DispatchRequestHeadersCallback(headers);
+ 
+   bool will_send_data =
+-      HasUploadData() | spdy_session_->EndStreamWithDataFrame();
++      HasUploadData() || spdy_session_->EndStreamWithDataFrame();
+   result = stream_->SendRequestHeaders(
+       std::move(headers),
+       will_send_data ? MORE_DATA_TO_SEND : NO_MORE_DATA_TO_SEND);
+diff --git a/src/3rdparty/chromium/net/tools/huffman_trie/trie_entry.h b/src/3rdparty/chromium/net/tools/huffman_trie/trie_entry.h
+index fe70260..eac6a7f 100644
+--- a/src/3rdparty/chromium/net/tools/huffman_trie/trie_entry.h
++++ b/src/3rdparty/chromium/net/tools/huffman_trie/trie_entry.h
+@@ -5,6 +5,7 @@
+ #ifndef NET_TOOLS_HUFFMAN_TRIE_TRIE_ENTRY_H_
+ #define NET_TOOLS_HUFFMAN_TRIE_TRIE_ENTRY_H_
+ 
++#include <cstdint>
+ #include <memory>
+ #include <string>
+ #include <vector>
+diff --git a/src/3rdparty/chromium/net/third_party/quiche/src/quic/core/quic_config.cc b/src/3rdparty/chromium/net/third_party/quiche/src/quic/core/quic_config.cc
+index bac4e18..0e8be9c 100644
+--- a/src/3rdparty/chromium/net/third_party/quiche/src/quic/core/quic_config.cc
++++ b/src/3rdparty/chromium/net/third_party/quiche/src/quic/core/quic_config.cc
+@@ -1265,7 +1265,7 @@ QuicErrorCode QuicConfig::ProcessTransportParameters(
+       *error_details = "Bad stateless reset token length";
+       return QUIC_INTERNAL_ERROR;
+     }
+-    memcpy(&stateless_reset_token, params.stateless_reset_token.data(),
++    memcpy(reinterpret_cast<void*>(&stateless_reset_token), params.stateless_reset_token.data(),
+            params.stateless_reset_token.size());
+     stateless_reset_token_.SetReceivedValue(stateless_reset_token);
+   }
+diff --git a/src/3rdparty/chromium/net/third_party/quiche/src/quic/core/quic_framer.cc b/src/3rdparty/chromium/net/third_party/quiche/src/quic/core/quic_framer.cc
+index e57277c..7d7df89 100644
+--- a/src/3rdparty/chromium/net/third_party/quiche/src/quic/core/quic_framer.cc
++++ b/src/3rdparty/chromium/net/third_party/quiche/src/quic/core/quic_framer.cc
+@@ -1699,7 +1699,7 @@ bool QuicFramer::ProcessIetfDataPacket(QuicDataReader* encrypted_reader,
+         encrypted_reader->PeekRemainingPayload();
+     if (remaining.length() >= sizeof(header->possible_stateless_reset_token)) {
+       header->has_possible_stateless_reset_token = true;
+-      memcpy(&header->possible_stateless_reset_token,
++      memcpy(reinterpret_cast<void*>(&header->possible_stateless_reset_token),
+              &remaining.data()[remaining.length() -
+                                sizeof(header->possible_stateless_reset_token)],
+              sizeof(header->possible_stateless_reset_token));
+diff --git a/src/3rdparty/chromium/net/third_party/quiche/src/quic/platform/api/quic_ip_address.h b/src/3rdparty/chromium/net/third_party/quiche/src/quic/platform/api/quic_ip_address.h
+index 3585970..79dc7e4 100644
+--- a/src/3rdparty/chromium/net/third_party/quiche/src/quic/platform/api/quic_ip_address.h
++++ b/src/3rdparty/chromium/net/third_party/quiche/src/quic/platform/api/quic_ip_address.h
+@@ -15,6 +15,7 @@
+ #include <sys/types.h>
+ #endif
+ 
++#include <cstdint>
+ #include <ostream>
+ #include <string>
+ 
