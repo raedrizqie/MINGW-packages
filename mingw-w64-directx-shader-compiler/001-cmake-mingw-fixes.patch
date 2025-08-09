@@ -8,7 +8,7 @@ index 52107180..db43ce77 100644
    else()
 -    add_compile_options(-fcf-protection)
 +    if(LLVM_NATIVE_ARCH MATCHES "X86")
-+      add_compile_options(-fcf-protection)
++      add_compile_options(-nostdinc -fcf-protection)
 +    endif()
    endif()
  endif(WIN32)
