@@ -1,0 +1,528 @@
+diff --git a/src/3rdparty/chromium/sandbox/win/BUILD.gn b/src/3rdparty/chromium/sandbox/win/BUILD.gn
+index e5db1a5..05dddf4 100644
+--- a/src/3rdparty/chromium/sandbox/win/BUILD.gn
++++ b/src/3rdparty/chromium/sandbox/win/BUILD.gn
+@@ -308,7 +308,7 @@ test("sbox_validation_tests") {
+     "//testing/gtest",
+   ]
+ 
+-  libs = [ "shlwapi.lib" ]
++  libs = [ "shlwapi" ]
+ }
+ 
+ test("sbox_unittests") {
+diff --git a/src/3rdparty/chromium/sandbox/win/src/handle_closer.cc b/src/3rdparty/chromium/sandbox/win/src/handle_closer.cc
+index 841a815..e1b58c9 100644
+--- a/src/3rdparty/chromium/sandbox/win/src/handle_closer.cc
++++ b/src/3rdparty/chromium/sandbox/win/src/handle_closer.cc
+@@ -158,10 +158,6 @@ bool HandleCloser::SetupHandleList(void* buffer, size_t buffer_bytes) {
+ }
+ 
+ bool GetHandleName(HANDLE handle, std::wstring* handle_name) {
+-  static NtQueryObject QueryObject = nullptr;
+-  if (!QueryObject)
+-    ResolveNTFunctionPtr("NtQueryObject", &QueryObject);
+-
+   ULONG size = MAX_PATH;
+   std::unique_ptr<UNICODE_STRING, base::FreeDeleter> name;
+   NTSTATUS result;
+@@ -170,7 +166,7 @@ bool GetHandleName(HANDLE handle, std::wstring* handle_name) {
+     name.reset(static_cast<UNICODE_STRING*>(malloc(size)));
+     DCHECK(name.get());
+     result =
+-        QueryObject(handle, ObjectNameInformation, name.get(), size, &size);
++        NtQueryObject(handle, ObjectNameInformation, name.get(), size, &size);
+   } while (result == STATUS_INFO_LENGTH_MISMATCH ||
+            result == STATUS_BUFFER_OVERFLOW);
+ 
+diff --git a/src/3rdparty/chromium/sandbox/win/src/handle_closer_agent.cc b/src/3rdparty/chromium/sandbox/win/src/handle_closer_agent.cc
+index 045b17a..11a0769 100644
+--- a/src/3rdparty/chromium/sandbox/win/src/handle_closer_agent.cc
++++ b/src/3rdparty/chromium/sandbox/win/src/handle_closer_agent.cc
+@@ -18,13 +18,9 @@ namespace {
+ // called for invalid handles so it catches STATUS_INVALID_HANDLE exceptions
+ // that can be generated when handle tracing is enabled.
+ NTSTATUS QueryObjectTypeInformation(HANDLE handle, void* buffer, ULONG* size) {
+-  static NtQueryObject QueryObject = nullptr;
+-  if (!QueryObject)
+-    ResolveNTFunctionPtr("NtQueryObject", &QueryObject);
+-
+   NTSTATUS status = STATUS_UNSUCCESSFUL;
+   __try {
+-    status = QueryObject(handle, ObjectTypeInformation, buffer, *size, size);
++    status = NtQueryObject(handle, ObjectTypeInformation, buffer, *size, size);
+   } __except (GetExceptionCode() == STATUS_INVALID_HANDLE
+                   ? EXCEPTION_EXECUTE_HANDLER
+                   : EXCEPTION_CONTINUE_SEARCH) {
+@@ -205,16 +201,16 @@ bool HandleCloserAgent::CloseHandles() {
+       if (NT_SUCCESS(rc) && size == type_info_buffer.size())
+         rc = STATUS_INFO_LENGTH_MISMATCH;
+     }
+-    if (!NT_SUCCESS(rc) || !type_info->Name.Buffer) {
++    if (!NT_SUCCESS(rc) || !type_info->TypeName.Buffer) {
+       ++invalid_count;
+       continue;
+     }
+ 
+     --handle_count;
+-    type_info->Name.Buffer[type_info->Name.Length / sizeof(wchar_t)] = L'\0';
++    type_info->TypeName.Buffer[type_info->TypeName.Length / sizeof(wchar_t)] = L'\0';
+ 
+     // Check if we're looking for this type of handle.
+-    HandleMap::iterator result = handles_to_close_.find(type_info->Name.Buffer);
++    HandleMap::iterator result = handles_to_close_.find(type_info->TypeName.Buffer);
+     if (result != handles_to_close_.end()) {
+       HandleMap::mapped_type& names = result->second;
+       // Empty set means close all handles of this type; otherwise check name.
+diff --git a/src/3rdparty/chromium/sandbox/win/src/interception_agent.cc b/src/3rdparty/chromium/sandbox/win/src/interception_agent.cc
+index 26e65df..8596965 100644
+--- a/src/3rdparty/chromium/sandbox/win/src/interception_agent.cc
++++ b/src/3rdparty/chromium/sandbox/win/src/interception_agent.cc
+@@ -45,7 +45,7 @@ InterceptionAgent* InterceptionAgent::GetInterceptionAgent() {
+ 
+     size_t array_bytes = g_interceptions->num_intercepted_dlls * sizeof(void*);
+     s_singleton = reinterpret_cast<InterceptionAgent*>(
+-        new (NT_ALLOC) char[array_bytes + sizeof(InterceptionAgent)]);
++        new char[array_bytes + sizeof(InterceptionAgent)]);
+ 
+     bool success = s_singleton->Init(g_interceptions);
+     if (!success) {
+@@ -112,7 +112,7 @@ bool InterceptionAgent::OnDllLoad(const UNICODE_STRING* full_path,
+   size_t buffer_bytes = offsetof(DllInterceptionData, thunks) +
+                         dll_info->num_functions * sizeof(ThunkData);
+   dlls_[i] = reinterpret_cast<DllInterceptionData*>(
+-      new (NT_PAGE, base_address) char[buffer_bytes]);
++      new char[buffer_bytes]);
+ 
+   DCHECK_NT(dlls_[i]);
+   if (!dlls_[i])
+diff --git a/src/3rdparty/chromium/sandbox/win/src/interceptors_64.cc b/src/3rdparty/chromium/sandbox/win/src/interceptors_64.cc
+index 0ac2671..760f117 100644
+--- a/src/3rdparty/chromium/sandbox/win/src/interceptors_64.cc
++++ b/src/3rdparty/chromium/sandbox/win/src/interceptors_64.cc
+@@ -52,7 +52,7 @@ NTSTATUS WINAPI TargetNtUnmapViewOfSection64(HANDLE process, PVOID base) {
+ 
+ NTSTATUS WINAPI
+ TargetNtSetInformationThread64(HANDLE thread,
+-                               NT_THREAD_INFORMATION_CLASS thread_info_class,
++                               THREADINFOCLASS thread_info_class,
+                                PVOID thread_information,
+                                ULONG thread_information_bytes) {
+   NtSetInformationThreadFunction orig_fn =
+diff --git a/src/3rdparty/chromium/sandbox/win/src/interceptors_64.h b/src/3rdparty/chromium/sandbox/win/src/interceptors_64.h
+index f34627d..802e892 100644
+--- a/src/3rdparty/chromium/sandbox/win/src/interceptors_64.h
++++ b/src/3rdparty/chromium/sandbox/win/src/interceptors_64.h
+@@ -39,7 +39,7 @@ SANDBOX_INTERCEPT NTSTATUS WINAPI TargetNtUnmapViewOfSection64(HANDLE process,
+ // Interception of NtSetInformationThread on the child process.
+ SANDBOX_INTERCEPT NTSTATUS WINAPI
+ TargetNtSetInformationThread64(HANDLE thread,
+-                               NT_THREAD_INFORMATION_CLASS thread_info_class,
++                               THREADINFOCLASS thread_info_class,
+                                PVOID thread_information,
+                                ULONG thread_information_bytes);
+ 
+diff --git a/src/3rdparty/chromium/sandbox/win/src/nt_internals.h b/src/3rdparty/chromium/sandbox/win/src/nt_internals.h
+index 6041566..42a07f1 100644
+--- a/src/3rdparty/chromium/sandbox/win/src/nt_internals.h
++++ b/src/3rdparty/chromium/sandbox/win/src/nt_internals.h
+@@ -10,10 +10,15 @@
+ #include <windows.h>
+ 
+ #include <stddef.h>
++#include <winternl.h>
+ 
+ typedef LONG NTSTATUS;
++#ifndef NT_SUCCESS
+ #define NT_SUCCESS(st) (st >= 0)
++#endif
++#ifndef NT_ERROR
+ #define NT_ERROR(st) ((((ULONG)(st)) >> 30) == 3)
++#endif
+ 
+ // clang-format off
+ #define STATUS_SUCCESS                ((NTSTATUS)0x00000000L)
+@@ -42,6 +47,7 @@ typedef LONG NTSTATUS;
+ #define CURRENT_THREAD ((HANDLE)-2)
+ #define NtCurrentProcess CURRENT_PROCESS
+ 
++#ifdef _MSC_VER
+ typedef struct _UNICODE_STRING {
+   USHORT Length;
+   USHORT MaximumLength;
+@@ -144,6 +150,7 @@ typedef struct _IO_STATUS_BLOCK {
+ #define FILE_OVERWRITTEN                        0x00000003
+ #define FILE_EXISTS                             0x00000004
+ #define FILE_DOES_NOT_EXIST                     0x00000005
++#endif // _MSC_VER
+ 
+ typedef NTSTATUS(WINAPI* NtCreateFileFunction)(
+     OUT PHANDLE FileHandle,
+@@ -168,6 +175,7 @@ typedef NTSTATUS(WINAPI* NtOpenFileFunction)(OUT PHANDLE FileHandle,
+ 
+ typedef NTSTATUS(WINAPI* NtCloseFunction)(IN HANDLE Handle);
+ 
++#ifdef _MSC_VER
+ typedef enum _FILE_INFORMATION_CLASS {
+   FileRenameInformation = 10
+ } FILE_INFORMATION_CLASS,
+@@ -179,6 +187,7 @@ typedef struct _FILE_RENAME_INFORMATION {
+   ULONG FileNameLength;
+   WCHAR FileName[1];
+ } FILE_RENAME_INFORMATION, *PFILE_RENAME_INFORMATION;
++#endif // _MSC_VER
+ 
+ typedef NTSTATUS(WINAPI* NtSetInformationFileFunction)(
+     IN HANDLE FileHandle,
+@@ -187,6 +196,7 @@ typedef NTSTATUS(WINAPI* NtSetInformationFileFunction)(
+     IN ULONG Length,
+     IN FILE_INFORMATION_CLASS FileInformationClass);
+ 
++#ifdef _MSC_VER
+ typedef struct FILE_BASIC_INFORMATION {
+   LARGE_INTEGER CreationTime;
+   LARGE_INTEGER LastAccessTime;
+@@ -194,11 +204,13 @@ typedef struct FILE_BASIC_INFORMATION {
+   LARGE_INTEGER ChangeTime;
+   ULONG FileAttributes;
+ } FILE_BASIC_INFORMATION, *PFILE_BASIC_INFORMATION;
++#endif // _MSC_VER
+ 
+ typedef NTSTATUS(WINAPI* NtQueryAttributesFileFunction)(
+     IN POBJECT_ATTRIBUTES ObjectAttributes,
+     OUT PFILE_BASIC_INFORMATION FileAttributes);
+ 
++#ifdef _MSC_VER
+ typedef struct _FILE_NETWORK_OPEN_INFORMATION {
+   LARGE_INTEGER CreationTime;
+   LARGE_INTEGER LastAccessTime;
+@@ -208,6 +220,7 @@ typedef struct _FILE_NETWORK_OPEN_INFORMATION {
+   LARGE_INTEGER EndOfFile;
+   ULONG FileAttributes;
+ } FILE_NETWORK_OPEN_INFORMATION, *PFILE_NETWORK_OPEN_INFORMATION;
++#endif // _MSC_VER
+ 
+ typedef NTSTATUS(WINAPI* NtQueryFullAttributesFileFunction)(
+     IN POBJECT_ATTRIBUTES ObjectAttributes,
+@@ -265,10 +278,12 @@ typedef NTSTATUS(WINAPI* NtQuerySectionFunction)(
+ // -----------------------------------------------------------------------
+ // Process and Thread
+ 
++#ifdef _MSC_VER
+ typedef struct _CLIENT_ID {
+   PVOID UniqueProcess;
+   PVOID UniqueThread;
+ } CLIENT_ID, *PCLIENT_ID;
++#endif // _MSC_VER
+ 
+ typedef NTSTATUS(WINAPI* NtOpenThreadFunction)(OUT PHANDLE ThreadHandle,
+                                                IN ACCESS_MASK DesiredAccess,
+@@ -282,6 +297,7 @@ typedef NTSTATUS(WINAPI* NtOpenProcessFunction)(OUT PHANDLE ProcessHandle,
+                                                     ObjectAttributes,
+                                                 IN PCLIENT_ID ClientId);
+ 
++#ifdef _MSC_VER
+ typedef enum _NT_THREAD_INFORMATION_CLASS {
+   ThreadBasicInformation,
+   ThreadTimes,
+@@ -303,13 +319,15 @@ typedef enum _NT_THREAD_INFORMATION_CLASS {
+   ThreadHideFromDebugger
+ } NT_THREAD_INFORMATION_CLASS,
+     *PNT_THREAD_INFORMATION_CLASS;
++#endif // _MSC_VER
+ 
+ typedef NTSTATUS(WINAPI* NtSetInformationThreadFunction)(
+     IN HANDLE ThreadHandle,
+-    IN NT_THREAD_INFORMATION_CLASS ThreadInformationClass,
++    IN THREADINFOCLASS ThreadInformationClass,
+     IN PVOID ThreadInformation,
+     IN ULONG ThreadInformationLength);
+ 
++#ifdef _MSC_VER
+ // Partial definition only:
+ typedef enum _PROCESSINFOCLASS {
+   ProcessBasicInformation = 0,
+@@ -324,10 +342,11 @@ typedef struct _RTL_USER_PROCESS_PARAMETERS {
+   UNICODE_STRING ImagePathName;
+   UNICODE_STRING CommandLine;
+ } RTL_USER_PROCESS_PARAMETERS, *PRTL_USER_PROCESS_PARAMETERS;
++#endif // _MSC_VER
+ 
+ // Partial definition only, from
+ // https://msdn.microsoft.com/en-us/library/windows/desktop/aa813706(v=vs.85).aspx
+-typedef struct _PEB {
++typedef struct _NT_PEB {
+   BYTE InheritedAddressSpace;
+   BYTE ReadImageFileExecOptions;
+   BYTE BeingDebugged;
+@@ -336,8 +355,9 @@ typedef struct _PEB {
+   PVOID ImageBaseAddress;
+   PVOID Ldr;
+   PRTL_USER_PROCESS_PARAMETERS ProcessParameters;
+-} PEB, *PPEB;
++} NT_PEB, *PNT_PEB;
+ 
++#ifdef _MSC_VER
+ typedef LONG KPRIORITY;
+ 
+ typedef struct _PROCESS_BASIC_INFORMATION {
+@@ -360,6 +380,7 @@ typedef struct _PROCESS_BASIC_INFORMATION {
+     PVOID padding_for_x64_3;
+   };
+ } PROCESS_BASIC_INFORMATION, *PPROCESS_BASIC_INFORMATION;
++#endif // _MSC_VER
+ 
+ typedef NTSTATUS(WINAPI* NtQueryInformationProcessFunction)(
+     IN HANDLE ProcessHandle,
+@@ -527,8 +548,10 @@ typedef NTSTATUS(WINAPI* NtSetValueKeyFunction)(IN HANDLE KeyHandle,
+ // -----------------------------------------------------------------------
+ // Memory
+ 
++#ifdef _MSC_VER
+ // Don't really need this structure right now.
+ typedef PVOID PRTL_HEAP_PARAMETERS;
++#endif // _MSC_VER
+ 
+ typedef PVOID(WINAPI* RtlCreateHeapFunction)(IN ULONG Flags,
+                                              IN PVOID HeapBase OPTIONAL,
+@@ -590,6 +613,7 @@ typedef NTSTATUS(WINAPI* NtProtectVirtualMemoryFunction)(
+ // -----------------------------------------------------------------------
+ // Objects
+ 
++#ifdef _MSC_VER
+ typedef enum _OBJECT_INFORMATION_CLASS {
+   ObjectBasicInformation,
+   ObjectNameInformation,
+@@ -617,6 +641,7 @@ typedef struct __PUBLIC_OBJECT_TYPE_INFORMATION {
+   UNICODE_STRING TypeName;
+   ULONG Reserved[22];  // reserved for internal use
+ } PUBLIC_OBJECT_TYPE_INFORMATION, *PPUBLIC_OBJECT_TYPE_INFORMATION;
++#endif // _MSC_VER
+ 
+ typedef enum _POOL_TYPE {
+   NonPagedPool,
+@@ -628,6 +653,7 @@ typedef enum _POOL_TYPE {
+   NonPagedPoolCacheAlignedMustS
+ } POOL_TYPE;
+ 
++#ifdef _MSC_VER
+ typedef struct _OBJECT_BASIC_INFORMATION {
+   ULONG Attributes;
+   ACCESS_MASK GrantedAccess;
+@@ -689,6 +715,7 @@ typedef struct _SYSTEM_HANDLE_INFORMATION_EX {
+ typedef struct _OBJECT_NAME_INFORMATION {
+   UNICODE_STRING ObjectName;
+ } OBJECT_NAME_INFORMATION, *POBJECT_NAME_INFORMATION;
++#endif // _MSC_VER
+ 
+ typedef NTSTATUS(WINAPI* NtQueryObjectFunction)(
+     IN HANDLE Handle,
+@@ -717,6 +744,7 @@ typedef NTSTATUS(WINAPI* NtWaitForSingleObjectFunction)(
+     IN BOOLEAN Alertable,
+     IN PLARGE_INTEGER TimeOut OPTIONAL);
+ 
++#ifdef _MSC_VER
+ typedef NTSTATUS(WINAPI* NtQuerySystemInformation)(
+     IN SYSTEM_INFORMATION_CLASS SystemInformationClass,
+     OUT PVOID SystemInformation,
+@@ -729,6 +757,7 @@ typedef NTSTATUS(WINAPI* NtQueryObject)(IN HANDLE Handle,
+                                         OUT PVOID ObjectInformation,
+                                         IN ULONG ObjectInformationLength,
+                                         OUT PULONG ReturnLength);
++#endif // _MSC_VER
+ 
+ // -----------------------------------------------------------------------
+ // Strings
+@@ -804,10 +833,12 @@ typedef NTSTATUS(WINAPI* NtCreateLowBoxToken)(
+     IN DWORD handle_count,
+     IN PHANDLE handles);
+ 
++#ifdef _MSC_VER
+ typedef NTSTATUS(WINAPI* NtSetInformationProcess)(IN HANDLE process_handle,
+                                                   IN ULONG info_class,
+                                                   IN PVOID process_information,
+                                                   IN ULONG information_length);
++#endif // _MSC_VER
+ 
+ struct PROCESS_ACCESS_TOKEN {
+   HANDLE token;
+diff --git a/src/3rdparty/chromium/sandbox/win/src/policy_target.cc b/src/3rdparty/chromium/sandbox/win/src/policy_target.cc
+index 5cf894a..70ef91d 100644
+--- a/src/3rdparty/chromium/sandbox/win/src/policy_target.cc
++++ b/src/3rdparty/chromium/sandbox/win/src/policy_target.cc
+@@ -77,7 +77,7 @@ bool QueryBroker(IpcTag ipc_id, CountedParameterSetBase* params) {
+ NTSTATUS WINAPI TargetNtSetInformationThread(
+     NtSetInformationThreadFunction orig_SetInformationThread,
+     HANDLE thread,
+-    NT_THREAD_INFORMATION_CLASS thread_info_class,
++    THREADINFOCLASS thread_info_class,
+     PVOID thread_information,
+     ULONG thread_information_bytes) {
+   do {
+diff --git a/src/3rdparty/chromium/sandbox/win/src/policy_target.h b/src/3rdparty/chromium/sandbox/win/src/policy_target.h
+index 62686aa..b2490b3 100644
+--- a/src/3rdparty/chromium/sandbox/win/src/policy_target.h
++++ b/src/3rdparty/chromium/sandbox/win/src/policy_target.h
+@@ -23,7 +23,7 @@ extern "C" {
+ // It should never be called directly.
+ SANDBOX_INTERCEPT NTSTATUS WINAPI TargetNtSetInformationThread(
+     NtSetInformationThreadFunction orig_SetInformationThread, HANDLE thread,
+-    NT_THREAD_INFORMATION_CLASS thread_info_class, PVOID thread_information,
++    THREADINFOCLASS thread_info_class, PVOID thread_information,
+     ULONG thread_information_bytes);
+ 
+ // Interception of NtOpenThreadToken on the child process.
+diff --git a/src/3rdparty/chromium/sandbox/win/src/sandbox_nt_util.cc b/src/3rdparty/chromium/sandbox/win/src/sandbox_nt_util.cc
+index d7f6f03..892a6f4 100644
+--- a/src/3rdparty/chromium/sandbox/win/src/sandbox_nt_util.cc
++++ b/src/3rdparty/chromium/sandbox/win/src/sandbox_nt_util.cc
+@@ -11,6 +11,7 @@
+ 
+ #include "base/compiler_specific.h"
+ #include "base/win/pe_image.h"
++#include "build/build_config.h"
+ #include "sandbox/win/src/sandbox_factory.h"
+ #include "sandbox/win/src/target_services.h"
+ 
+@@ -253,7 +254,7 @@ NTSTATUS AllocAndGetFullPath(
+       std::unique_ptr<OBJECT_NAME_INFORMATION, NtAllocDeleter> handle_name;
+       if (size) {
+         handle_name.reset(reinterpret_cast<OBJECT_NAME_INFORMATION*>(
+-            new (NT_ALLOC) BYTE[size]));
++            new BYTE[size]));
+ 
+         // Query the name information a second time to get the name of the
+         // object referenced by the handle.
+@@ -266,16 +267,16 @@ NTSTATUS AllocAndGetFullPath(
+ 
+       // Space for path + '\' + name + '\0'.
+       size_t name_length =
+-          handle_name->ObjectName.Length + (wcslen(path) + 2) * sizeof(wchar_t);
+-      full_path->reset(new (NT_ALLOC) wchar_t[name_length / sizeof(wchar_t)]);
++          handle_name->Name.Length + (wcslen(path) + 2) * sizeof(wchar_t);
++      full_path->reset(new wchar_t[name_length / sizeof(wchar_t)]);
+       if (!*full_path)
+         break;
+       wchar_t* off = full_path->get();
+-      ret = CopyData(off, handle_name->ObjectName.Buffer,
+-                     handle_name->ObjectName.Length);
++      ret = CopyData(off, handle_name->Name.Buffer,
++                     handle_name->Name.Length);
+       if (!NT_SUCCESS(ret))
+         break;
+-      off += handle_name->ObjectName.Length / sizeof(wchar_t);
++      off += handle_name->Name.Length / sizeof(wchar_t);
+       *off = L'\\';
+       off += 1;
+       ret = CopyData(off, path, wcslen(path) * sizeof(wchar_t));
+@@ -314,7 +315,7 @@ NTSTATUS AllocAndCopyName(const OBJECT_ATTRIBUTES* in_object,
+         break;
+ 
+       size_t size = in_object->ObjectName->Length + sizeof(wchar_t);
+-      out_name->reset(new (NT_ALLOC) wchar_t[size / sizeof(wchar_t)]);
++      out_name->reset(new wchar_t[size / sizeof(wchar_t)]);
+       if (!*out_name)
+         break;
+ 
+@@ -420,7 +421,7 @@ UNICODE_STRING* AnsiToUnicode(const char* string) {
+       ansi_string.MaximumLength * sizeof(wchar_t) + sizeof(UNICODE_STRING);
+ 
+   UNICODE_STRING* out_string =
+-      reinterpret_cast<UNICODE_STRING*>(new (NT_ALLOC) char[name_bytes]);
++      reinterpret_cast<UNICODE_STRING*>(new char[name_bytes]);
+   if (!out_string)
+     return nullptr;
+ 
+@@ -503,7 +504,7 @@ UNICODE_STRING* GetBackingFilePath(PVOID address) {
+ 
+   for (;;) {
+     MEMORY_SECTION_NAME* section_name = reinterpret_cast<MEMORY_SECTION_NAME*>(
+-        new (NT_ALLOC) char[buffer_bytes]);
++        new char[buffer_bytes]);
+ 
+     if (!section_name)
+       return nullptr;
+@@ -559,7 +560,7 @@ UNICODE_STRING* ExtractModuleName(const UNICODE_STRING* module_path) {
+   // Based on the code above, size_bytes should always be small enough
+   // to make the static_cast below safe.
+   DCHECK_NT(UINT16_MAX > size_bytes);
+-  char* str_buffer = new (NT_ALLOC) char[size_bytes + sizeof(UNICODE_STRING)];
++  char* str_buffer = new char[size_bytes + sizeof(UNICODE_STRING)];
+   if (!str_buffer)
+     return nullptr;
+ 
+@@ -663,7 +664,7 @@ bool NtGetPathFromHandle(HANDLE handle,
+   std::unique_ptr<BYTE[], NtAllocDeleter> name_ptr;
+   if (!size)
+     return false;
+-  name_ptr.reset(new (NT_ALLOC) BYTE[size]);
++  name_ptr.reset(new BYTE[size]);
+   name = reinterpret_cast<OBJECT_NAME_INFORMATION*>(name_ptr.get());
+ 
+   // Query the name information a second time to get the name of the
+@@ -672,10 +673,10 @@ bool NtGetPathFromHandle(HANDLE handle,
+ 
+   if (STATUS_SUCCESS != status)
+     return false;
+-  size_t num_path_wchars = (name->ObjectName.Length / sizeof(wchar_t)) + 1;
+-  path->reset(new (NT_ALLOC) wchar_t[num_path_wchars]);
++  size_t num_path_wchars = (name->Name.Length / sizeof(wchar_t)) + 1;
++  path->reset(new wchar_t[num_path_wchars]);
+   status =
+-      CopyData(path->get(), name->ObjectName.Buffer, name->ObjectName.Length);
++      CopyData(path->get(), name->Name.Buffer, name->Name.Length);
+   path->get()[num_path_wchars - 1] = L'\0';
+   if (STATUS_SUCCESS != status)
+     return false;
+diff --git a/src/3rdparty/chromium/sandbox/win/src/target_process.cc b/src/3rdparty/chromium/sandbox/win/src/target_process.cc
+index f182512..8db65b8 100644
+--- a/src/3rdparty/chromium/sandbox/win/src/target_process.cc
++++ b/src/3rdparty/chromium/sandbox/win/src/target_process.cc
+@@ -242,7 +242,7 @@ ResultCode TargetProcess::TransferVariable(const char* name,
+   if (!module)
+     return SBOX_ERROR_CANNOT_LOADLIBRARY_EXECUTABLE;
+ 
+-  child_var = ::GetProcAddress(module, name);
++  child_var = reinterpret_cast<void*>(::GetProcAddress(module, name));
+   ::FreeLibrary(module);
+ 
+   if (!child_var)
+@@ -362,12 +362,9 @@ ResultCode TargetProcess::AssignLowBoxToken(
+   PROCESS_ACCESS_TOKEN process_access_token = {};
+   process_access_token.token = token.Get();
+ 
+-  NtSetInformationProcess SetInformationProcess = nullptr;
+-  ResolveNTFunctionPtr("NtSetInformationProcess", &SetInformationProcess);
+-
+-  NTSTATUS status = SetInformationProcess(
++  NTSTATUS status = NtSetInformationProcess(
+       sandbox_process_info_.process_handle(),
+-      static_cast<PROCESS_INFORMATION_CLASS>(NtProcessInformationAccessToken),
++      static_cast<PROCESSINFOCLASS>(NtProcessInformationAccessToken),
+       &process_access_token, sizeof(process_access_token));
+   if (!NT_SUCCESS(status)) {
+     ::SetLastError(GetLastErrorFromNtStatus(status));
+diff --git a/src/3rdparty/chromium/sandbox/win/src/win_utils.cc b/src/3rdparty/chromium/sandbox/win/src/win_utils.cc
+index 0c97c31..77a0331 100644
+--- a/src/3rdparty/chromium/sandbox/win/src/win_utils.cc
++++ b/src/3rdparty/chromium/sandbox/win/src/win_utils.cc
+@@ -433,8 +433,8 @@ bool GetPathFromHandle(HANDLE handle, std::wstring* path) {
+   if (STATUS_SUCCESS != status)
+     return false;
+ 
+-  path->assign(name->ObjectName.Buffer,
+-               name->ObjectName.Length / sizeof(name->ObjectName.Buffer[0]));
++  path->assign(name->Name.Buffer,
++               name->Name.Length / sizeof(name->Name.Buffer[0]));
+   return true;
+ }
+ 
+@@ -521,7 +521,7 @@ void* GetProcessBaseAddress(HANDLE process) {
+   if (STATUS_SUCCESS != status)
+     return nullptr;
+ 
+-  PEB peb = {};
++  NT_PEB peb = {};
+   SIZE_T bytes_read = 0;
+   if (!::ReadProcessMemory(process, process_basic_info.PebBaseAddress, &peb,
+                            sizeof(peb), &bytes_read) ||

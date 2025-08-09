@@ -1,0 +1,163 @@
+diff --git a/src/3rdparty/chromium/third_party/angle/BUILD.gn b/src/3rdparty/chromium/third_party/angle/BUILD.gn
+index fb57176..bf62594 100644
+--- a/src/3rdparty/chromium/third_party/angle/BUILD.gn
++++ b/src/3rdparty/chromium/third_party/angle/BUILD.gn
+@@ -129,7 +129,7 @@ config("extra_warnings") {
+   cflags = []
+ 
+   # Enable more default warnings on Windows.
+-  if (is_win) {
++  if (is_msvc) {
+     cflags += [
+       "/we4244",  # Conversion: possible loss of data.
+       "/we4312",  # Conversion: greater size.
+@@ -192,7 +192,7 @@ config("better_linux_stack_traces") {
+   }
+ }
+ 
+-_use_copy_compiler_dll = angle_has_build && is_win && target_cpu != "arm64"
++_use_copy_compiler_dll = angle_has_build && is_msvc && target_cpu != "arm64"
+ 
+ # Windows ARM64 is available since 10.0.16299 so no need to copy
+ # d3dcompiler_47.dll because this file is available as inbox.
+@@ -332,7 +332,7 @@ angle_static_library("angle_image_util") {
+ }
+ 
+ config("angle_gl_visibility_config") {
+-  if (is_win) {
++  if (is_msvc) {
+     defines = [
+       "GL_APICALL=",
+       "GL_API=",
+@@ -380,9 +380,9 @@ angle_static_library("angle_gpu_info_util") {
+   if (is_win) {
+     sources += libangle_gpu_info_util_win_sources
+     if (!angle_is_winuwp) {
+-      libs += [ "setupapi.lib" ]
++      libs += [ "setupapi" ]
+     }
+-    libs += [ "dxgi.lib" ]
++    libs += [ "dxgi" ]
+   }
+ 
+   if (is_linux || is_chromeos) {
+@@ -471,7 +471,7 @@ angle_static_library("translator") {
+     ":angle_translator_headers",
+   ]
+ 
+-  if (is_win) {
++  if (is_msvc) {
+     # Necessary to suppress some system header xtree warnigns in Release.
+     # For some reason this warning doesn't get triggered in Chromium
+     cflags = [ "/wd4718" ]
+@@ -574,7 +574,7 @@ config("libANGLE_config") {
+   ldflags = []
+   defines += [ "LIBANGLE_IMPLEMENTATION" ]
+ 
+-  if (is_win) {
++  if (is_msvc) {
+     cflags += [ "/wd4530" ]  # C++ exception handler used, but unwind semantics
+                              # are not enabled.
+   }
+@@ -670,8 +670,8 @@ angle_source_set("libANGLE_base") {
+ 
+   if (is_win) {
+     libs += [
+-      "gdi32.lib",
+-      "user32.lib",
++      "gdi32",
++      "user32",
+     ]
+   }
+ 
+@@ -867,7 +867,7 @@ template("angle_libGLESv2") {
+   angle_shared_library(target_name) {
+     sources = libglesv2_sources + invoker.sources
+ 
+-    if (is_win) {
++    if (is_msvc) {
+       sources += [ "src/libGLESv2/${invoker.output_name}_autogen.def" ]
+     }
+ 
+diff --git a/src/3rdparty/chromium/third_party/angle/src/common/mathutil.h b/src/3rdparty/chromium/third_party/angle/src/common/mathutil.h
+index 1d73bbf..dafaf4c 100644
+--- a/src/3rdparty/chromium/third_party/angle/src/common/mathutil.h
++++ b/src/3rdparty/chromium/third_party/angle/src/common/mathutil.h
+@@ -1073,7 +1073,7 @@ inline int BitCount(uint64_t bits)
+ #    endif  // defined(_M_IX86) || defined(_M_X64)
+ #endif      // defined(_MSC_VER) && !defined(__clang__)
+ 
+-#if defined(ANGLE_PLATFORM_POSIX) || defined(__clang__)
++#if defined(ANGLE_PLATFORM_POSIX) || defined(__clang__) || defined(__GNUC__)
+ inline int BitCount(uint32_t bits)
+ {
+     return __builtin_popcount(bits);
+@@ -1083,7 +1083,7 @@ inline int BitCount(uint64_t bits)
+ {
+     return __builtin_popcountll(bits);
+ }
+-#endif  // defined(ANGLE_PLATFORM_POSIX) || defined(__clang__)
++#endif  // defined(ANGLE_PLATFORM_POSIX) || defined(__clang__) || defined(__GNUC__)
+ 
+ inline int BitCount(uint8_t bits)
+ {
+diff --git a/src/3rdparty/chromium/third_party/angle/src/libANGLE/MemoryProgramCache.cpp b/src/3rdparty/chromium/third_party/angle/src/libANGLE/MemoryProgramCache.cpp
+index a9cf30e..27d3354 100644
+--- a/src/3rdparty/chromium/third_party/angle/src/libANGLE/MemoryProgramCache.cpp
++++ b/src/3rdparty/chromium/third_party/angle/src/libANGLE/MemoryProgramCache.cpp
+@@ -21,7 +21,9 @@
+ #include "libANGLE/renderer/ProgramImpl.h"
+ #include "platform/PlatformMethods.h"
+ 
++#ifndef USE_SYSTEM_ZLIB
+ #define USE_SYSTEM_ZLIB
++#endif
+ #include "compression_utils_portable.h"
+ 
+ namespace gl
+diff --git a/src/3rdparty/chromium/third_party/angle/src/libANGLE/renderer/d3d/BUILD.gn b/src/3rdparty/chromium/third_party/angle/src/libANGLE/renderer/d3d/BUILD.gn
+index 14cf3b1..bb2da10 100644
+--- a/src/3rdparty/chromium/third_party/angle/src/libANGLE/renderer/d3d/BUILD.gn
++++ b/src/3rdparty/chromium/third_party/angle/src/libANGLE/renderer/d3d/BUILD.gn
+@@ -294,14 +294,16 @@ angle_source_set("angle_d3d_shared") {
+ if (angle_enable_d3d9) {
+   config("angle_d3d9_backend_config") {
+     defines = [ "ANGLE_ENABLE_D3D9" ]
+-    ldflags = [ "/DELAYLOAD:d3d9.dll" ]
++    if (is_msvc) {
++      ldflags = [ "/DELAYLOAD:d3d9.dll" ]
++    }
+   }
+ 
+   angle_source_set("angle_d3d9_backend") {
+     sources = _d3d9_backend_sources
+     libs = [
+-      "d3d9.lib",
+-      "delayimp.lib",
++      "d3d9",
++      "delayimp",
+     ]
+     public_deps = [ ":angle_d3d_shared" ]
+     public_configs = [ ":angle_d3d9_backend_config" ]
+@@ -316,7 +318,7 @@ if (angle_enable_d3d11) {
+   angle_source_set("angle_d3d11_backend") {
+     sources = _d3d11_backend_sources
+ 
+-    libs = [ "dxguid.lib" ]
++    libs = [ "dxguid" ]
+ 
+     public_deps = [ ":angle_d3d_shared" ]
+     public_configs = [ ":angle_d3d11_backend_config" ]
+diff --git a/src/3rdparty/chromium/third_party/angle/util/util_export.h b/src/3rdparty/chromium/third_party/angle/util/util_export.h
+index 36fb6b7..8cd58b4 100644
+--- a/src/3rdparty/chromium/third_party/angle/util/util_export.h
++++ b/src/3rdparty/chromium/third_party/angle/util/util_export.h
+@@ -12,7 +12,7 @@
+ // We define "IMPLEMENTATION" to get the dllexport label when compiling the
+ // util library. Consumers get the dllimport label by default.
+ #if !defined(ANGLE_UTIL_EXPORT)
+-#    if defined(_WIN32)
++#    if defined(_MSC_VER)
+ #        if defined(LIBANGLE_UTIL_IMPLEMENTATION)
+ #            define ANGLE_UTIL_EXPORT __declspec(dllexport)
+ #        else
