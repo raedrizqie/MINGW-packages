@@ -1,0 +1,516 @@
+diff --git a/src/3rdparty/chromium/third_party/skia/BUILD.gn b/src/3rdparty/chromium/third_party/skia/BUILD.gn
+index e7a79b9..c789c91 100644
+--- a/src/3rdparty/chromium/third_party/skia/BUILD.gn
++++ b/src/3rdparty/chromium/third_party/skia/BUILD.gn
+@@ -158,7 +158,7 @@ opts("crc32") {
+ opts("sse2") {
+   enabled = is_x86
+   sources = skia_opts.sse2_sources
+-  if (!is_clang && is_win) {
++  if (!is_clang && is_msvc) {
+     defines = [ "SK_CPU_SSE_LEVEL=SK_CPU_SSE_LEVEL_SSE2" ]
+   } else {
+     cflags = [ "-msse2" ]
+@@ -168,7 +168,7 @@ opts("sse2") {
+ opts("ssse3") {
+   enabled = is_x86
+   sources = skia_opts.ssse3_sources
+-  if (!is_clang && is_win) {
++  if (!is_clang && is_msvc) {
+     defines = [ "SK_CPU_SSE_LEVEL=SK_CPU_SSE_LEVEL_SSSE3" ]
+   } else {
+     cflags = [ "-mssse3" ]
+@@ -178,7 +178,7 @@ opts("ssse3") {
+ opts("sse41") {
+   enabled = is_x86
+   sources = skia_opts.sse41_sources
+-  if (!is_clang && is_win) {
++  if (!is_clang && is_msvc) {
+     defines = [ "SK_CPU_SSE_LEVEL=SK_CPU_SSE_LEVEL_SSE41" ]
+   } else {
+     cflags = [ "-msse4.1" ]
+@@ -188,7 +188,7 @@ opts("sse41") {
+ opts("sse42") {
+   enabled = is_x86
+   sources = skia_opts.sse42_sources
+-  if (!is_clang && is_win) {
++  if (!is_clang && is_msvc) {
+     defines = [ "SK_CPU_SSE_LEVEL=SK_CPU_SSE_LEVEL_SSE42" ]
+   } else {
+     cflags = [ "-msse4.2" ]
+@@ -198,7 +198,7 @@ opts("sse42") {
+ opts("avx") {
+   enabled = is_x86
+   sources = skia_opts.avx_sources
+-  if (is_win) {
++  if (is_msvc) {
+     cflags = [ "/arch:AVX" ]
+   } else {
+     cflags = [ "-mavx" ]
+@@ -211,7 +211,7 @@ opts("avx") {
+ opts("hsw") {
+   enabled = is_x86
+   sources = skia_opts.hsw_sources
+-  if (is_win) {
++  if (is_msvc) {
+     cflags = [ "/arch:AVX2" ]
+   } else {
+     cflags = [ "-march=haswell" ]
+@@ -224,7 +224,7 @@ opts("hsw") {
+ opts("skx") {
+   enabled = is_x86
+   sources = skia_opts.skx_sources
+-  if (is_win) {
++  if (is_msvc) {
+     cflags = [ "/arch:AVX512" ]
+   } else {
+     cflags = [ "-march=skylake-avx512" ]
+@@ -504,7 +504,7 @@ optional("fontmgr_win_gdi") {
+ 
+   public = [ "include/ports/SkTypeface_win.h" ]
+   sources = [ "src/ports/SkFontHost_win.cpp" ]
+-  libs = [ "Gdi32.lib" ]
++  libs = [ "gdi32" ]
+ }
+ 
+ if (skia_lex) {
+@@ -808,7 +808,7 @@ optional("gpu") {
+     } else if (is_win) {
+       sources += [ "src/gpu/gl/win/GrGLMakeNativeInterface_win.cpp" ]
+       if (target_cpu != "arm64") {
+-        libs += [ "OpenGL32.lib" ]
++        libs += [ "opengl32" ]
+       }
+     } else {
+       sources += [ "src/gpu/gl/GrGLMakeNativeInterface_none.cpp" ]
+@@ -852,9 +852,9 @@ optional("gpu") {
+     ]
+     if (dawn_enable_d3d12) {
+       libs += [
+-        "d3d12.lib",
+-        "dxgi.lib",
+-        "d3dcompiler.lib",
++        "d3d12",
++        "dxgi",
++        "d3dcompiler",
+       ]
+     } else if (dawn_enable_metal) {
+       frameworks += [ "Metal.framework" ]
+@@ -872,9 +872,9 @@ optional("gpu") {
+       public_defines += [ "SK_ENABLE_D3D_DEBUG_LAYER" ]
+     }
+     libs += [
+-      "d3d12.lib",
+-      "dxgi.lib",
+-      "d3dcompiler.lib",
++      "d3d12",
++      "dxgi",
++      "d3dcompiler",
+     ]
+   }
+ 
+@@ -1025,8 +1025,8 @@ optional("raw") {
+ import("third_party/skcms/skcms.gni")
+ source_set("skcms") {
+   cflags = []
+-  if (!is_win || is_clang) {
+-    cflags += [
++  if (!is_msvc || is_clang) {
++    cflags_c = [
+       "-w",
+       "-std=c11",
+     ]
+@@ -1236,11 +1236,11 @@ component("skia") {
+       "src/ports/SkOSLibrary_win.cpp",
+     ]
+     libs += [
+-      "FontSub.lib",
+-      "Ole32.lib",
+-      "OleAut32.lib",
+-      "User32.lib",
+-      "Usp10.lib",
++      "fontsub",
++      "ole32",
++      "oleaut32",
++      "user32",
++      "usp10",
+     ]
+   } else {
+     sources += [
+@@ -1481,7 +1481,7 @@ if (skia_enable_tools) {
+   }
+ 
+   config("cpp14") {
+-    if (is_win) {
++    if (is_msvc) {
+       cflags_cc = [ "/std:c++14" ]
+     } else {
+       cflags_cc = [ "-std=c++14" ]
+@@ -1652,9 +1652,9 @@ if (skia_enable_tools) {
+         ]
+       } else if (is_win) {
+         sources += [ "tools/gpu/gl/win/CreatePlatformGLTestContext_win.cpp" ]
+-        libs += [ "Gdi32.lib" ]
++        libs += [ "gdi32" ]
+         if (target_cpu != "arm64") {
+-          libs += [ "OpenGL32.lib" ]
++          libs += [ "opengl32" ]
+         }
+       }
+     }
+@@ -1791,7 +1791,7 @@ if (skia_enable_tools) {
+         frameworks += [ "Foundation.framework" ]
+       }
+     } else if (is_win) {
+-      libs += [ "DbgHelp.lib" ]
++      libs += [ "dbghelp" ]
+     }
+ 
+     defines = []
+@@ -2521,7 +2521,7 @@ if (skia_enable_tools) {
+         "tools/fiddle/examples.cpp",
+         "tools/fiddle/examples.h",
+       ]
+-      if (is_win) {
++      if (is_msvc) {
+         cflags = [
+           "/wd4756",  # Overflow in constant arithmetic
+           "/wd4305",  # truncation from 'double' to 'float'
+@@ -2648,7 +2648,7 @@ if (skia_enable_tools) {
+       ]
+     }
+     test_app("mdbviz") {
+-      if (is_win) {
++      if (is_msvc) {
+         # on Windows we need to disable some exception handling warnings due to the Qt headers
+         cflags = [ "/Wv:18" ]  # 18 -> VS2013, 19 -> VS2015, 1910 -> VS2017
+       }
+@@ -2668,9 +2668,9 @@ if (skia_enable_tools) {
+       ]
+       lib_dirs = [ "$skia_qt_path/lib" ]
+       libs = [
+-        "Qt5Core.lib",
+-        "Qt5Gui.lib",
+-        "Qt5Widgets.lib",
++        "Qt5Core",
++        "Qt5Gui",
++        "Qt5Widgets",
+       ]
+       include_dirs = [
+         "$skia_qt_path/include",
+diff --git a/src/3rdparty/chromium/third_party/skia/gn/BUILD.gn b/src/3rdparty/chromium/third_party/skia/gn/BUILD.gn
+index 1b40237..6a84994 100644
+--- a/src/3rdparty/chromium/third_party/skia/gn/BUILD.gn
++++ b/src/3rdparty/chromium/third_party/skia/gn/BUILD.gn
+@@ -53,7 +53,7 @@ config("default") {
+   libs = []
+ 
+   if (werror) {
+-    if (is_win) {
++    if (is_msvc) {
+       cflags += [ "/WX" ]
+     } else {
+       cflags += [ "-Werror" ]
+@@ -63,7 +63,7 @@ config("default") {
+   # Disable warnings about unknown attributes.
+   # (These unknown attribute warnings are on by default, so we don't make
+   # disabling them part of :warnings, as some targets remove :warnings.)
+-  if (is_win && !is_clang) {
++  if (is_msvc && !is_clang) {
+     cflags += [ "/wd5030" ]
+   } else {
+     cflags += [ "-Wno-attributes" ]
+@@ -89,7 +89,7 @@ config("default") {
+     asmflags += [ target_triple ]
+   }
+ 
+-  if (is_win) {
++  if (is_msvc) {
+     if (is_clang && target_cpu == "arm64") {
+       cflags += [ "--target=arm64-windows" ]
+     }
+@@ -129,6 +129,16 @@ config("default") {
+       "$win_sdk/Lib/$win_sdk_version/um/$target_cpu",
+       "$win_vc/Tools/MSVC/$win_toolchain_version/lib/$target_cpu",
+     ]
++  } else if (is_mingw) {
++    if target_cpu != "arm64") {
++      cflags += [ "-Wa,-mbig-obj" ]
++    }
++    cflags_cc += [ "-std=c++17" ]
++    defines += [
++      "_CRT_SECURE_NO_WARNINGS",
++      "WIN32_LEAN_AND_MEAN",
++      "NOMINMAX",
++    ]
+   } else {
+     cflags += [
+       "-fstrict-aliasing",
+@@ -280,7 +290,7 @@ config("default") {
+       "-fsanitize-blacklist=$_suppressions",
+     ]
+ 
+-    if (is_win) {
++    if (is_msvc) {
+       cflags += [
+         "/FI$_suppressions",
+ 
+@@ -320,7 +330,7 @@ config("recover_pointer_overflow") {
+ 
+ config("no_exceptions") {
+   # Exceptions are disabled by default on Windows.  (Use /EHsc to enable them.)
+-  if (!is_win) {
++  if (!is_msvc) {
+     cflags_cc = [ "-fno-exceptions" ]
+   }
+ }
+@@ -330,7 +340,7 @@ config("warnings") {
+   cflags_cc = []
+   cflags_objc = []
+   cflags_objcc = []
+-  if (is_win) {
++  if (is_msvc) {
+     cflags += [
+       "/W3",  # Turn on lots of warnings.
+ 
+@@ -495,7 +505,7 @@ config("warnings") {
+   }
+ }
+ config("warnings_except_public_headers") {
+-  if (!is_win || is_clang) {
++  if (!is_msvc || is_clang) {
+     cflags = [
+       "-Wno-sign-conversion",
+       "-Wno-unused-parameter",
+@@ -519,7 +529,7 @@ config("debug_symbols") {
+       "-gline-tables-only",
+       "-funwind-tables",  # Helps make in-process backtraces fuller.
+     ]
+-  } else if (is_win) {
++  } else if (is_msvc) {
+     cflags = [ "/Z7" ]
+     if (is_clang) {
+       cflags += [ "-gcodeview-ghash" ]
+@@ -534,7 +544,7 @@ config("debug_symbols") {
+ 
+ config("no_rtti") {
+   if (sanitize != "ASAN") {  # -fsanitize=vptr requires RTTI
+-    if (is_win) {
++    if (is_msvc) {
+       cflags_cc = [ "/GR-" ]
+     } else {
+       cflags_cc = [ "-fno-rtti" ]
+@@ -543,7 +553,7 @@ config("no_rtti") {
+ }
+ 
+ config("optimize") {
+-  if (is_win) {
++  if (is_msvc) {
+     cflags = [
+       "/O2",
+       "/Zc:inline",
+@@ -590,7 +600,9 @@ config("executable") {
+       "-rdynamic",
+       "-Wl,-rpath,\$ORIGIN",
+     ]
+-  } else if (is_win) {
++  } else if (is_mingw) {
++    ldflags = [ "-mconsole" ]
++  } else if (is_msvc) {
+     ldflags = [
+       "/SUBSYSTEM:CONSOLE",  # Quiet "no subsystem specified; CONSOLE assumed".
+       "/INCREMENTAL:NO",  # Quiet warnings about failing to incrementally link
+diff --git a/src/3rdparty/chromium/third_party/skia/gn/BUILDCONFIG.gn b/src/3rdparty/chromium/third_party/skia/gn/BUILDCONFIG.gn
+index cc2e16e..fac7024 100644
+--- a/src/3rdparty/chromium/third_party/skia/gn/BUILDCONFIG.gn
++++ b/src/3rdparty/chromium/third_party/skia/gn/BUILDCONFIG.gn
+@@ -58,6 +58,8 @@ is_tvos = current_os == "tvos"
+ is_linux = current_os == "linux"
+ is_mac = current_os == "mac"
+ is_win = current_os == "win"
++is_mingw = is_win && (cxx == "g++" || cxx == "clang++")
++is_msvc = is_win && !is_mingw
+ 
+ # This is just to make the Dawn build files happy. Skia itself uses target_os = "linux"
+ # for ChromeOS, so this variable will not affect Skia proper.
+@@ -115,7 +117,7 @@ if (is_android) {
+   }
+ }
+ 
+-if (target_os == "win") {
++if (is_msvc) {
+   # By default we look for 2017 (Enterprise, Pro, and Community), then 2015. If MSVC is installed in a
+   # non-default location, you can set win_vc to inform us where it is.
+ 
+@@ -126,7 +128,7 @@ if (target_os == "win") {
+                         # directory.
+ }
+ 
+-if (target_os == "win") {
++if (is_msvc) {
+   if (win_toolchain_version == "") {
+     win_toolchain_version = exec_script("//gn/highest_version_dir.py",
+                                         [
+@@ -211,7 +213,7 @@ set_defaults("component") {
+   }
+ }
+ 
+-if (is_win) {
++if (is_msvc) {
+   # Windows tool chain
+   set_default_toolchain("//gn/toolchain:msvc")
+   default_toolchain_name = "msvc"
+diff --git a/src/3rdparty/chromium/third_party/skia/gn/toolchain/BUILD.gn b/src/3rdparty/chromium/third_party/skia/gn/toolchain/BUILD.gn
+index e8e6ce4..7eb7fa1 100644
+--- a/src/3rdparty/chromium/third_party/skia/gn/toolchain/BUILD.gn
++++ b/src/3rdparty/chromium/third_party/skia/gn/toolchain/BUILD.gn
+@@ -312,6 +312,8 @@ template("gcc_like_toolchain") {
+       rpath = "-Wl,-soname,$soname"
+       if (is_mac || is_ios) {
+         rpath = "-Wl,-install_name,@rpath/$soname"
++      } else if (is_mingw) {
++        rpath =""
+       }
+ 
+       rspfile = "{{output}}.rsp"
+@@ -333,7 +335,11 @@ template("gcc_like_toolchain") {
+       command = "$cxx -shared {{ldflags}} $_start_group @$rspfile {{frameworks}} {{solibs}} $_end_group {{libs}} $rpath -o {{output}}"
+       outputs = [ "{{root_out_dir}}/$soname" ]
+       output_prefix = "lib"
+-      default_output_extension = ".so"
++      if (is_mingw) {
++        default_output_extension = ".dll"
++      } else {
++        default_output_extension = ".so"
++      }
+       description = "link {{output}}"
+       if (0 <= link_pool_depth) {
+         pool = ":link_pool($default_toolchain)"
+@@ -360,6 +366,11 @@ template("gcc_like_toolchain") {
+       command = "$cxx {{ldflags}} $_start_group @$rspfile {{frameworks}} {{solibs}} $_end_group {{libs}} -o $exe_name"
+ 
+       outputs = [ "$exe_name" ]
++      if (is_mingw) {
++        default_output_extension = ".exe"
++      } else {
++        default_output_extension = ""
++      }
+       description = "link {{output}}"
+       if (0 <= link_pool_depth) {
+         pool = ":link_pool($default_toolchain)"
+diff --git a/src/3rdparty/chromium/third_party/skia/modules/skottie/src/animator/Vec2KeyframeAnimator.cpp b/src/3rdparty/chromium/third_party/skia/modules/skottie/src/animator/Vec2KeyframeAnimator.cpp
+index 38e715c..e726096 100644
+--- a/src/3rdparty/chromium/third_party/skia/modules/skottie/src/animator/Vec2KeyframeAnimator.cpp
++++ b/src/3rdparty/chromium/third_party/skia/modules/skottie/src/animator/Vec2KeyframeAnimator.cpp
+@@ -225,7 +225,7 @@ bool AnimatablePropertyContainer::bindAutoOrientable(const AnimationBuilder& abu
+ 
+     // Separate-dimensions vector value: each component is animated independently.
+     return this->bind(abuilder, (*jprop)["x"], &v->x)
+-         | this->bind(abuilder, (*jprop)["y"], &v->y);
++         || this->bind(abuilder, (*jprop)["y"], &v->y);
+ }
+ 
+ template <>
+diff --git a/src/3rdparty/chromium/third_party/skia/modules/skottie/src/animator/VectorKeyframeAnimator.cpp b/src/3rdparty/chromium/third_party/skia/modules/skottie/src/animator/VectorKeyframeAnimator.cpp
+index 7e2bab9..a643785 100644
+--- a/src/3rdparty/chromium/third_party/skia/modules/skottie/src/animator/VectorKeyframeAnimator.cpp
++++ b/src/3rdparty/chromium/third_party/skia/modules/skottie/src/animator/VectorKeyframeAnimator.cpp
+@@ -257,8 +257,8 @@ bool AnimatablePropertyContainer::bind<VectorValue>(const AnimationBuilder& abui
+     // Separate-dimensions vector value: each component is animated independently.
+     *v = { 0, 0, 0 };
+     return this->bind(abuilder, (*jprop)["x"], v->data() + 0)
+-         | this->bind(abuilder, (*jprop)["y"], v->data() + 1)
+-         | this->bind(abuilder, (*jprop)["z"], v->data() + 2);
++         || this->bind(abuilder, (*jprop)["y"], v->data() + 1)
++         || this->bind(abuilder, (*jprop)["z"], v->data() + 2);
+ }
+ 
+ } // namespace internal
+diff --git a/src/3rdparty/chromium/third_party/skia/src/core/SkPathEffect.cpp b/src/3rdparty/chromium/third_party/skia/src/core/SkPathEffect.cpp
+index d3625f0..a8c34d1 100644
+--- a/src/3rdparty/chromium/third_party/skia/src/core/SkPathEffect.cpp
++++ b/src/3rdparty/chromium/third_party/skia/src/core/SkPathEffect.cpp
+@@ -159,7 +159,7 @@ protected:
+     bool onFilterPath(SkPath* dst, const SkPath& src, SkStrokeRec* rec,
+                       const SkRect* cullRect) const override {
+         // use bit-or so that we always call both, even if the first one succeeds
+-        return fPE0->filterPath(dst, src, rec, cullRect) |
++        return fPE0->filterPath(dst, src, rec, cullRect) ||
+                fPE1->filterPath(dst, src, rec, cullRect);
+     }
+ 
+diff --git a/src/3rdparty/chromium/third_party/skia/src/core/SkPathPriv.h b/src/3rdparty/chromium/third_party/skia/src/core/SkPathPriv.h
+index d2fa3c4..d131b98 100644
+--- a/src/3rdparty/chromium/third_party/skia/src/core/SkPathPriv.h
++++ b/src/3rdparty/chromium/third_party/skia/src/core/SkPathPriv.h
+@@ -323,7 +323,7 @@ public:
+ 
+     static bool IsAxisAligned(const SkPath& path) {
+         SkRect tmp;
+-        return (path.fPathRef->fIsRRect | path.fPathRef->fIsOval) || path.isRect(&tmp);
++        return (path.fPathRef->fIsRRect || path.fPathRef->fIsOval) || path.isRect(&tmp);
+     }
+ 
+     static bool AllPointsEq(const SkPoint pts[], int count) {
+diff --git a/src/3rdparty/chromium/third_party/skia/src/opts/SkRasterPipeline_opts.h b/src/3rdparty/chromium/third_party/skia/src/opts/SkRasterPipeline_opts.h
+index 4abad71..86d4e0a 100644
+--- a/src/3rdparty/chromium/third_party/skia/src/opts/SkRasterPipeline_opts.h
++++ b/src/3rdparty/chromium/third_party/skia/src/opts/SkRasterPipeline_opts.h
+@@ -978,7 +978,7 @@ SI F approx_powf(F x, F y) {
+ }
+ 
+ SI F from_half(U16 h) {
+-#if defined(JUMPER_IS_NEON) && defined(SK_CPU_ARM64) \
++#if defined(JUMPER_IS_NEON) && defined(SK_CPU_ARM64) && !defined(__GNUC__) \
+     && !defined(SK_BUILD_FOR_GOOGLE3)  // Temporary workaround for some Google3 builds.
+ #if defined(SK_BUILD_FOR_MAC)
+     return vcvt_f32_f16(h);
+@@ -1004,7 +1004,7 @@ SI F from_half(U16 h) {
+ }
+ 
+ SI U16 to_half(F f) {
+-#if defined(JUMPER_IS_NEON) && defined(SK_CPU_ARM64) \
++#if defined(JUMPER_IS_NEON) && defined(SK_CPU_ARM64) && !defined(__GNUC__) \
+     && !defined(SK_BUILD_FOR_GOOGLE3)  // Temporary workaround for some Google3 builds.
+ #if defined(SK_BUILD_FOR_MAC)
+     return vcvt_f16_f32(f);
+diff --git a/src/3rdparty/chromium/third_party/skia/src/ports/SkFontHost_FreeType.cpp b/src/3rdparty/chromium/third_party/skia/src/ports/SkFontHost_FreeType.cpp
+index f73b5fe..6f52e46 100644
+--- a/src/3rdparty/chromium/third_party/skia/src/ports/SkFontHost_FreeType.cpp
++++ b/src/3rdparty/chromium/third_party/skia/src/ports/SkFontHost_FreeType.cpp
+@@ -51,7 +51,9 @@
+ 
+ // SK_FREETYPE_MINIMUM_RUNTIME_VERSION 0x<major><minor><patch><flags>
+ // Flag SK_FREETYPE_DLOPEN: also try dlopen to get newer features.
++#ifndef _WIN32
+ #define SK_FREETYPE_DLOPEN (0x1)
++#endif
+ #ifndef SK_FREETYPE_MINIMUM_RUNTIME_VERSION
+ #  if defined(SK_BUILD_FOR_ANDROID_FRAMEWORK) || defined (SK_BUILD_FOR_GOOGLE3)
+ #    define SK_FREETYPE_MINIMUM_RUNTIME_VERSION (((FREETYPE_MAJOR) << 24) | ((FREETYPE_MINOR) << 16) | ((FREETYPE_PATCH) << 8))
+diff --git a/src/3rdparty/chromium/third_party/skia/src/ports/SkScalerContext_win_dw.cpp b/src/3rdparty/chromium/third_party/skia/src/ports/SkScalerContext_win_dw.cpp
+index b2df467..2fd42be 100644
+--- a/src/3rdparty/chromium/third_party/skia/src/ports/SkScalerContext_win_dw.cpp
++++ b/src/3rdparty/chromium/third_party/skia/src/ports/SkScalerContext_win_dw.cpp
+@@ -520,7 +520,7 @@ bool SkScalerContext_DW::isPngGlyph(const SkGlyph& glyph) {
+ 
+     DWRITE_GLYPH_IMAGE_FORMATS f;
+     IDWriteFontFace4* fontFace4 = this->getDWriteTypeface()->fDWriteFontFace4.get();
+-    HRBM(fontFace4->GetGlyphImageFormats(glyph.getGlyphID(), 0, UINT32_MAX, &f),
++    HRBM(fontFace4->GetGlyphImageFormats_(glyph.getGlyphID(), 0, UINT32_MAX, &f),
+          "Cannot get glyph image formats.");
+     return f & DWRITE_GLYPH_IMAGE_FORMATS_PNG;
+ }
+diff --git a/src/3rdparty/chromium/third_party/skia/src/xps/SkXPSDevice.cpp b/src/3rdparty/chromium/third_party/skia/src/xps/SkXPSDevice.cpp
+index 53047f9..6712f4c 100644
+--- a/src/3rdparty/chromium/third_party/skia/src/xps/SkXPSDevice.cpp
++++ b/src/3rdparty/chromium/third_party/skia/src/xps/SkXPSDevice.cpp
+@@ -317,7 +317,7 @@ bool SkXPSDevice::endSheet() {
+     return true;
+ }
+ 
+-static HRESULT subset_typeface(const SkXPSDevice::TypefaceUse& current) {
++HRESULT subset_typeface(const SkXPSDevice::TypefaceUse& current) {
+     //CreateFontPackage wants unsigned short.
+     //Microsoft, Y U NO stdint.h?
+     std::vector<unsigned short> keepList;

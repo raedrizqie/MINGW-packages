@@ -1,0 +1,547 @@
+diff --git a/src/3rdparty/chromium/services/device/generic_sensor/BUILD.gn b/src/3rdparty/chromium/services/device/generic_sensor/BUILD.gn
+index 91887b7..9687ba2 100644
+--- a/src/3rdparty/chromium/services/device/generic_sensor/BUILD.gn
++++ b/src/3rdparty/chromium/services/device/generic_sensor/BUILD.gn
+@@ -123,16 +123,18 @@ source_set("generic_sensor") {
+       "relative_orientation_euler_angles_fusion_algorithm_using_accelerometer_and_gyroscope.h",
+     ]
+ 
+-    sources += [
+-      "platform_sensor_provider_winrt.cc",
+-      "platform_sensor_provider_winrt.h",
+-      "platform_sensor_reader_winrt.cc",
+-      "platform_sensor_reader_winrt.h",
+-    ]
++    if (is_msvc) {
++      sources += [
++        "platform_sensor_provider_winrt.cc",
++        "platform_sensor_provider_winrt.h",
++        "platform_sensor_reader_winrt.cc",
++        "platform_sensor_reader_winrt.h",
++      ]
++    }
+ 
+     libs = [
+-      "portabledeviceguids.lib",
+-      "sensorsapi.lib",
++      "portabledeviceguids",
++      "sensorsapi",
+     ]
+   }
+ }
+diff --git a/src/3rdparty/chromium/services/device/generic_sensor/platform_sensor_provider.cc b/src/3rdparty/chromium/services/device/generic_sensor/platform_sensor_provider.cc
+index 1ab9deb..46b26b8 100644
+--- a/src/3rdparty/chromium/services/device/generic_sensor/platform_sensor_provider.cc
++++ b/src/3rdparty/chromium/services/device/generic_sensor/platform_sensor_provider.cc
+@@ -27,12 +27,14 @@ std::unique_ptr<PlatformSensorProvider> PlatformSensorProvider::Create() {
+   return std::make_unique<PlatformSensorProviderMac>();
+ #elif defined(OS_ANDROID)
+   return std::make_unique<PlatformSensorProviderAndroid>();
+-#elif defined(OS_WIN)
++#elif defined(OS_WIN) && defined(COMPILER_MSVC)
+   if (PlatformSensorProvider::UseWindowsWinrt()) {
+     return std::make_unique<PlatformSensorProviderWinrt>();
+   } else {
+     return std::make_unique<PlatformSensorProviderWin>();
+   }
++#elif defined(OS_WIN) && defined(COMPILER_GCC)
++  return std::make_unique<PlatformSensorProviderWin>();
+ #elif (defined(OS_LINUX) || defined(OS_CHROMEOS)) && defined(USE_UDEV)
+   return std::make_unique<PlatformSensorProviderLinux>();
+ #else
+@@ -40,7 +42,7 @@ std::unique_ptr<PlatformSensorProvider> PlatformSensorProvider::Create() {
+ #endif
+ }
+ 
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+ // static
+ bool PlatformSensorProvider::UseWindowsWinrt() {
+   // TODO: Windows version dependency should eventually be updated to
+diff --git a/src/3rdparty/chromium/services/device/generic_sensor/platform_sensor_provider_win.cc b/src/3rdparty/chromium/services/device/generic_sensor/platform_sensor_provider_win.cc
+index 5f87c7f..1adb14c 100644
+--- a/src/3rdparty/chromium/services/device/generic_sensor/platform_sensor_provider_win.cc
++++ b/src/3rdparty/chromium/services/device/generic_sensor/platform_sensor_provider_win.cc
+@@ -23,8 +23,12 @@
+ namespace device {
+ 
+ PlatformSensorProviderWin::PlatformSensorProviderWin()
++#if defined(COMPILER_MSVC)
+     : com_sta_task_runner_(base::ThreadPool::CreateCOMSTATaskRunner(
+           {base::TaskPriority::USER_VISIBLE})) {}
++#else
++{}
++#endif
+ 
+ PlatformSensorProviderWin::~PlatformSensorProviderWin() = default;
+ 
+@@ -35,7 +39,9 @@ void PlatformSensorProviderWin::SetSensorManagerForTesting(
+ 
+ scoped_refptr<base::SingleThreadTaskRunner>
+ PlatformSensorProviderWin::GetComStaTaskRunnerForTesting() {
++#if defined(COMPILER_MSVC)
+   return com_sta_task_runner_;
++#endif
+ }
+ 
+ void PlatformSensorProviderWin::CreateSensorInternal(
+@@ -45,6 +51,7 @@ void PlatformSensorProviderWin::CreateSensorInternal(
+   DCHECK_CALLED_ON_VALID_THREAD(thread_checker_);
+   if (sensor_manager_) {
+     OnInitSensorManager(type, reading_buffer, std::move(callback));
++#if defined(COMPILER_MSVC)
+   } else {
+     com_sta_task_runner_->PostTaskAndReply(
+         FROM_HERE,
+@@ -53,11 +60,14 @@ void PlatformSensorProviderWin::CreateSensorInternal(
+         base::BindOnce(&PlatformSensorProviderWin::OnInitSensorManager,
+                        base::Unretained(this), type, reading_buffer,
+                        std::move(callback)));
++#endif
+   }
+ }
+ 
+ void PlatformSensorProviderWin::InitSensorManager() {
++#if defined(COMPILER_MSVC)
+   DCHECK(com_sta_task_runner_->RunsTasksInCurrentSequence());
++#endif
+ 
+   HRESULT hr = ::CoCreateInstance(CLSID_SensorManager, nullptr, CLSCTX_ALL,
+                                   IID_PPV_ARGS(&sensor_manager_));
+@@ -100,6 +110,7 @@ void PlatformSensorProviderWin::OnInitSensorManager(
+ 
+     // Try to create low-level sensors by default.
+     default: {
++#if defined(COMPILER_MSVC)
+       base::PostTaskAndReplyWithResult(
+           com_sta_task_runner_.get(), FROM_HERE,
+           base::BindOnce(&PlatformSensorProviderWin::CreateSensorReader,
+@@ -107,6 +118,7 @@ void PlatformSensorProviderWin::OnInitSensorManager(
+           base::BindOnce(&PlatformSensorProviderWin::SensorReaderCreated,
+                          base::Unretained(this), type, reading_buffer,
+                          std::move(callback)));
++#endif
+       break;
+     }
+   }
+@@ -137,18 +149,22 @@ void PlatformSensorProviderWin::SensorReaderCreated(
+     }
+   }
+ 
++#if defined(COMPILER_MSVC)
+   scoped_refptr<PlatformSensor> sensor =
+       new PlatformSensorWin(type, reading_buffer, this, com_sta_task_runner_,
+                             std::move(sensor_reader));
+   std::move(callback).Run(sensor);
++#endif
+ }
+ 
+ std::unique_ptr<PlatformSensorReaderWinBase>
+ PlatformSensorProviderWin::CreateSensorReader(mojom::SensorType type) {
++#if defined(COMPILER_MSVC)
+   DCHECK(com_sta_task_runner_->RunsTasksInCurrentSequence());
+   if (!sensor_manager_)
+     return nullptr;
+   return PlatformSensorReaderWin32::Create(type, sensor_manager_);
++#endif
+ }
+ 
+ }  // namespace device
+diff --git a/src/3rdparty/chromium/services/device/generic_sensor/platform_sensor_reader_win.cc b/src/3rdparty/chromium/services/device/generic_sensor/platform_sensor_reader_win.cc
+index 3ebfb17..48f84e0 100644
+--- a/src/3rdparty/chromium/services/device/generic_sensor/platform_sensor_reader_win.cc
++++ b/src/3rdparty/chromium/services/device/generic_sensor/platform_sensor_reader_win.cc
+@@ -7,7 +7,9 @@
+ #include <Sensors.h>
+ #include <comdef.h>
+ #include <objbase.h>
++#if defined(COMPILER_MSVC)
+ #include <wrl/implements.h>
++#endif
+ 
+ #include <iomanip>
+ 
+@@ -249,6 +251,7 @@ std::unique_ptr<ReaderInitParams> CreateReaderInitParamsForSensor(
+ 
+ }  // namespace
+ 
++#if defined(COMPILER_MSVC)
+ // Class that implements ISensorEvents used by the ISensor interface to dispatch
+ // state and data change events.
+ class EventListener
+@@ -351,6 +354,7 @@ class EventListener
+ 
+   DISALLOW_COPY_AND_ASSIGN(EventListener);
+ };
++#endif // COMPILER_MSVC
+ 
+ // static
+ std::unique_ptr<PlatformSensorReaderWinBase> PlatformSensorReaderWin32::Create(
+@@ -379,8 +383,12 @@ std::unique_ptr<PlatformSensorReaderWinBase> PlatformSensorReaderWin32::Create(
+   if (FAILED(hr))
+     return nullptr;
+ 
++#if defined(COMPILER_MSVC)
+   return base::WrapUnique(
+       new PlatformSensorReaderWin32(sensor, std::move(params)));
++#else
++  return nullptr;
++#endif
+ }
+ 
+ // static
+@@ -401,6 +409,7 @@ Microsoft::WRL::ComPtr<ISensor> PlatformSensorReaderWin32::GetSensorForType(
+   return sensor;
+ }
+ 
++#if defined(COMPILER_MSVC)
+ PlatformSensorReaderWin32::PlatformSensorReaderWin32(
+     Microsoft::WRL::ComPtr<ISensor> sensor,
+     std::unique_ptr<ReaderInitParams> params)
+@@ -414,6 +423,7 @@ PlatformSensorReaderWin32::PlatformSensorReaderWin32(
+   DCHECK(init_params_->reader_func);
+   DCHECK(sensor_);
+ }
++#endif
+ 
+ void PlatformSensorReaderWin32::SetClient(Client* client) {
+   base::AutoLock autolock(lock_);
+diff --git a/src/3rdparty/chromium/services/device/geolocation/BUILD.gn b/src/3rdparty/chromium/services/device/geolocation/BUILD.gn
+index 2250f47..5b2ded3 100644
+--- a/src/3rdparty/chromium/services/device/geolocation/BUILD.gn
++++ b/src/3rdparty/chromium/services/device/geolocation/BUILD.gn
+@@ -137,7 +137,7 @@ source_set("geolocation") {
+     ]
+   }
+ 
+-  if (is_win) {
++  if (is_msvc) {
+     sources += [
+       "win/location_provider_winrt.cc",
+       "win/location_provider_winrt.h",
+diff --git a/src/3rdparty/chromium/services/device/geolocation/location_arbitrator.cc b/src/3rdparty/chromium/services/device/geolocation/location_arbitrator.cc
+index 7da9b47..6aad367 100644
+--- a/src/3rdparty/chromium/services/device/geolocation/location_arbitrator.cc
++++ b/src/3rdparty/chromium/services/device/geolocation/location_arbitrator.cc
+@@ -159,7 +159,7 @@ LocationArbitrator::NewNetworkLocationProvider(
+ 
+ std::unique_ptr<LocationProvider>
+ LocationArbitrator::NewSystemLocationProvider() {
+-#if defined(OS_LINUX) || defined(OS_CHROMEOS) || defined(OS_FUCHSIA)
++#if defined(OS_LINUX) || defined(OS_CHROMEOS) || defined(OS_FUCHSIA) || (defined(OS_WIN) && defined(COMPILER_GCC))
+   return nullptr;
+ #else
+   return device::NewSystemLocationProvider();
+diff --git a/src/3rdparty/chromium/services/device/hid/BUILD.gn b/src/3rdparty/chromium/services/device/hid/BUILD.gn
+index a70323b..a21749f 100644
+--- a/src/3rdparty/chromium/services/device/hid/BUILD.gn
++++ b/src/3rdparty/chromium/services/device/hid/BUILD.gn
+@@ -55,8 +55,8 @@ source_set("hid") {
+       "hid_service_win.h",
+     ]
+     libs = [
+-      "hid.lib",
+-      "setupapi.lib",
++      "hid",
++      "setupapi",
+     ]
+   }
+ 
+diff --git a/src/3rdparty/chromium/services/device/hid/hid_service_win.cc b/src/3rdparty/chromium/services/device/hid/hid_service_win.cc
+index e9233de..22246e2 100644
+--- a/src/3rdparty/chromium/services/device/hid/hid_service_win.cc
++++ b/src/3rdparty/chromium/services/device/hid/hid_service_win.cc
+@@ -10,7 +10,9 @@
+ #include <devpkey.h>
+ #include <setupapi.h>
+ #include <stddef.h>
++#if defined(COMPILER_MSVC)
+ #include <wdmguid.h>
++#endif
+ #include <winioctl.h>
+ 
+ #include <memory>
+@@ -45,7 +47,7 @@ bool GetDeviceGuidProperty(HDEVINFO device_info_set,
+                            const DEVPROPKEY& property,
+                            GUID* property_buffer) {
+   DEVPROPTYPE property_type;
+-  if (!SetupDiGetDeviceProperty(
++  if (!SetupDiGetDevicePropertyW(
+           device_info_set, &device_info_data, &property, &property_type,
+           reinterpret_cast<PBYTE>(property_buffer), sizeof(*property_buffer),
+           /*RequiredSize=*/nullptr, /*Flags=*/0) ||
+diff --git a/src/3rdparty/chromium/services/device/serial/BUILD.gn b/src/3rdparty/chromium/services/device/serial/BUILD.gn
+index 94aeb94..3e8870a 100644
+--- a/src/3rdparty/chromium/services/device/serial/BUILD.gn
++++ b/src/3rdparty/chromium/services/device/serial/BUILD.gn
+@@ -15,8 +15,10 @@ if (is_win || ((is_linux || is_chromeos) && use_udev) || is_mac) {
+   config("platform_support") {
+     visibility = [ ":serial" ]
+     if (is_win) {
+-      libs = [ "setupapi.lib" ]
+-      ldflags = [ "/DELAYLOAD:setupapi.dll" ]
++      libs = [ "setupapi" ]
++      if (is_msvc) {
++        ldflags = [ "/DELAYLOAD:setupapi.dll" ]
++      }
+     }
+   }
+ 
+diff --git a/src/3rdparty/chromium/services/device/serial/serial_device_enumerator_win.cc b/src/3rdparty/chromium/services/device/serial/serial_device_enumerator_win.cc
+index c64e04e..2a91ffa 100644
+--- a/src/3rdparty/chromium/services/device/serial/serial_device_enumerator_win.cc
++++ b/src/3rdparty/chromium/services/device/serial/serial_device_enumerator_win.cc
+@@ -7,6 +7,7 @@
+ #include <windows.h>  // Must be in front of other Windows header files.
+ 
+ #include <devguid.h>
++#include <ntdef.h>
+ #include <ntddser.h>
+ #include <setupapi.h>
+ #include <stdint.h>
+@@ -48,7 +49,7 @@ base::Optional<std::string> GetProperty(HDEVINFO dev_info,
+ 
+   DEVPROPTYPE property_type;
+   DWORD required_size;
+-  if (SetupDiGetDeviceProperty(dev_info, dev_info_data, &property,
++  if (SetupDiGetDevicePropertyW(dev_info, dev_info_data, &property,
+                                &property_type, /*PropertyBuffer=*/nullptr,
+                                /*PropertyBufferSize=*/0, &required_size,
+                                /*Flags=*/0) ||
+@@ -58,7 +59,7 @@ base::Optional<std::string> GetProperty(HDEVINFO dev_info,
+   }
+ 
+   std::wstring buffer;
+-  if (!SetupDiGetDeviceProperty(
++  if (!SetupDiGetDevicePropertyW(
+           dev_info, dev_info_data, &property, &property_type,
+           reinterpret_cast<PBYTE>(base::WriteInto(&buffer, required_size)),
+           required_size, /*RequiredSize=*/nullptr, /*Flags=*/0)) {
+diff --git a/src/3rdparty/chromium/services/device/usb/BUILD.gn b/src/3rdparty/chromium/services/device/usb/BUILD.gn
+index f2d4524..aac8f14 100644
+--- a/src/3rdparty/chromium/services/device/usb/BUILD.gn
++++ b/src/3rdparty/chromium/services/device/usb/BUILD.gn
+@@ -118,8 +118,8 @@ static_library("usb") {
+     ]
+ 
+     libs = [
+-      "setupapi.lib",
+-      "winusb.lib",
++      "setupapi",
++      "winusb",
+     ]
+ 
+     deps += [ "//third_party/re2" ]
+diff --git a/src/3rdparty/chromium/services/device/usb/usb_service_win.cc b/src/3rdparty/chromium/services/device/usb/usb_service_win.cc
+index 51477ef..0effaaa 100644
+--- a/src/3rdparty/chromium/services/device/usb/usb_service_win.cc
++++ b/src/3rdparty/chromium/services/device/usb/usb_service_win.cc
+@@ -57,7 +57,7 @@ base::Optional<uint32_t> GetDeviceUint32Property(HDEVINFO dev_info,
+ 
+   DEVPROPTYPE property_type;
+   uint32_t buffer;
+-  if (!SetupDiGetDeviceProperty(
++  if (!SetupDiGetDevicePropertyW(
+           dev_info, dev_info_data, &property, &property_type,
+           reinterpret_cast<PBYTE>(&buffer), sizeof(buffer), nullptr, 0) ||
+       property_type != DEVPROP_TYPE_UINT32) {
+@@ -77,7 +77,7 @@ base::Optional<std::wstring> GetDeviceStringProperty(
+ 
+   DEVPROPTYPE property_type;
+   DWORD required_size;
+-  if (SetupDiGetDeviceProperty(dev_info, dev_info_data, &property,
++  if (SetupDiGetDevicePropertyW(dev_info, dev_info_data, &property,
+                                &property_type, nullptr, 0, &required_size, 0) ||
+       GetLastError() != ERROR_INSUFFICIENT_BUFFER ||
+       property_type != DEVPROP_TYPE_STRING) {
+@@ -85,7 +85,7 @@ base::Optional<std::wstring> GetDeviceStringProperty(
+   }
+ 
+   std::wstring buffer;
+-  if (!SetupDiGetDeviceProperty(
++  if (!SetupDiGetDevicePropertyW(
+           dev_info, dev_info_data, &property, &property_type,
+           reinterpret_cast<PBYTE>(base::WriteInto(&buffer, required_size)),
+           required_size, nullptr, 0)) {
+@@ -105,7 +105,7 @@ base::Optional<std::vector<std::wstring>> GetDeviceStringListProperty(
+ 
+   DEVPROPTYPE property_type;
+   DWORD required_size;
+-  if (SetupDiGetDeviceProperty(dev_info, dev_info_data, &property,
++  if (SetupDiGetDevicePropertyW(dev_info, dev_info_data, &property,
+                                &property_type, nullptr, 0, &required_size, 0) ||
+       GetLastError() != ERROR_INSUFFICIENT_BUFFER ||
+       property_type != DEVPROP_TYPE_STRING_LIST) {
+@@ -113,7 +113,7 @@ base::Optional<std::vector<std::wstring>> GetDeviceStringListProperty(
+   }
+ 
+   std::wstring buffer;
+-  if (!SetupDiGetDeviceProperty(
++  if (!SetupDiGetDevicePropertyW(
+           dev_info, dev_info_data, &property, &property_type,
+           reinterpret_cast<PBYTE>(base::WriteInto(&buffer, required_size)),
+           required_size, nullptr, 0)) {
+diff --git a/src/3rdparty/chromium/services/network/url_loader.cc b/src/3rdparty/chromium/services/network/url_loader.cc
+index 3f7e688..409d1cd 100644
+--- a/src/3rdparty/chromium/services/network/url_loader.cc
++++ b/src/3rdparty/chromium/services/network/url_loader.cc
+@@ -918,7 +918,7 @@ void URLLoader::FollowRedirect(
+ 
+   // Removing headers can't make the set of pre-existing headers unsafe, but
+   // adding headers can.
+-  if (!AreRequestHeadersSafe(modified_headers) |
++  if (!AreRequestHeadersSafe(modified_headers) ||
+       !AreRequestHeadersSafe(modified_cors_exempt_headers)) {
+     NotifyCompleted(net::ERR_INVALID_ARGUMENT);
+     // |this| may have been deleted.
+diff --git a/src/3rdparty/chromium/services/service_manager/public/cpp/interface_provider_spec.cc b/src/3rdparty/chromium/services/service_manager/public/cpp/interface_provider_spec.cc
+index 012df60..afd91a4 100644
+--- a/src/3rdparty/chromium/services/service_manager/public/cpp/interface_provider_spec.cc
++++ b/src/3rdparty/chromium/services/service_manager/public/cpp/interface_provider_spec.cc
+@@ -24,13 +24,13 @@ InterfaceProviderSpec& InterfaceProviderSpec::operator=(
+ 
+ bool InterfaceProviderSpec::operator==(
+     const InterfaceProviderSpec& other) const {
+-  return other.provides == provides && other.requires == requires;
++  return other.provides == provides && other.needs == needs;
+ }
+ 
+ bool InterfaceProviderSpec::operator<(
+     const InterfaceProviderSpec& other) const {
+-  return std::tie(provides, requires) <
+-         std::tie(other.provides, other.requires);
++  return std::tie(provides, needs) <
++         std::tie(other.provides, other.needs);
+ }
+ 
+ bool GetInterfaceProviderSpec(const std::string& spec_name,
+diff --git a/src/3rdparty/chromium/services/service_manager/public/cpp/interface_provider_spec.h b/src/3rdparty/chromium/services/service_manager/public/cpp/interface_provider_spec.h
+index 1db349e..22107ad 100644
+--- a/src/3rdparty/chromium/services/service_manager/public/cpp/interface_provider_spec.h
++++ b/src/3rdparty/chromium/services/service_manager/public/cpp/interface_provider_spec.h
+@@ -33,7 +33,7 @@ struct SERVICE_MANAGER_PUBLIC_CPP_TYPES_EXPORT InterfaceProviderSpec {
+   bool operator==(const InterfaceProviderSpec& other) const;
+   bool operator<(const InterfaceProviderSpec& other) const;
+   std::map<Capability, InterfaceSet> provides;
+-  std::map<Name, CapabilitySet> requires;
++  std::map<Name, CapabilitySet> needs;
+ };
+ 
+ // Map of spec name -> spec.
+diff --git a/src/3rdparty/chromium/services/service_manager/public/cpp/interface_provider_spec_mojom_traits.h b/src/3rdparty/chromium/services/service_manager/public/cpp/interface_provider_spec_mojom_traits.h
+index b996bc7..3557274 100644
+--- a/src/3rdparty/chromium/services/service_manager/public/cpp/interface_provider_spec_mojom_traits.h
++++ b/src/3rdparty/chromium/services/service_manager/public/cpp/interface_provider_spec_mojom_traits.h
+@@ -20,13 +20,13 @@ struct COMPONENT_EXPORT(SERVICE_MANAGER_MOJOM)
+     return spec.provides;
+   }
+   static const std::map<service_manager::Name, service_manager::CapabilitySet>&
+-  requires(const service_manager::InterfaceProviderSpec& spec) {
+-    return spec.requires;
++  needs(const service_manager::InterfaceProviderSpec& spec) {
++    return spec.needs;
+   }
+   static bool Read(service_manager::mojom::InterfaceProviderSpecDataView data,
+                    service_manager::InterfaceProviderSpec* out) {
+     return data.ReadProvides(&out->provides) &&
+-           data.ReadRequires(&out->requires);
++           data.ReadNeeds(&out->needs);
+   }
+ };
+ 
+diff --git a/src/3rdparty/chromium/services/service_manager/public/mojom/interface_provider_spec.mojom b/src/3rdparty/chromium/services/service_manager/public/mojom/interface_provider_spec.mojom
+index f17d55b..97afaa8 100644
+--- a/src/3rdparty/chromium/services/service_manager/public/mojom/interface_provider_spec.mojom
++++ b/src/3rdparty/chromium/services/service_manager/public/mojom/interface_provider_spec.mojom
+@@ -35,7 +35,7 @@ struct InterfaceProviderSpec {
+   // A map of service name -> collection of required capabilities. "*" is also
+   // supported as the key, which supplies a set of capabilities required from
+   // all services in addition to specific ones specified.
+-  map<string, CapabilitySet> requires;
++  map<string, CapabilitySet> needs;
+ };
+ 
+ // The name of the InterfaceProviderSpec in service manifests used by the
+diff --git a/src/3rdparty/chromium/services/shape_detection/BUILD.gn b/src/3rdparty/chromium/services/shape_detection/BUILD.gn
+index abce530..43733a5 100644
+--- a/src/3rdparty/chromium/services/shape_detection/BUILD.gn
++++ b/src/3rdparty/chromium/services/shape_detection/BUILD.gn
+@@ -41,7 +41,7 @@ source_set("lib") {
+     ]
+     frameworks = [ "QuartzCore.framework" ]
+     weak_frameworks = [ "Vision.framework" ]
+-  } else if (is_win) {
++  } else if (is_msvc) {
+     sources += [
+       "barcode_detection_provider_impl.cc",
+       "barcode_detection_provider_impl.h",
+diff --git a/src/3rdparty/chromium/services/shape_detection/face_detection_provider_win.h b/src/3rdparty/chromium/services/shape_detection/face_detection_provider_win.h
+index 1cb4ff0..c3f047d 100644
+--- a/src/3rdparty/chromium/services/shape_detection/face_detection_provider_win.h
++++ b/src/3rdparty/chromium/services/shape_detection/face_detection_provider_win.h
+@@ -15,7 +15,9 @@
+ #include "base/memory/weak_ptr.h"
+ #include "mojo/public/cpp/bindings/pending_receiver.h"
+ #include "mojo/public/cpp/bindings/self_owned_receiver.h"
++#if defined(COMPILER_MSVC)
+ #include "services/shape_detection/face_detection_impl_win.h"
++#endif
+ #include "services/shape_detection/public/mojom/facedetection_provider.mojom.h"
+ 
+ namespace shape_detection {
+@@ -40,11 +42,13 @@ class FaceDetectionProviderWin
+       shape_detection::mojom::FaceDetectorOptionsPtr options) override;
+ 
+  private:
++#if defined(COMPILER_MSVC)
+   void OnFaceDetectorCreated(
+       mojo::PendingReceiver<shape_detection::mojom::FaceDetection> receiver,
+       ABI::Windows::Graphics::Imaging::BitmapPixelFormat pixel_format,
+       Microsoft::WRL::ComPtr<ABI::Windows::Media::FaceAnalysis::IFaceDetector>
+           face_detector);
++#endif
+ 
+   mojo::SelfOwnedReceiverRef<mojom::FaceDetectionProvider> receiver_;
+   base::WeakPtrFactory<FaceDetectionProviderWin> weak_factory_{this};
+diff --git a/src/3rdparty/chromium/services/shape_detection/shape_detection_service.cc b/src/3rdparty/chromium/services/shape_detection/shape_detection_service.cc
+index 6c41cd7..f0f6127 100644
+--- a/src/3rdparty/chromium/services/shape_detection/shape_detection_service.cc
++++ b/src/3rdparty/chromium/services/shape_detection/shape_detection_service.cc
+@@ -9,7 +9,7 @@
+ 
+ #include "base/bind.h"
+ #include "base/macros.h"
+-#if defined(OS_WIN)
++#if defined(OS_WIN) && defined(COMPILER_MSVC)
+ #include "services/shape_detection/barcode_detection_provider_impl.h"
+ #include "services/shape_detection/face_detection_provider_win.h"
+ #elif defined(OS_MAC)
+@@ -57,7 +57,7 @@ void ShapeDetectionService::BindFaceDetectionProvider(
+       receiver.PassPipe().release().value());
+ #elif defined(OS_MAC)
+   FaceDetectionProviderMac::Create(std::move(receiver));
+-#elif defined(OS_WIN)
++#elif defined(OS_WIN) && defined(COMPILER_MSVC)
+   FaceDetectionProviderWin::Create(std::move(receiver));
+ #else
+   FaceDetectionProviderImpl::Create(std::move(receiver));
+diff --git a/src/3rdparty/chromium/services/video_capture/video_capture_service_impl.cc b/src/3rdparty/chromium/services/video_capture/video_capture_service_impl.cc
+index 27844d6..7102b8f 100644
+--- a/src/3rdparty/chromium/services/video_capture/video_capture_service_impl.cc
++++ b/src/3rdparty/chromium/services/video_capture/video_capture_service_impl.cc
+@@ -164,6 +164,7 @@ void VideoCaptureServiceImpl::LazyInitializeDeviceFactory() {
+ 
+   LazyInitializeGpuDependenciesContext();
+ 
++#if !(defined(OS_WIN) && defined(COMPILER_GCC))
+   // Create the platform-specific device factory.
+   // The task runner passed to CreateFactory is used for things that need to
+   // happen on a "UI thread equivalent", e.g. obtaining screen rotation on
+@@ -197,6 +198,7 @@ void VideoCaptureServiceImpl::LazyInitializeDeviceFactory() {
+       std::make_unique<DeviceFactoryMediaToMojoAdapter>(
+           std::move(video_capture_system)));
+ #endif  // defined(OS_CHROMEOS)
++#endif
+ }
+ 
+ void VideoCaptureServiceImpl::LazyInitializeVideoSourceProvider() {

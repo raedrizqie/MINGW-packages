@@ -1,0 +1,220 @@
+diff --git a/src/3rdparty/chromium/gpu/command_buffer/client/implementation_base.cc b/src/3rdparty/chromium/gpu/command_buffer/client/implementation_base.cc
+index 3363612..1b9932d 100644
+--- a/src/3rdparty/chromium/gpu/command_buffer/client/implementation_base.cc
++++ b/src/3rdparty/chromium/gpu/command_buffer/client/implementation_base.cc
+@@ -98,7 +98,7 @@ void ImplementationBase::GenSyncToken(GLbyte* sync_token) {
+   SyncToken sync_token_data(gpu_control_->GetNamespaceID(),
+                             gpu_control_->GetCommandBufferID(), fence_sync);
+   sync_token_data.SetVerifyFlush();
+-  memcpy(sync_token, &sync_token_data, sizeof(sync_token_data));
++  memcpy(reinterpret_cast<void*>(sync_token), &sync_token_data, sizeof(sync_token_data));
+ }
+ 
+ void ImplementationBase::GenUnverifiedSyncToken(GLbyte* sync_token) {
+@@ -115,7 +115,7 @@ void ImplementationBase::GenUnverifiedSyncToken(GLbyte* sync_token) {
+   // Copy the data over after setting the data to ensure alignment.
+   SyncToken sync_token_data(gpu_control_->GetNamespaceID(),
+                             gpu_control_->GetCommandBufferID(), fence_sync);
+-  memcpy(sync_token, &sync_token_data, sizeof(sync_token_data));
++  memcpy(reinterpret_cast<void*>(sync_token), &sync_token_data, sizeof(sync_token_data));
+ }
+ 
+ void ImplementationBase::VerifySyncTokens(GLbyte** sync_tokens, GLsizei count) {
+@@ -123,7 +123,7 @@ void ImplementationBase::VerifySyncTokens(GLbyte** sync_tokens, GLsizei count) {
+   for (GLsizei i = 0; i < count; ++i) {
+     if (sync_tokens[i]) {
+       SyncToken sync_token;
+-      memcpy(&sync_token, sync_tokens[i], sizeof(sync_token));
++      memcpy(reinterpret_cast<void*>(&sync_token), sync_tokens[i], sizeof(sync_token));
+ 
+       if (sync_token.HasData() && !sync_token.verified_flush()) {
+         if (!GetVerifiedSyncTokenForIPC(sync_token, &sync_token)) {
+@@ -138,7 +138,7 @@ void ImplementationBase::VerifySyncTokens(GLbyte** sync_tokens, GLsizei count) {
+       // Set verify bit on empty sync tokens too.
+       sync_token.SetVerifyFlush();
+ 
+-      memcpy(sync_tokens[i], &sync_token, sizeof(sync_token));
++      memcpy(reinterpret_cast<void*>(sync_tokens[i]), &sync_token, sizeof(sync_token));
+     }
+   }
+ 
+@@ -153,7 +153,7 @@ void ImplementationBase::WaitSyncToken(const GLbyte* sync_token_data) {
+ 
+   // Copy the data over before data access to ensure alignment.
+   SyncToken sync_token, verified_sync_token;
+-  memcpy(&sync_token, sync_token_data, sizeof(SyncToken));
++  memcpy(reinterpret_cast<void*>(&sync_token), sync_token_data, sizeof(SyncToken));
+ 
+   if (!sync_token.HasData())
+     return;
+@@ -306,7 +306,7 @@ bool ImplementationBase::GetBucketContents(uint32_t bucket_id,
+         WaitForCmd();
+       }
+       uint32_t size_to_copy = std::min(size, buffer.size());
+-      memcpy(&(*data)[offset], buffer.address(), size_to_copy);
++      memcpy(reinterpret_cast<void*>(&(*data)[offset]), buffer.address(), size_to_copy);
+       offset += size_to_copy;
+       size -= size_to_copy;
+       buffer.Release();
+@@ -331,7 +331,7 @@ void ImplementationBase::SetBucketContents(uint32_t bucket_id,
+       if (!buffer.valid()) {
+         return;
+       }
+-      memcpy(buffer.address(), static_cast<const int8_t*>(data) + offset,
++      memcpy(reinterpret_cast<void*>(buffer.address()), static_cast<const int8_t*>(data) + offset,
+              buffer.size());
+       helper_->SetBucketData(bucket_id, offset, buffer.size(), buffer.shm_id(),
+                              buffer.offset());
+diff --git a/src/3rdparty/chromium/gpu/command_buffer/common/skia_utils.h b/src/3rdparty/chromium/gpu/command_buffer/common/skia_utils.h
+index 6508d79..a9f9528 100644
+--- a/src/3rdparty/chromium/gpu/command_buffer/common/skia_utils.h
++++ b/src/3rdparty/chromium/gpu/command_buffer/common/skia_utils.h
+@@ -5,6 +5,7 @@
+ #ifndef GPU_COMMAND_BUFFER_COMMON_SKIA_UTILS_H_
+ #define GPU_COMMAND_BUFFER_COMMON_SKIA_UTILS_H_
+ 
++#include <cstdint>
+ #include <memory>
+ 
+ #include "base/optional.h"
+diff --git a/src/3rdparty/chromium/gpu/command_buffer/service/BUILD.gn b/src/3rdparty/chromium/gpu/command_buffer/service/BUILD.gn
+index 56cb734..315a414 100644
+--- a/src/3rdparty/chromium/gpu/command_buffer/service/BUILD.gn
++++ b/src/3rdparty/chromium/gpu/command_buffer/service/BUILD.gn
+@@ -464,7 +464,7 @@ target(link_target_type, "gles2_sources") {
+     }
+   }
+ 
+-  if (is_win) {
++  if (is_msvc) {
+     sources += [
+       "shared_image_backing_d3d.cc",
+       "shared_image_backing_d3d.h",
+diff --git a/src/3rdparty/chromium/gpu/command_buffer/service/gpu_fence_manager.h b/src/3rdparty/chromium/gpu/command_buffer/service/gpu_fence_manager.h
+index ee50d6f..576f6e3 100644
+--- a/src/3rdparty/chromium/gpu/command_buffer/service/gpu_fence_manager.h
++++ b/src/3rdparty/chromium/gpu/command_buffer/service/gpu_fence_manager.h
+@@ -5,6 +5,7 @@
+ #ifndef GPU_COMMAND_BUFFER_SERVICE_GPU_FENCE_MANAGER_H_
+ #define GPU_COMMAND_BUFFER_SERVICE_GPU_FENCE_MANAGER_H_
+ 
++#include <cstdint>
+ #include <memory>
+ #include <vector>
+ 
+diff --git a/src/3rdparty/chromium/gpu/command_buffer/service/shader_translator_cache.h b/src/3rdparty/chromium/gpu/command_buffer/service/shader_translator_cache.h
+index 5b5a54c..44c3c6c 100644
+--- a/src/3rdparty/chromium/gpu/command_buffer/service/shader_translator_cache.h
++++ b/src/3rdparty/chromium/gpu/command_buffer/service/shader_translator_cache.h
+@@ -59,7 +59,7 @@ class GPU_GLES2_EXPORT ShaderTranslatorCache
+                                const ShBuiltInResources& resources,
+                                ShShaderOutput shader_output_language,
+                                ShCompileOptions driver_bug_workarounds) {
+-      memset(this, 0, sizeof(*this));
++      memset(reinterpret_cast<void*>(this), 0, sizeof(*this));
+       this->shader_type = shader_type;
+       this->shader_spec = shader_spec;
+       this->resources = resources;
+@@ -68,7 +68,7 @@ class GPU_GLES2_EXPORT ShaderTranslatorCache
+     }
+ 
+     ShaderTranslatorInitParams(const ShaderTranslatorInitParams& params) {
+-      memcpy(this, &params, sizeof(*this));
++      memcpy(reinterpret_cast<void*>(this), &params, sizeof(*this));
+     }
+ 
+     bool operator== (const ShaderTranslatorInitParams& params) const {
+diff --git a/src/3rdparty/chromium/gpu/config/BUILD.gn b/src/3rdparty/chromium/gpu/config/BUILD.gn
+index 569657a..63d7699 100644
+--- a/src/3rdparty/chromium/gpu/config/BUILD.gn
++++ b/src/3rdparty/chromium/gpu/config/BUILD.gn
+@@ -212,8 +212,8 @@ source_set("config_sources") {
+ 
+   if (is_win) {
+     libs = [
+-      "dxgi.lib",
+-      "dxguid.lib",
++      "dxgi",
++      "dxguid",
+     ]
+ 
+     if (is_chrome_branded && is_official_build) {
+diff --git a/src/3rdparty/chromium/gpu/config/gpu_info_collector_win.cc b/src/3rdparty/chromium/gpu/config/gpu_info_collector_win.cc
+index 7296643..2e21646 100644
+--- a/src/3rdparty/chromium/gpu/config/gpu_info_collector_win.cc
++++ b/src/3rdparty/chromium/gpu/config/gpu_info_collector_win.cc
+@@ -257,7 +257,7 @@ uint32_t GetGpuSupportedD3D12Version() {
+     // Check to see if the adapter supports Direct3D 12, but don't create the
+     // actual device yet. (**ppDevice == nullptr)
+     for (auto level : feature_levels) {
+-      if (SUCCEEDED(D3D12CreateDevice(nullptr, level, _uuidof(ID3D12Device),
++      if (SUCCEEDED(D3D12CreateDevice(nullptr, level, __uuidof(ID3D12Device),
+                                       nullptr))) {
+         return level;
+       }
+diff --git a/src/3rdparty/chromium/gpu/config/process_json.py b/src/3rdparty/chromium/gpu/config/process_json.py
+index 392f986..c65e9f7 100755
+--- a/src/3rdparty/chromium/gpu/config/process_json.py
++++ b/src/3rdparty/chromium/gpu/config/process_json.py
+@@ -606,7 +606,7 @@ def write_conditions(entry_id, is_exception, exception_id, entry,
+                   'Intel' in driver_vendor)
+       assert is_intel, 'Intel driver schema is only for Intel GPUs'
+       valid_version = check_intel_driver_version(driver_version['value'])
+-      if driver_version.has_key('value2'):
++      if 'value2' in driver_version:
+         valid_version = (valid_version and
+                          check_intel_driver_version(driver_version['value2']))
+       assert valid_version, INTEL_DRIVER_VERSION_SCHEMA
+@@ -616,7 +616,7 @@ def write_conditions(entry_id, is_exception, exception_id, entry,
+       is_nvidia = (format(vendor_id, '#04x') == '0x10de')
+       assert is_nvidia, 'Nvidia driver schema is only for Nvidia GPUs'
+       valid_version = check_nvidia_driver_version(driver_version['value'])
+-      if driver_version.has_key('value2'):
++      if 'value2' in driver_version:
+         valid_version = (valid_version and
+                          check_nvidia_driver_version(driver_version['value2']))
+       assert valid_version, NVIDIA_DRIVER_VERSION_SCHEMA
+@@ -877,7 +877,7 @@ def process_json_file(json_filepath, list_tag,
+       if os_type not in _OS_TYPE_MAP:
+         raise Exception('Unknown OS type "%s" for entry %d' %
+                         (os_type, entry_id))
+-      if os_filter != None and os_type != os_filter:
++      if os_filter not in (None, os_type):
+         continue
+     entry_count += 1
+     write_entry(entry, total_features, feature_tag, unique_symbol_id,
+diff --git a/src/3rdparty/chromium/gpu/ipc/common/device_perf_info.mojom b/src/3rdparty/chromium/gpu/ipc/common/device_perf_info.mojom
+index de7b958..54f3606 100644
+--- a/src/3rdparty/chromium/gpu/ipc/common/device_perf_info.mojom
++++ b/src/3rdparty/chromium/gpu/ipc/common/device_perf_info.mojom
+@@ -16,6 +16,7 @@ enum Direct3DFeatureLevel {
+   k11_1,
+   k12_0,
+   k12_1,
++  k12_2,
+ };
+ 
+ // Corresponds to |gpu::HasDisceretGpu| in "gpu/config/device_perf_info.h"
+diff --git a/src/3rdparty/chromium/gpu/ipc/common/device_perf_info_mojom_traits.cc b/src/3rdparty/chromium/gpu/ipc/common/device_perf_info_mojom_traits.cc
+index e4e29e7..706bc40 100644
+--- a/src/3rdparty/chromium/gpu/ipc/common/device_perf_info_mojom_traits.cc
++++ b/src/3rdparty/chromium/gpu/ipc/common/device_perf_info_mojom_traits.cc
+@@ -32,6 +32,8 @@ EnumTraits<gpu::mojom::Direct3DFeatureLevel, D3D_FEATURE_LEVEL>::ToMojom(
+       return gpu::mojom::Direct3DFeatureLevel::k12_0;
+     case D3D_FEATURE_LEVEL_12_1:
+       return gpu::mojom::Direct3DFeatureLevel::k12_1;
++    case D3D_FEATURE_LEVEL_12_2:
++      return gpu::mojom::Direct3DFeatureLevel::k12_2;
+   }
+   NOTREACHED() << "Invalid D3D_FEATURE_LEVEL:" << d3d_feature_level;
+   return gpu::mojom::Direct3DFeatureLevel::k1_0_Core;
+@@ -72,6 +74,9 @@ bool EnumTraits<gpu::mojom::Direct3DFeatureLevel, D3D_FEATURE_LEVEL>::FromMojom(
+     case gpu::mojom::Direct3DFeatureLevel::k12_1:
+       *out = D3D_FEATURE_LEVEL_12_1;
+       return true;
++    case gpu::mojom::Direct3DFeatureLevel::k12_2:
++      *out = D3D_FEATURE_LEVEL_12_2;
++      return true;
+   }
+   NOTREACHED() << "Invalid D3D_FEATURE_LEVEL: " << input;
+   return false;

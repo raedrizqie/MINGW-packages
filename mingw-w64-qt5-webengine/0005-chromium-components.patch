@@ -1,0 +1,410 @@
+diff --git a/src/3rdparty/chromium/components/cronet/BUILD.gn b/src/3rdparty/chromium/components/cronet/BUILD.gn
+index b2b7d75..1a43096 100644
+--- a/src/3rdparty/chromium/components/cronet/BUILD.gn
++++ b/src/3rdparty/chromium/components/cronet/BUILD.gn
+@@ -117,8 +117,6 @@ if (is_android) {
+   }
+ 
+   _cronet_shared_lib_name = "cronet.$chrome_version_full"
+-  _cronet_shared_lib_file_name =
+-      "$shlib_prefix$_cronet_shared_lib_name$shlib_extension"
+ 
+   shared_library("cronet") {
+     output_name = _cronet_shared_lib_name
+@@ -201,7 +199,6 @@ if (is_android) {
+   # Copy boiler-plate files into the package.
+   copy("cronet_package_copy") {
+     sources = [
+-      "${root_out_dir}${shlib_subdir}/${_cronet_shared_lib_file_name}",
+       "//AUTHORS",
+       "//chrome/VERSION",
+     ]
+diff --git a/src/3rdparty/chromium/components/download/internal/common/base_file.cc b/src/3rdparty/chromium/components/download/internal/common/base_file.cc
+index 4f4ebe4..449352a 100644
+--- a/src/3rdparty/chromium/components/download/internal/common/base_file.cc
++++ b/src/3rdparty/chromium/components/download/internal/common/base_file.cc
+@@ -273,7 +273,11 @@ DownloadInterruptReason BaseFile::Rename(const base::FilePath& new_path) {
+ 
+     // A simple rename wouldn't work here since we want the file to have
+     // permissions / security descriptors that makes sense in the new directory.
++#if defined(OS_WIN) && defined(COMPILER_GCC)
++    rename_result = DOWNLOAD_INTERRUPT_REASON_NONE;
++#else
+     rename_result = MoveFileAndAdjustPermissions(new_path);
++#endif
+   }
+ 
+   CONDITIONAL_TRACE(END0("download", "DownloadFileRename"));
+diff --git a/src/3rdparty/chromium/components/download/internal/common/base_file_win.cc b/src/3rdparty/chromium/components/download/internal/common/base_file_win.cc
+index ac50ce5..c5a3ce5 100644
+--- a/src/3rdparty/chromium/components/download/internal/common/base_file_win.cc
++++ b/src/3rdparty/chromium/components/download/internal/common/base_file_win.cc
+@@ -10,7 +10,9 @@
+ #include <shellapi.h>
+ #include <shobjidl.h>
+ #include <wrl/client.h>
++#if defined(COMPILER_MSVC)
+ #include <wrl/implements.h>
++#endif
+ 
+ #include "base/threading/scoped_blocking_call.h"
+ #include "base/win/com_init_util.h"
+@@ -144,9 +146,13 @@ DownloadInterruptReason HRESULTToDownloadInterruptReason(HRESULT hr) {
+ }
+ 
+ class FileOperationProgressSink
++#if defined(COMPILER_MSVC)
+     : public Microsoft::WRL::RuntimeClass<
+           Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>,
+           IFileOperationProgressSink> {
++#else
++    : public IFileOperationProgressSink {
++#endif
+  public:
+   FileOperationProgressSink() = default;
+ 
+@@ -225,7 +231,7 @@ class FileOperationProgressSink
+   IFACEMETHODIMP UpdateProgress(UINT, UINT) override { return S_OK; }
+ 
+  protected:
+-  ~FileOperationProgressSink() override = default;
++  ~FileOperationProgressSink() = default;
+ 
+  private:
+   HRESULT result_ = S_OK;
+@@ -235,6 +241,7 @@ class FileOperationProgressSink
+ 
+ }  // namespace
+ 
++#if defined(COMPILER_MSVC)
+ // Renames a file using IFileOperation::MoveItem() to ensure that the target
+ // file gets the correct default security descriptor in the new path.
+ // Returns a network error, or net::OK for success.
+@@ -303,5 +310,6 @@ DownloadInterruptReason BaseFile::MoveFileAndAdjustPermissions(
+ 
+   return interrupt_reason;
+ }
++#endif
+ 
+ }  // namespace download
+diff --git a/src/3rdparty/chromium/components/download/internal/common/download_task_runner.cc b/src/3rdparty/chromium/components/download/internal/common/download_task_runner.cc
+index 1139f19..11436b4 100644
+--- a/src/3rdparty/chromium/components/download/internal/common/download_task_runner.cc
++++ b/src/3rdparty/chromium/components/download/internal/common/download_task_runner.cc
+@@ -15,7 +15,7 @@ namespace download {
+ 
+ namespace {
+ 
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+ // On Windows, the download code dips into COM and the shell here and there,
+ // necessitating the use of a COM single-threaded apartment sequence.
+ base::LazyThreadPoolCOMSTATaskRunner g_download_task_runner =
+diff --git a/src/3rdparty/chromium/components/download/public/common/download_stats.h b/src/3rdparty/chromium/components/download/public/common/download_stats.h
+index 3c7f34e..28e97ca 100644
+--- a/src/3rdparty/chromium/components/download/public/common/download_stats.h
++++ b/src/3rdparty/chromium/components/download/public/common/download_stats.h
+@@ -145,7 +145,7 @@ enum DownloadCountTypes {
+ 
+ // Enum for in-progress download DB, used in histogram
+ // "Download.InProgressDB.Counts".
+-enum InProgressDBCountTypes {
++enum InProgressDBCountTypes : uint8_t {
+   // Count of initialization attempts.
+   kInitializationCount = 0,
+ 
+diff --git a/src/3rdparty/chromium/components/history/core/browser/web_history_service.cc b/src/3rdparty/chromium/components/history/core/browser/web_history_service.cc
+index b21871c..e7f7cc0 100644
+--- a/src/3rdparty/chromium/components/history/core/browser/web_history_service.cc
++++ b/src/3rdparty/chromium/components/history/core/browser/web_history_service.cc
+@@ -58,11 +58,12 @@ const char kHistoryAudioHistoryChangeUrl[] =
+ const char kQueryWebAndAppActivityUrl[] =
+     "https://history.google.com/history/api/lookup?client=web_app";
+ 
+-const char kQueryOtherFormsOfBrowsingHistoryUrlSuffix[] = "/historystatus";
+-
+ const char kPostDataMimeType[] = "text/plain";
+ 
++#if !defined(TOOLKIT_QT)
++const char kQueryOtherFormsOfBrowsingHistoryUrlSuffix[] = "/historystatus";
+ const char kSyncProtoMimeType[] = "application/octet-stream";
++#endif
+ 
+ // The maximum number of retries for the SimpleURLLoader requests.
+ const size_t kMaxRetries = 1;
+diff --git a/src/3rdparty/chromium/components/metrics/BUILD.gn b/src/3rdparty/chromium/components/metrics/BUILD.gn
+index dd63573..25be1e5 100644
+--- a/src/3rdparty/chromium/components/metrics/BUILD.gn
++++ b/src/3rdparty/chromium/components/metrics/BUILD.gn
+@@ -182,7 +182,7 @@ jumbo_static_library("metrics") {
+       "system_session_analyzer/system_session_analyzer_win.h",
+     ]
+     deps += [ "//components/browser_watcher:stability_client" ]
+-    libs = [ "wevtapi.lib" ]
++    libs = [ "wevtapi" ]
+   } else {
+     sources += [ "machine_id_provider_nonwin.cc" ]
+   }
+diff --git a/src/3rdparty/chromium/components/metrics/environment_recorder.h b/src/3rdparty/chromium/components/metrics/environment_recorder.h
+index 0042d2e..e3eb227 100644
+--- a/src/3rdparty/chromium/components/metrics/environment_recorder.h
++++ b/src/3rdparty/chromium/components/metrics/environment_recorder.h
+@@ -5,6 +5,7 @@
+ #ifndef COMPONENTS_METRICS_ENVIRONMENT_RECORDER_H_
+ #define COMPONENTS_METRICS_ENVIRONMENT_RECORDER_H_
+ 
++#include <cstdint>
+ #include <string>
+ 
+ #include "base/macros.h"
+diff --git a/src/3rdparty/chromium/components/os_crypt/BUILD.gn b/src/3rdparty/chromium/components/os_crypt/BUILD.gn
+index 380c8a7..6571df9 100644
+--- a/src/3rdparty/chromium/components/os_crypt/BUILD.gn
++++ b/src/3rdparty/chromium/components/os_crypt/BUILD.gn
+@@ -64,7 +64,7 @@ component("os_crypt") {
+ 
+   if (is_win) {
+     sources += [ "os_crypt_win.cc" ]
+-    libs = [ "crypt32.lib" ]
++    libs = [ "crypt32" ]
+   }
+ 
+   if (is_desktop_linux && !is_chromecast) {
+diff --git a/src/3rdparty/chromium/components/policy/core/common/BUILD.gn b/src/3rdparty/chromium/components/policy/core/common/BUILD.gn
+index 402c420..bdcdbae 100644
+--- a/src/3rdparty/chromium/components/policy/core/common/BUILD.gn
++++ b/src/3rdparty/chromium/components/policy/core/common/BUILD.gn
+@@ -196,11 +196,11 @@ jumbo_source_set("internal") {
+       "policy_loader_win.h",
+     ]
+     libs = [
+-      "netapi32.lib",
+-      "ntdsapi.lib",
+-      "secur32.lib",
+-      "shlwapi.lib",
+-      "userenv.lib",
++      "netapi32",
++      "ntdsapi",
++      "secur32",
++      "shlwapi",
++      "userenv",
+     ]
+   }
+ 
+diff --git a/src/3rdparty/chromium/components/services/quarantine/quarantine_impl.cc b/src/3rdparty/chromium/components/services/quarantine/quarantine_impl.cc
+index 8324caa..f69dafa 100644
+--- a/src/3rdparty/chromium/components/services/quarantine/quarantine_impl.cc
++++ b/src/3rdparty/chromium/components/services/quarantine/quarantine_impl.cc
+@@ -28,17 +28,17 @@ QuarantineImpl::~QuarantineImpl() = default;
+ 
+ namespace {
+ 
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+ scoped_refptr<base::SingleThreadTaskRunner> GetTaskRunner() {
+   return base::ThreadPool::CreateCOMSTATaskRunner(
+       {base::MayBlock(), base::TaskPriority::USER_VISIBLE});
+ }
+-#else   // OS_WIN
++#else   // COMPILER_MSVC
+ scoped_refptr<base::TaskRunner> GetTaskRunner() {
+   return base::ThreadPool::CreateTaskRunner(
+       {base::MayBlock(), base::TaskPriority::USER_VISIBLE});
+ }
+-#endif  // OS_WIN
++#endif  // COMPILER_MSVC
+ 
+ }  // namespace
+ 
+@@ -48,7 +48,7 @@ void QuarantineImpl::QuarantineFile(
+     const GURL& referrer_url,
+     const std::string& client_guid,
+     mojom::Quarantine::QuarantineFileCallback callback) {
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+   if (base::FeatureList::IsEnabled(quarantine::kOutOfProcessQuarantine)) {
+     // In out of process case, we are running in a utility process,
+     // so directly call QuarantineFile and send the result.
+@@ -58,7 +58,7 @@ void QuarantineImpl::QuarantineFile(
+     std::move(callback).Run(result);
+     return;
+   }
+-#endif  // OS_WIN
++#endif  // COMPILER_MSVC
+   // For in-proc case, or non-Windows platforms, we are running in the browser
+   // process, so post a task to do the potentially blocking quarantine work.
+   base::PostTaskAndReplyWithResult(
+diff --git a/src/3rdparty/chromium/components/services/quarantine/quarantine_impl.h b/src/3rdparty/chromium/components/services/quarantine/quarantine_impl.h
+index 3c31d42..ac8dc22 100644
+--- a/src/3rdparty/chromium/components/services/quarantine/quarantine_impl.h
++++ b/src/3rdparty/chromium/components/services/quarantine/quarantine_impl.h
+@@ -12,9 +12,9 @@
+ #include "mojo/public/cpp/bindings/pending_receiver.h"
+ #include "mojo/public/cpp/bindings/receiver.h"
+ 
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+ #include "base/win/scoped_com_initializer.h"
+-#endif  // OS_WIN
++#endif  // COMPILER_MSVC
+ 
+ namespace quarantine {
+ 
+@@ -35,10 +35,10 @@ class QuarantineImpl : public mojom::Quarantine {
+  private:
+   mojo::Receiver<mojom::Quarantine> receiver_{this};
+ 
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+   base::win::ScopedCOMInitializer com_initializer_{
+       base::win::ScopedCOMInitializer::Uninitialization::kBlockPremature};
+-#endif  // OS_WIN
++#endif  // COMPILER_MSVC
+ 
+   DISALLOW_COPY_AND_ASSIGN(QuarantineImpl);
+ };
+diff --git a/src/3rdparty/chromium/components/sessions/core/session_service_commands.cc b/src/3rdparty/chromium/components/sessions/core/session_service_commands.cc
+index c931e3f..5ac3c15 100644
+--- a/src/3rdparty/chromium/components/sessions/core/session_service_commands.cc
++++ b/src/3rdparty/chromium/components/sessions/core/session_service_commands.cc
+@@ -164,8 +164,8 @@ enum PersistedWindowShowState {
+ // Assert to ensure PersistedWindowShowState is updated if ui::WindowShowState
+ // is changed.
+ static_assert(ui::SHOW_STATE_END ==
+-                  (static_cast<ui::WindowShowState>(PERSISTED_SHOW_STATE_END) -
+-                   2),
++                  static_cast<ui::WindowShowState>(PERSISTED_SHOW_STATE_END -
++                                                   2),
+               "SHOW_STATE_END must equal PERSISTED_SHOW_STATE_END minus the "
+               "deprecated entries");
+ // Returns the show state to store to disk based |state|.
+diff --git a/src/3rdparty/chromium/components/signin/public/identity_manager/identity_manager_builder.cc b/src/3rdparty/chromium/components/signin/public/identity_manager/identity_manager_builder.cc
+index 3f24bda..a756fb6 100644
+--- a/src/3rdparty/chromium/components/signin/public/identity_manager/identity_manager_builder.cc
++++ b/src/3rdparty/chromium/components/signin/public/identity_manager/identity_manager_builder.cc
+@@ -87,6 +87,7 @@ std::unique_ptr<AccountsMutator> BuildAccountsMutator(
+ #endif
+ }
+ 
++#if !defined(TOOLKIT_QT)
+ std::unique_ptr<AccountFetcherService> BuildAccountFetcherService(
+     SigninClient* signin_client,
+     ProfileOAuth2TokenService* token_service,
+@@ -98,6 +99,7 @@ std::unique_ptr<AccountFetcherService> BuildAccountFetcherService(
+                                       std::move(image_decoder));
+   return account_fetcher_service;
+ }
++#endif
+ 
+ }  // anonymous namespace
+ 
+diff --git a/src/3rdparty/chromium/components/storage_monitor/portable_device_watcher_win.cc b/src/3rdparty/chromium/components/storage_monitor/portable_device_watcher_win.cc
+index 0b87af0..ec97af0 100644
+--- a/src/3rdparty/chromium/components/storage_monitor/portable_device_watcher_win.cc
++++ b/src/3rdparty/chromium/components/storage_monitor/portable_device_watcher_win.cc
+@@ -10,6 +10,7 @@
+ 
+ #include <dbt.h>
+ #include <objbase.h>
++#include <initguid.h> // for WPD_* inits
+ #include <portabledevice.h>
+ #include <wrl/client.h>
+ 
+@@ -506,9 +507,11 @@ PortableDeviceWatcherWin::~PortableDeviceWatcherWin() {
+ void PortableDeviceWatcherWin::Init(HWND hwnd) {
+   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
+   notifications_ = RegisterPortableDeviceNotification(hwnd);
++#if defined(COMPILER_MSVC)
+   media_task_runner_ = base::ThreadPool::CreateCOMSTATaskRunner(
+       {base::MayBlock(), base::TaskPriority::BEST_EFFORT,
+        base::TaskShutdownBehavior::CONTINUE_ON_SHUTDOWN});
++#endif
+   EnumerateAttachedDevices();
+ }
+ 
+diff --git a/src/3rdparty/chromium/components/system_media_controls/BUILD.gn b/src/3rdparty/chromium/components/system_media_controls/BUILD.gn
+index ebe3164..0512d07 100644
+--- a/src/3rdparty/chromium/components/system_media_controls/BUILD.gn
++++ b/src/3rdparty/chromium/components/system_media_controls/BUILD.gn
+@@ -22,7 +22,7 @@ component("system_media_controls") {
+   public_deps = [ "//skia" ]
+ 
+   # TODO(https://crbug.com/949596): Move MPRIS and Now Playing here.
+-  if (is_win) {
++  if (is_msvc) {
+     sources = [
+       "win/system_media_controls_win.cc",
+       "win/system_media_controls_win.h",
+diff --git a/src/3rdparty/chromium/components/ui_devtools/BUILD.gn b/src/3rdparty/chromium/components/ui_devtools/BUILD.gn
+index 4063225..dc1207c 100644
+--- a/src/3rdparty/chromium/components/ui_devtools/BUILD.gn
++++ b/src/3rdparty/chromium/components/ui_devtools/BUILD.gn
+@@ -96,7 +96,7 @@ component("ui_devtools") {
+   defines = [ "UI_DEVTOOLS_IMPLEMENTATION" ]
+ 
+   cflags = []
+-  if (is_win) {
++  if (is_msvc) {
+     cflags += [ "/wd4800" ]  # Value forced to bool.
+   }
+ 
+@@ -137,7 +137,7 @@ source_set("unit_tests") {
+   testonly = true
+ 
+   cflags = []
+-  if (is_win) {
++  if (is_msvc) {
+     cflags += [ "/wd4800" ]  # Value forced to bool.
+   }
+ 
+diff --git a/src/3rdparty/chromium/components/ui_devtools/views/BUILD.gn b/src/3rdparty/chromium/components/ui_devtools/views/BUILD.gn
+index e9fb3b2..a973392 100644
+--- a/src/3rdparty/chromium/components/ui_devtools/views/BUILD.gn
++++ b/src/3rdparty/chromium/components/ui_devtools/views/BUILD.gn
+@@ -6,7 +6,7 @@ import("//build/config/ui.gni")
+ 
+ source_set("views") {
+   cflags = []
+-  if (is_win) {
++  if (is_msvc) {
+     cflags += [ "/wd4800" ]  # Value forced to bool.
+   }
+ 
+@@ -62,7 +62,7 @@ source_set("unit_tests") {
+   testonly = true
+ 
+   cflags = []
+-  if (is_win) {
++  if (is_msvc) {
+     cflags += [ "/wd4800" ]  # Value forced to bool.
+   }
+ 
+diff --git a/src/3rdparty/chromium/components/viz/service/gl/info_collection_gpu_service_impl.cc b/src/3rdparty/chromium/components/viz/service/gl/info_collection_gpu_service_impl.cc
+index f72d981..4ed47dc 100644
+--- a/src/3rdparty/chromium/components/viz/service/gl/info_collection_gpu_service_impl.cc
++++ b/src/3rdparty/chromium/components/viz/service/gl/info_collection_gpu_service_impl.cc
+@@ -105,7 +105,11 @@ void InfoCollectionGpuServiceImpl::RequestDxDiagNodeInfoOnMain(
+   // We can continue on shutdown here because we're not writing any critical
+   // state in this task.
+   base::PostTaskAndReplyWithResult(
++#if defined(COMPILER_MSVC)
+       base::ThreadPool::CreateCOMSTATaskRunner(
++#else
++      base::ThreadPool::CreateTaskRunner(
++#endif
+           {base::TaskPriority::USER_VISIBLE,
+            base::TaskShutdownBehavior::CONTINUE_ON_SHUTDOWN})
+           .get(),
+diff --git a/src/3rdparty/chromium/components/wifi/BUILD.gn b/src/3rdparty/chromium/components/wifi/BUILD.gn
+index 8a7e8b5..0063602 100644
+--- a/src/3rdparty/chromium/components/wifi/BUILD.gn
++++ b/src/3rdparty/chromium/components/wifi/BUILD.gn
+@@ -31,7 +31,7 @@ jumbo_component("wifi") {
+   ]
+ 
+   if (is_win) {
+-    libs = [ "iphlpapi.lib" ]
++    libs = [ "iphlpapi" ]
+     deps += [
+       "//third_party/libxml:xml_reader",  # Safe, data come from system.
+       "//third_party/libxml:xml_writer",

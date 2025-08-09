@@ -1,0 +1,1735 @@
+diff --git a/src/3rdparty/chromium/base/BUILD.gn b/src/3rdparty/chromium/base/BUILD.gn
+index c15b2b2..fd2ec2c 100644
+--- a/src/3rdparty/chromium/base/BUILD.gn
++++ b/src/3rdparty/chromium/base/BUILD.gn
+@@ -114,11 +114,13 @@ if (is_win) {
+   # This is in a separate config so the flags can be applied to dependents.
+   # ldflags in GN aren't automatically inherited.
+   config("base_win_linker_flags") {
+-    ldflags = [
+-      "/DELAYLOAD:cfgmgr32.dll",
+-      "/DELAYLOAD:powrprof.dll",
+-      "/DELAYLOAD:setupapi.dll",
+-    ]
++    if (is_msvc) {
++      ldflags = [
++        "/DELAYLOAD:cfgmgr32.dll",
++        "/DELAYLOAD:powrprof.dll",
++        "/DELAYLOAD:setupapi.dll",
++      ]
++    }
+   }
+ }
+ 
+@@ -1854,6 +1856,26 @@ jumbo_component("base") {
+       "strings/string16.cc",
+     ]
+ 
++    if (is_mingw) {
++      sources -= [
++        "win/atl_throw.cc",              # requires <atlbase.h>
++        "win/atl_throw.h",
++        "win/com_init_balancer.cc",      # requires <wrl/implements.h>
++        "win/com_init_balancer.h",
++        "win/enum_variant.cc",           # requires <wrl/implements.h>
++        "win/enum_variant.h",
++        "win/scoped_com_initializer.cc", # requires <wrl/implements.h>
++        "win/scoped_com_initializer.h",
++        "win/vector.cc",                 # requires <wrl/implements.h>
++        "win/vector.h",
++      ]
++
++      defines += [
++        "STRSAFE_NO_DEPRECATE",
++        "__STRSAFE__NO_INLINE",
++      ]
++    }
++
+     # winternl.h and NTSecAPI.h have different definitions of UNICODE_STRING.
+     # There's only one client of NTSecAPI.h in base but several of winternl.h,
+     # so exclude the NTSecAPI.h one.
+@@ -1877,13 +1899,13 @@ jumbo_component("base") {
+     configs += [ "//build/config/compiler:no_size_t_to_int_warning" ]
+ 
+     libs += [
+-      "cfgmgr32.lib",
+-      "powrprof.lib",
+-      "propsys.lib",
+-      "setupapi.lib",
+-      "userenv.lib",
+-      "wbemuuid.lib",
+-      "winmm.lib",
++      "cfgmgr32",
++      "powrprof",
++      "propsys",
++      "setupapi",
++      "userenv",
++      "wbemuuid",
++      "winmm",
+     ]
+     all_dependent_configs += [
+       ":base_win_linker_flags",
+@@ -2210,7 +2232,7 @@ jumbo_component("base") {
+ 
+     all_dependent_configs += [ "//third_party/perfetto/gn:public_config" ]
+ 
+-    if (is_win) {
++    if (is_msvc) {
+       sources += [
+         "trace_event/trace_event_etw_export_win.cc",
+         "trace_event/trace_event_etw_export_win.h",
+@@ -2549,14 +2571,18 @@ if (is_win) {
+   # base/test/data/pe_image.
+   shared_library("pe_image_test") {
+     sources = [ "win/pe_image_test.cc" ]
+-    ldflags = [
+-      "/DELAYLOAD:cfgmgr32.dll",
+-      "/DELAYLOAD:shell32.dll",
+-      "/SUBSYSTEM:WINDOWS",
+-    ]
++    if (is_mingw) {
++      ldflags = [ "-mwindows" ]
++    } else {
++      ldflags = [
++        "/DELAYLOAD:cfgmgr32.dll",
++        "/DELAYLOAD:shell32.dll",
++        "/SUBSYSTEM:WINDOWS",
++      ]
++    }
+     libs = [
+-      "cfgmgr32.lib",
+-      "shell32.lib",
++      "cfgmgr32",
++      "shell32",
+     ]
+   }
+ 
+diff --git a/src/3rdparty/chromium/base/allocator/partition_allocator/partition_alloc_constants.h b/src/3rdparty/chromium/base/allocator/partition_allocator/partition_alloc_constants.h
+index f03ba1e..1d66538 100644
+--- a/src/3rdparty/chromium/base/allocator/partition_allocator/partition_alloc_constants.h
++++ b/src/3rdparty/chromium/base/allocator/partition_allocator/partition_alloc_constants.h
+@@ -195,7 +195,7 @@ NumPartitionPagesPerSuperPage() {
+ //
+ // __STDCPP_DEFAULT_NEW_ALIGNMENT__ is C++17. As such, it is not defined on all
+ // platforms, as Chrome's requirement is C++14 as of 2020.
+-#if defined(__STDCPP_DEFAULT_NEW_ALIGNMENT__)
++#if defined(__STDCPP_DEFAULT_NEW_ALIGNMENT__) && !__cplusplus >= 201703L
+ static constexpr size_t kAlignment =
+     std::max(alignof(std::max_align_t), __STDCPP_DEFAULT_NEW_ALIGNMENT__);
+ #else
+diff --git a/src/3rdparty/chromium/base/bind_internal.h b/src/3rdparty/chromium/base/bind_internal.h
+index 8f978b9..8607eb6 100644
+--- a/src/3rdparty/chromium/base/bind_internal.h
++++ b/src/3rdparty/chromium/base/bind_internal.h
+@@ -327,7 +327,7 @@ struct IsCallableObject<Callable, void_t<decltype(&Callable::operator())>>
+ // raw pointer to a RefCounted type.
+ template <typename... Ts>
+ struct HasRefCountedTypeAsRawPtr
+-    : disjunction<NeedsScopedRefptrButGetsRawPtr<Ts>...> {};
++    : std::disjunction<NeedsScopedRefptrButGetsRawPtr<Ts>...> {};
+ 
+ // ForceVoidReturn<>
+ //
+diff --git a/src/3rdparty/chromium/base/containers/vector_buffer.h b/src/3rdparty/chromium/base/containers/vector_buffer.h
+index 019913c..5c93347 100644
+--- a/src/3rdparty/chromium/base/containers/vector_buffer.h
++++ b/src/3rdparty/chromium/base/containers/vector_buffer.h
+@@ -129,7 +129,7 @@ class VectorBuffer {
+   static void MoveRange(T* from_begin, T* from_end, T* to) {
+     CHECK(!RangesOverlap(from_begin, from_end, to));
+     memcpy(
+-        to, from_begin,
++        reinterpret_cast<void*>(to), from_begin,
+         CheckSub(get_uintptr(from_end), get_uintptr(from_begin)).ValueOrDie());
+   }
+ 
+diff --git a/src/3rdparty/chromium/base/export_template.h b/src/3rdparty/chromium/base/export_template.h
+index e177fa5..b2f4cb9 100644
+--- a/src/3rdparty/chromium/base/export_template.h
++++ b/src/3rdparty/chromium/base/export_template.h
+@@ -138,8 +138,10 @@
+ 
+ EXPORT_TEMPLATE_TEST(DEFAULT, );
+ EXPORT_TEMPLATE_TEST(DEFAULT, __attribute__((visibility("default"))));
++#if defined(_MSC_VER)
+ EXPORT_TEMPLATE_TEST(EXPORT_DLLEXPORT, __declspec(dllexport));
+ EXPORT_TEMPLATE_TEST(DEFAULT, __declspec(dllimport));
++#endif
+ 
+ #undef EXPORT_TEMPLATE_TEST
+ #undef EXPORT_TEMPLATE_TEST_DEFAULT_DEFAULT
+diff --git a/src/3rdparty/chromium/base/memory/aligned_memory.cc b/src/3rdparty/chromium/base/memory/aligned_memory.cc
+index 7017e31..9ec33e1 100644
+--- a/src/3rdparty/chromium/base/memory/aligned_memory.cc
++++ b/src/3rdparty/chromium/base/memory/aligned_memory.cc
+@@ -18,7 +18,7 @@ void* AlignedAlloc(size_t size, size_t alignment) {
+   DCHECK(bits::IsPowerOfTwo(alignment));
+   DCHECK_EQ(alignment % sizeof(void*), 0U);
+   void* ptr = nullptr;
+-#if defined(COMPILER_MSVC)
++#if defined(OS_WIN)
+   ptr = _aligned_malloc(size, alignment);
+ #elif defined(OS_ANDROID)
+   // Android technically supports posix_memalign(), but does not expose it in
+diff --git a/src/3rdparty/chromium/base/memory/aligned_memory.h b/src/3rdparty/chromium/base/memory/aligned_memory.h
+index 39a823a..90271aa 100644
+--- a/src/3rdparty/chromium/base/memory/aligned_memory.h
++++ b/src/3rdparty/chromium/base/memory/aligned_memory.h
+@@ -16,7 +16,7 @@
+ #include "base/process/process_metrics.h"
+ #include "build/build_config.h"
+ 
+-#if defined(COMPILER_MSVC)
++#if defined(OS_WIN)
+ #include <malloc.h>
+ #else
+ #include <stdlib.h>
+@@ -42,7 +42,7 @@ namespace base {
+ BASE_EXPORT void* AlignedAlloc(size_t size, size_t alignment);
+ 
+ inline void AlignedFree(void* ptr) {
+-#if defined(COMPILER_MSVC)
++#if defined(OS_WIN)
+   _aligned_free(ptr);
+ #else
+   free(ptr);
+diff --git a/src/3rdparty/chromium/base/optional.h b/src/3rdparty/chromium/base/optional.h
+index 093ed0f..d7288e9 100644
+--- a/src/3rdparty/chromium/base/optional.h
++++ b/src/3rdparty/chromium/base/optional.h
+@@ -360,7 +360,7 @@ struct MoveAssignable<false> {
+ // Helper to conditionally enable converting constructors and assign operators.
+ template <typename T, typename U>
+ using IsConvertibleFromOptional =
+-    disjunction<std::is_constructible<T, Optional<U>&>,
++    std::disjunction<std::is_constructible<T, Optional<U>&>,
+                 std::is_constructible<T, const Optional<U>&>,
+                 std::is_constructible<T, Optional<U>&&>,
+                 std::is_constructible<T, const Optional<U>&&>,
+@@ -371,7 +371,7 @@ using IsConvertibleFromOptional =
+ 
+ template <typename T, typename U>
+ using IsAssignableFromOptional =
+-    disjunction<IsConvertibleFromOptional<T, U>,
++    std::disjunction<IsConvertibleFromOptional<T, U>,
+                 std::is_assignable<T&, Optional<U>&>,
+                 std::is_assignable<T&, const Optional<U>&>,
+                 std::is_assignable<T&, Optional<U>&&>,
+diff --git a/src/3rdparty/chromium/base/process/memory_win.cc b/src/3rdparty/chromium/base/process/memory_win.cc
+index 45e1f01..09fd54e 100644
+--- a/src/3rdparty/chromium/base/process/memory_win.cc
++++ b/src/3rdparty/chromium/base/process/memory_win.cc
+@@ -7,6 +7,7 @@
+ 
+ #include <windows.h>  // Must be in front of other Windows header files.
+ 
++#include <memory.h>
+ #include <new.h>
+ #include <psapi.h>
+ #include <stddef.h>
+@@ -28,6 +29,9 @@ extern "C" void* (*const malloc_default)(size_t) = &malloc;
+ #pragma clang diagnostic pop  // -Wglobal-constructors
+ #endif
+ 
++#if defined(COMPILER_GCC)
++extern "C" void* __attribute__((weak, alias("malloc_default"))) (*const malloc_unchecked)(size_t);
++#else
+ #if defined(_M_IX86)
+ #pragma comment(linker, "/alternatename:_malloc_unchecked=_malloc_default")
+ #elif defined(_M_X64) || defined(_M_ARM) || defined(_M_ARM64)
+@@ -35,6 +39,7 @@ extern "C" void* (*const malloc_default)(size_t) = &malloc;
+ #else
+ #error Unsupported platform
+ #endif
++#endif
+ 
+ namespace base {
+ 
+@@ -68,9 +73,13 @@ void EnableTerminationOnHeapCorruption() {
+ }
+ 
+ void EnableTerminationOnOutOfMemory() {
++#if defined(COMPILER_GCC)
++  std::set_new_handler(nullptr);
++#else
+   constexpr int kCallNewHandlerOnAllocationFailure = 1;
+   _set_new_handler(&ReleaseReservationOrTerminate);
+   _set_new_mode(kCallNewHandlerOnAllocationFailure);
++#endif
+ }
+ 
+ // Implemented using a weak symbol.
+diff --git a/src/3rdparty/chromium/base/strings/string_number_conversions_win.h b/src/3rdparty/chromium/base/strings/string_number_conversions_win.h
+index 5abcc29..ea12e4c 100644
+--- a/src/3rdparty/chromium/base/strings/string_number_conversions_win.h
++++ b/src/3rdparty/chromium/base/strings/string_number_conversions_win.h
+@@ -5,6 +5,7 @@
+ #ifndef BASE_STRINGS_STRING_NUMBER_CONVERSIONS_WIN_H_
+ #define BASE_STRINGS_STRING_NUMBER_CONVERSIONS_WIN_H_
+ 
++#include <cstdint>
+ #include <string>
+ 
+ #include "base/base_export.h"
+diff --git a/src/3rdparty/chromium/base/system/sys_info.cc b/src/3rdparty/chromium/base/system/sys_info.cc
+index 97893b0..4b0e20d 100644
+--- a/src/3rdparty/chromium/base/system/sys_info.cc
++++ b/src/3rdparty/chromium/base/system/sys_info.cc
+@@ -92,7 +92,7 @@ std::string SysInfo::HardwareModelName() {
+ #endif
+ 
+ void SysInfo::GetHardwareInfo(base::OnceCallback<void(HardwareInfo)> callback) {
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+   // On Windows the calls to GetHardwareInfoSync can take a really long time to
+   // complete as they depend on WMI, using the CONTINUE_ON_SHUTDOWN traits will
+   // prevent this task from blocking shutdown.
+diff --git a/src/3rdparty/chromium/base/task/lazy_thread_pool_task_runner.cc b/src/3rdparty/chromium/base/task/lazy_thread_pool_task_runner.cc
+index 0b16f47..f4fe63e 100644
+--- a/src/3rdparty/chromium/base/task/lazy_thread_pool_task_runner.cc
++++ b/src/3rdparty/chromium/base/task/lazy_thread_pool_task_runner.cc
+@@ -54,7 +54,7 @@ LazyThreadPoolTaskRunner<SingleThreadTaskRunner, false>::Create() {
+   return ThreadPool::CreateSingleThreadTaskRunner(traits_, thread_mode_);
+ }
+ 
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+ template <>
+ scoped_refptr<SingleThreadTaskRunner>
+ LazyThreadPoolTaskRunner<SingleThreadTaskRunner, true>::Create() {
+@@ -100,7 +100,7 @@ LazyThreadPoolTaskRunner<TaskRunnerType, com_sta>::Get() {
+ template class LazyThreadPoolTaskRunner<SequencedTaskRunner, false>;
+ template class LazyThreadPoolTaskRunner<SingleThreadTaskRunner, false>;
+ 
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+ template class LazyThreadPoolTaskRunner<SingleThreadTaskRunner, true>;
+ #endif
+ 
+diff --git a/src/3rdparty/chromium/base/task/lazy_thread_pool_task_runner.h b/src/3rdparty/chromium/base/task/lazy_thread_pool_task_runner.h
+index b4cfe66..51aa92b 100644
+--- a/src/3rdparty/chromium/base/task/lazy_thread_pool_task_runner.h
++++ b/src/3rdparty/chromium/base/task/lazy_thread_pool_task_runner.h
+@@ -77,7 +77,7 @@ using LazyThreadPoolSequencedTaskRunner =
+ using LazyThreadPoolSingleThreadTaskRunner =
+     internal::LazyThreadPoolTaskRunner<SingleThreadTaskRunner, false>;
+ 
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+ // Lazy COM-STA enabled SingleThreadTaskRunner.
+ using LazyThreadPoolCOMSTATaskRunner =
+     internal::LazyThreadPoolTaskRunner<SingleThreadTaskRunner, true>;
+@@ -205,7 +205,7 @@ class BASE_EXPORT ScopedLazyTaskRunnerListForTesting {
+   friend class LazyThreadPoolTaskRunner<SequencedTaskRunner, false>;
+   friend class LazyThreadPoolTaskRunner<SingleThreadTaskRunner, false>;
+ 
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+   friend class LazyThreadPoolTaskRunner<SingleThreadTaskRunner, true>;
+ #endif
+ 
+diff --git a/src/3rdparty/chromium/base/task/post_task.cc b/src/3rdparty/chromium/base/task/post_task.cc
+index 744d004..ce0a9c5 100644
+--- a/src/3rdparty/chromium/base/task/post_task.cc
++++ b/src/3rdparty/chromium/base/task/post_task.cc
+@@ -117,13 +117,13 @@ scoped_refptr<SingleThreadTaskRunner> CreateSingleThreadTaskRunner(
+       traits, thread_mode);
+ }
+ 
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+ scoped_refptr<SingleThreadTaskRunner> CreateCOMSTATaskRunner(
+     const TaskTraits& traits,
+     SingleThreadTaskRunnerThreadMode thread_mode) {
+   return GetTaskExecutorForTraits(traits)->CreateCOMSTATaskRunner(traits,
+                                                                   thread_mode);
+ }
+-#endif  // defined(OS_WIN)
++#endif  // defined(COMPILER_MSVC)
+ 
+ }  // namespace base
+diff --git a/src/3rdparty/chromium/base/task/post_task.h b/src/3rdparty/chromium/base/task/post_task.h
+index 84b9597..82d0c68 100644
+--- a/src/3rdparty/chromium/base/task/post_task.h
++++ b/src/3rdparty/chromium/base/task/post_task.h
+@@ -189,7 +189,7 @@ BASE_EXPORT scoped_refptr<SingleThreadTaskRunner> CreateSingleThreadTaskRunner(
+     SingleThreadTaskRunnerThreadMode thread_mode =
+         SingleThreadTaskRunnerThreadMode::SHARED);
+ 
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+ // Returns a SingleThreadTaskRunner whose PostTask invocations result in
+ // scheduling tasks using |traits| in a COM Single-Threaded Apartment on a
+ // thread determined by |thread_mode|. See
+@@ -206,7 +206,7 @@ BASE_EXPORT scoped_refptr<SingleThreadTaskRunner> CreateCOMSTATaskRunner(
+     const TaskTraits& traits,
+     SingleThreadTaskRunnerThreadMode thread_mode =
+         SingleThreadTaskRunnerThreadMode::SHARED);
+-#endif  // defined(OS_WIN)
++#endif  // defined(COMPILER_MSVC)
+ 
+ // Helpers to send a Delete/ReleaseSoon to a new SequencedTaskRunner created
+ // from |traits|. The semantics match base::PostTask in that the deletion is
+diff --git a/src/3rdparty/chromium/base/task/simple_task_executor.cc b/src/3rdparty/chromium/base/task/simple_task_executor.cc
+index ffccf52..e19ab78 100644
+--- a/src/3rdparty/chromium/base/task/simple_task_executor.cc
++++ b/src/3rdparty/chromium/base/task/simple_task_executor.cc
+@@ -48,7 +48,7 @@ SimpleTaskExecutor::CreateSingleThreadTaskRunner(
+   return task_queue_;
+ }
+ 
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+ scoped_refptr<SingleThreadTaskRunner>
+ SimpleTaskExecutor::CreateCOMSTATaskRunner(
+     const TaskTraits& traits,
+@@ -57,6 +57,6 @@ SimpleTaskExecutor::CreateCOMSTATaskRunner(
+   NOTREACHED();
+   return task_queue_;
+ }
+-#endif  // defined(OS_WIN)
++#endif  // defined(COMPILER_MSVC)
+ 
+ }  // namespace base
+diff --git a/src/3rdparty/chromium/base/task/simple_task_executor.h b/src/3rdparty/chromium/base/task/simple_task_executor.h
+index 7d9a74d..16704ea 100644
+--- a/src/3rdparty/chromium/base/task/simple_task_executor.h
++++ b/src/3rdparty/chromium/base/task/simple_task_executor.h
+@@ -33,11 +33,11 @@ class BASE_EXPORT SimpleTaskExecutor : public TaskExecutor {
+       const TaskTraits& traits,
+       SingleThreadTaskRunnerThreadMode thread_mode) override;
+ 
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+   scoped_refptr<SingleThreadTaskRunner> CreateCOMSTATaskRunner(
+       const TaskTraits& traits,
+       SingleThreadTaskRunnerThreadMode thread_mode) override;
+-#endif  // defined(OS_WIN)
++#endif  // defined(COMPILER_MSVC)
+ 
+  private:
+   const scoped_refptr<SingleThreadTaskRunner> task_queue_;
+diff --git a/src/3rdparty/chromium/base/task/task_executor.h b/src/3rdparty/chromium/base/task/task_executor.h
+index a062fdc..60ff7da 100644
+--- a/src/3rdparty/chromium/base/task/task_executor.h
++++ b/src/3rdparty/chromium/base/task/task_executor.h
+@@ -53,7 +53,7 @@ class BASE_EXPORT TaskExecutor {
+       const TaskTraits& traits,
+       SingleThreadTaskRunnerThreadMode thread_mode) = 0;
+ 
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+   // Returns a SingleThreadTaskRunner whose PostTask invocations result in
+   // scheduling tasks using |traits| in a COM Single-Threaded Apartment. Tasks
+   // run in the same Single-Threaded Apartment in posting order for the returned
+@@ -62,7 +62,7 @@ class BASE_EXPORT TaskExecutor {
+   virtual scoped_refptr<SingleThreadTaskRunner> CreateCOMSTATaskRunner(
+       const TaskTraits& traits,
+       SingleThreadTaskRunnerThreadMode thread_mode) = 0;
+-#endif  // defined(OS_WIN)
++#endif  // defined(COMPILER_MSVC)
+ };
+ 
+ // Register a TaskExecutor with the //base/task/post_task.h API in the current
+diff --git a/src/3rdparty/chromium/base/task/thread_pool/pooled_single_thread_task_runner_manager.cc b/src/3rdparty/chromium/base/task/thread_pool/pooled_single_thread_task_runner_manager.cc
+index 1e5d8ce..b47237c 100644
+--- a/src/3rdparty/chromium/base/task/thread_pool/pooled_single_thread_task_runner_manager.cc
++++ b/src/3rdparty/chromium/base/task/thread_pool/pooled_single_thread_task_runner_manager.cc
+@@ -27,11 +27,11 @@
+ #include "base/threading/platform_thread.h"
+ #include "base/time/time.h"
+ 
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+ #include <windows.h>
+ 
+ #include "base/win/scoped_com_initializer.h"
+-#endif  // defined(OS_WIN)
++#endif  // defined(COMPILER_MSVC)
+ 
+ namespace base {
+ namespace internal {
+@@ -236,7 +236,7 @@ class WorkerThreadDelegate : public WorkerThread::Delegate {
+   DISALLOW_COPY_AND_ASSIGN(WorkerThreadDelegate);
+ };
+ 
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+ 
+ class WorkerThreadCOMDelegate : public WorkerThreadDelegate {
+  public:
+@@ -372,7 +372,7 @@ class WorkerThreadCOMDelegate : public WorkerThreadDelegate {
+   DISALLOW_COPY_AND_ASSIGN(WorkerThreadCOMDelegate);
+ };
+ 
+-#endif  // defined(OS_WIN)
++#endif  // defined(COMPILER_MSVC)
+ 
+ }  // namespace
+ 
+@@ -481,7 +481,7 @@ PooledSingleThreadTaskRunnerManager::PooledSingleThreadTaskRunnerManager(
+       delayed_task_manager_(delayed_task_manager) {
+   DCHECK(task_tracker_);
+   DCHECK(delayed_task_manager_);
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+   static_assert(std::extent<decltype(shared_com_worker_threads_)>() ==
+                     std::extent<decltype(shared_worker_threads_)>(),
+                 "The size of |shared_com_worker_threads_| must match "
+@@ -493,7 +493,7 @@ PooledSingleThreadTaskRunnerManager::PooledSingleThreadTaskRunnerManager(
+               std::remove_reference<decltype(shared_worker_threads_[0])>>(),
+       "The size of |shared_com_worker_threads_| must match "
+       "|shared_worker_threads_|");
+-#endif  // defined(OS_WIN)
++#endif  // defined(COMPILER_MSVC)
+   DCHECK(!g_manager_is_alive);
+   g_manager_is_alive = true;
+ }
+@@ -550,14 +550,14 @@ PooledSingleThreadTaskRunnerManager::CreateSingleThreadTaskRunner(
+   return CreateTaskRunnerImpl<WorkerThreadDelegate>(traits, thread_mode);
+ }
+ 
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+ scoped_refptr<SingleThreadTaskRunner>
+ PooledSingleThreadTaskRunnerManager::CreateCOMSTATaskRunner(
+     const TaskTraits& traits,
+     SingleThreadTaskRunnerThreadMode thread_mode) {
+   return CreateTaskRunnerImpl<WorkerThreadCOMDelegate>(traits, thread_mode);
+ }
+-#endif  // defined(OS_WIN)
++#endif  // defined(COMPILER_MSVC)
+ 
+ // static
+ PooledSingleThreadTaskRunnerManager::ContinueOnShutdown
+@@ -657,7 +657,7 @@ PooledSingleThreadTaskRunnerManager::CreateWorkerThreadDelegate<
+       task_tracker_);
+ }
+ 
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+ template <>
+ std::unique_ptr<WorkerThreadDelegate>
+ PooledSingleThreadTaskRunnerManager::CreateWorkerThreadDelegate<
+@@ -671,7 +671,7 @@ PooledSingleThreadTaskRunnerManager::CreateWorkerThreadDelegate<
+           : WorkerThread::ThreadLabel::SHARED_COM,
+       task_tracker_);
+ }
+-#endif  // defined(OS_WIN)
++#endif  // defined(COMPILER_MSVC)
+ 
+ template <typename DelegateType>
+ WorkerThread*
+@@ -698,7 +698,7 @@ PooledSingleThreadTaskRunnerManager::GetSharedWorkerThreadForTraits<
+                                [TraitsToContinueOnShutdown(traits)];
+ }
+ 
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+ template <>
+ WorkerThread*&
+ PooledSingleThreadTaskRunnerManager::GetSharedWorkerThreadForTraits<
+@@ -706,7 +706,7 @@ PooledSingleThreadTaskRunnerManager::GetSharedWorkerThreadForTraits<
+   return shared_com_worker_threads_[GetEnvironmentIndexForTraits(traits)]
+                                    [TraitsToContinueOnShutdown(traits)];
+ }
+-#endif  // defined(OS_WIN)
++#endif  // defined(COMPILER_MSVC)
+ 
+ void PooledSingleThreadTaskRunnerManager::UnregisterWorkerThread(
+     WorkerThread* worker) {
+@@ -729,7 +729,7 @@ void PooledSingleThreadTaskRunnerManager::UnregisterWorkerThread(
+ 
+ void PooledSingleThreadTaskRunnerManager::ReleaseSharedWorkerThreads() {
+   decltype(shared_worker_threads_) local_shared_worker_threads;
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+   decltype(shared_com_worker_threads_) local_shared_com_worker_threads;
+ #endif
+   {
+@@ -738,7 +738,7 @@ void PooledSingleThreadTaskRunnerManager::ReleaseSharedWorkerThreads() {
+       for (size_t j = 0; j < base::size(shared_worker_threads_[i]); ++j) {
+         local_shared_worker_threads[i][j] = shared_worker_threads_[i][j];
+         shared_worker_threads_[i][j] = nullptr;
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+         local_shared_com_worker_threads[i][j] =
+             shared_com_worker_threads_[i][j];
+         shared_com_worker_threads_[i][j] = nullptr;
+@@ -751,7 +751,7 @@ void PooledSingleThreadTaskRunnerManager::ReleaseSharedWorkerThreads() {
+     for (size_t j = 0; j < base::size(local_shared_worker_threads[i]); ++j) {
+       if (local_shared_worker_threads[i][j])
+         UnregisterWorkerThread(local_shared_worker_threads[i][j]);
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+       if (local_shared_com_worker_threads[i][j])
+         UnregisterWorkerThread(local_shared_com_worker_threads[i][j]);
+ #endif
+diff --git a/src/3rdparty/chromium/base/task/thread_pool/task_tracker.cc b/src/3rdparty/chromium/base/task/thread_pool/task_tracker.cc
+index 06311fc..22259e9 100644
+--- a/src/3rdparty/chromium/base/task/thread_pool/task_tracker.cc
++++ b/src/3rdparty/chromium/base/task/thread_pool/task_tracker.cc
+@@ -187,14 +187,14 @@ class EphemeralTaskExecutor : public TaskExecutor {
+     return single_thread_task_runner_;
+   }
+ 
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+   scoped_refptr<SingleThreadTaskRunner> CreateCOMSTATaskRunner(
+       const TaskTraits& traits,
+       SingleThreadTaskRunnerThreadMode thread_mode) override {
+     CheckTraitsCompatibleWithSequenceTraits(traits);
+     return single_thread_task_runner_;
+   }
+-#endif  // defined(OS_WIN)
++#endif  // defined(COMPILER_MSVC)
+ 
+  private:
+   // Currently ignores |traits.priority()|.
+diff --git a/src/3rdparty/chromium/base/task/thread_pool/thread_group.cc b/src/3rdparty/chromium/base/task/thread_pool/thread_group.cc
+index a6f0c73..60426e4 100644
+--- a/src/3rdparty/chromium/base/task/thread_pool/thread_group.cc
++++ b/src/3rdparty/chromium/base/task/thread_pool/thread_group.cc
+@@ -12,7 +12,7 @@
+ #include "base/task/thread_pool/task_tracker.h"
+ #include "base/threading/thread_local.h"
+ 
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+ #include "base/win/com_init_check_hook.h"
+ #include "base/win/scoped_com_initializer.h"
+ #include "base/win/scoped_winrt_initializer.h"
+@@ -267,7 +267,7 @@ bool ThreadGroup::ShouldYield(TaskSourceSortKey sort_key) const {
+   return sort_key.worker_count() > max_allowed_sort_key.worker_count + 1;
+ }
+ 
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+ // static
+ std::unique_ptr<win::ScopedWindowsThreadEnvironment>
+ ThreadGroup::GetScopedWindowsThreadEnvironment(WorkerEnvironment environment) {
+diff --git a/src/3rdparty/chromium/base/task/thread_pool/thread_group.h b/src/3rdparty/chromium/base/task/thread_pool/thread_group.h
+index a0c618f..54bfe8a 100644
+--- a/src/3rdparty/chromium/base/task/thread_pool/thread_group.h
++++ b/src/3rdparty/chromium/base/task/thread_pool/thread_group.h
+@@ -14,7 +14,7 @@
+ #include "base/task/thread_pool/tracked_ref.h"
+ #include "build/build_config.h"
+ 
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+ #include "base/win/scoped_windows_thread_environment.h"
+ #endif
+ 
+@@ -42,12 +42,12 @@ class BASE_EXPORT ThreadGroup {
+   enum class WorkerEnvironment {
+     // No special worker environment required.
+     NONE,
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+     // Initialize a COM MTA on the worker.
+     COM_MTA,
+     // Initialize a COM STA on the worker.
+     COM_STA,
+-#endif  // defined(OS_WIN)
++#endif  // defined(COMPILER_MSVC)
+   };
+ 
+   virtual ~ThreadGroup();
+@@ -168,7 +168,7 @@ class BASE_EXPORT ThreadGroup {
+               TrackedRef<Delegate> delegate,
+               ThreadGroup* predecessor_thread_group = nullptr);
+ 
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+   static std::unique_ptr<win::ScopedWindowsThreadEnvironment>
+   GetScopedWindowsThreadEnvironment(WorkerEnvironment environment);
+ #endif
+diff --git a/src/3rdparty/chromium/base/task/thread_pool/thread_group_impl.cc b/src/3rdparty/chromium/base/task/thread_pool/thread_group_impl.cc
+index 8f54387..e1d6160 100644
+--- a/src/3rdparty/chromium/base/task/thread_pool/thread_group_impl.cc
++++ b/src/3rdparty/chromium/base/task/thread_pool/thread_group_impl.cc
+@@ -36,12 +36,12 @@
+ #include "base/time/time_override.h"
+ #include "build/build_config.h"
+ 
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+ #include "base/win/scoped_com_initializer.h"
+ #include "base/win/scoped_windows_thread_environment.h"
+ #include "base/win/scoped_winrt_initializer.h"
+ #include "base/win/windows_version.h"
+-#endif  // defined(OS_WIN)
++#endif  // defined(COMPILER_MSVC)
+ 
+ namespace base {
+ namespace internal {
+@@ -289,9 +289,9 @@ class ThreadGroupImpl::WorkerThreadDelegateImpl : public WorkerThread::Delegate,
+     // yet).
+     bool is_running_task = false;
+ 
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+     std::unique_ptr<win::ScopedWindowsThreadEnvironment> win_thread_environment;
+-#endif  // defined(OS_WIN)
++#endif  // defined(COMPILER_MSVC)
+   } worker_only_;
+ 
+   // Writes from the worker thread protected by |outer_->lock_|. Reads from any
+@@ -566,10 +566,10 @@ void ThreadGroupImpl::WorkerThreadDelegateImpl::OnMainEntry(
+ #endif
+   }
+ 
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+   worker_only().win_thread_environment = GetScopedWindowsThreadEnvironment(
+       outer_->after_start().worker_environment);
+-#endif  // defined(OS_WIN)
++#endif  // defined(COMPILER_MSVC)
+ 
+   PlatformThread::SetName(
+       StringPrintf("ThreadPool%sWorker", outer_->thread_group_label_.c_str()));
+@@ -771,9 +771,9 @@ void ThreadGroupImpl::WorkerThreadDelegateImpl::OnMainExit(
+   }
+ #endif
+ 
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+   worker_only().win_thread_environment.reset();
+-#endif  // defined(OS_WIN)
++#endif  // defined(COMPILER_MSVC)
+ 
+   // Count cleaned up workers for tests. It's important to do this here instead
+   // of at the end of CleanupLockRequired() because some side-effects of
+diff --git a/src/3rdparty/chromium/base/task/thread_pool/thread_group_native_win.cc b/src/3rdparty/chromium/base/task/thread_pool/thread_group_native_win.cc
+index d6adc70..62c50b4 100644
+--- a/src/3rdparty/chromium/base/task/thread_pool/thread_group_native_win.cc
++++ b/src/3rdparty/chromium/base/task/thread_pool/thread_group_native_win.cc
+@@ -7,7 +7,9 @@
+ #include "base/optional.h"
+ #include "base/task/thread_pool/task_tracker.h"
+ #include "base/threading/scoped_blocking_call_internal.h"
++#if defined(COMPILER_MSVC)
+ #include "base/win/scoped_com_initializer.h"
++#endif
+ 
+ namespace base {
+ namespace internal {
+@@ -88,8 +90,10 @@ ThreadGroupNativeWin::RunNextTaskSource(PTP_CALLBACK_INSTANCE callback_instance,
+   // Windows Thread Pool API best practices state that all resources created
+   // in the callback function should be cleaned up before returning from the
+   // function. This includes COM initialization.
++#if defined(COMPILER_MSVC)
+   auto win_thread_environment = thread_group->GetScopedWindowsThreadEnvironment(
+       thread_group->worker_environment_);
++#endif
+ 
+   ScopedCallbackMayRunLongObserver callback_may_run_long_observer(
+       callback_instance);
+diff --git a/src/3rdparty/chromium/base/task/thread_pool/thread_pool_impl.cc b/src/3rdparty/chromium/base/task/thread_pool/thread_pool_impl.cc
+index cce0da5..f5fc4ed 100644
+--- a/src/3rdparty/chromium/base/task/thread_pool/thread_pool_impl.cc
++++ b/src/3rdparty/chromium/base/task/thread_pool/thread_pool_impl.cc
+@@ -178,7 +178,7 @@ void ThreadPoolImpl::Start(const ThreadPoolInstance::InitParams& init_params,
+     case InitParams::CommonThreadPoolEnvironment::DEFAULT:
+       worker_environment = ThreadGroup::WorkerEnvironment::NONE;
+       break;
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+     case InitParams::CommonThreadPoolEnvironment::COM_MTA:
+       worker_environment = ThreadGroup::WorkerEnvironment::COM_MTA;
+       break;
+@@ -217,7 +217,7 @@ void ThreadPoolImpl::Start(const ThreadPoolInstance::InitParams& init_params,
+     background_thread_group_->Start(
+         max_best_effort_tasks, max_best_effort_tasks, suggested_reclaim_time,
+         service_thread_task_runner, worker_thread_observer,
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+         // COM STA is a backward-compatibility feature for the foreground thread
+         // group only.
+         worker_environment == ThreadGroup::WorkerEnvironment::COM_STA
+@@ -263,14 +263,14 @@ ThreadPoolImpl::CreateSingleThreadTaskRunner(
+       VerifyAndAjustIncomingTraits(traits), thread_mode);
+ }
+ 
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+ scoped_refptr<SingleThreadTaskRunner> ThreadPoolImpl::CreateCOMSTATaskRunner(
+     const TaskTraits& traits,
+     SingleThreadTaskRunnerThreadMode thread_mode) {
+   return single_thread_task_runner_manager_.CreateCOMSTATaskRunner(
+       VerifyAndAjustIncomingTraits(traits), thread_mode);
+ }
+-#endif  // defined(OS_WIN)
++#endif  // defined(COMPILER_MSVC)
+ 
+ scoped_refptr<UpdateableSequencedTaskRunner>
+ ThreadPoolImpl::CreateUpdateableSequencedTaskRunner(const TaskTraits& traits) {
+diff --git a/src/3rdparty/chromium/base/task/thread_pool/thread_pool_impl.h b/src/3rdparty/chromium/base/task/thread_pool/thread_pool_impl.h
+index 512f29c..5cd2d0c 100644
+--- a/src/3rdparty/chromium/base/task/thread_pool/thread_pool_impl.h
++++ b/src/3rdparty/chromium/base/task/thread_pool/thread_pool_impl.h
+@@ -37,7 +37,7 @@
+ #include "base/task/thread_pool/task_tracker_posix.h"
+ #endif
+ 
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+ #include "base/win/com_init_check_hook.h"
+ #endif
+ 
+@@ -95,11 +95,11 @@ class BASE_EXPORT ThreadPoolImpl : public ThreadPoolInstance,
+   scoped_refptr<SingleThreadTaskRunner> CreateSingleThreadTaskRunner(
+       const TaskTraits& traits,
+       SingleThreadTaskRunnerThreadMode thread_mode) override;
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+   scoped_refptr<SingleThreadTaskRunner> CreateCOMSTATaskRunner(
+       const TaskTraits& traits,
+       SingleThreadTaskRunnerThreadMode thread_mode) override;
+-#endif  // defined(OS_WIN)
++#endif  // defined(COMPILER_MSVC)
+   scoped_refptr<UpdateableSequencedTaskRunner>
+   CreateUpdateableSequencedTaskRunner(const TaskTraits& traits);
+ 
+@@ -185,7 +185,7 @@ class BASE_EXPORT ThreadPoolImpl : public ThreadPoolInstance,
+   AtomicFlag join_for_testing_returned_;
+ #endif
+ 
+-#if defined(OS_WIN) && defined(COM_INIT_CHECK_HOOK_ENABLED)
++#if defined(COMPILER_MSVC) && defined(COM_INIT_CHECK_HOOK_ENABLED)
+   // Provides COM initialization verification for supported builds.
+   base::win::ComInitCheckHook com_init_check_hook_;
+ #endif
+diff --git a/src/3rdparty/chromium/base/task/thread_pool/thread_pool_instance.h b/src/3rdparty/chromium/base/task/thread_pool/thread_pool_instance.h
+index a089016..afd640c 100644
+--- a/src/3rdparty/chromium/base/task/thread_pool/thread_pool_instance.h
++++ b/src/3rdparty/chromium/base/task/thread_pool/thread_pool_instance.h
+@@ -53,7 +53,7 @@ class BASE_EXPORT ThreadPoolInstance {
+     enum class CommonThreadPoolEnvironment {
+       // Use the default environment (no environment).
+       DEFAULT,
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+       // Place the pool's workers in a COM MTA.
+       COM_MTA,
+       // Place the pool's *foreground* workers in a COM STA. This exists to
+@@ -62,7 +62,7 @@ class BASE_EXPORT ThreadPoolInstance {
+       // CreateCOMSTATaskRunner() instead of Create(Sequenced)TaskRunner() +
+       // this init param.
+       DEPRECATED_COM_STA_IN_FOREGROUND_GROUP,
+-#endif  // defined(OS_WIN)
++#endif  // defined(COMPILER_MSVC)
+     };
+ 
+     InitParams(int max_num_foreground_threads_in);
+diff --git a/src/3rdparty/chromium/base/task/thread_pool.cc b/src/3rdparty/chromium/base/task/thread_pool.cc
+index 24e2bba..6a9fa21 100644
+--- a/src/3rdparty/chromium/base/task/thread_pool.cc
++++ b/src/3rdparty/chromium/base/task/thread_pool.cc
+@@ -114,13 +114,13 @@ scoped_refptr<SingleThreadTaskRunner> ThreadPool::CreateSingleThreadTaskRunner(
+   return GetThreadPoolImpl()->CreateSingleThreadTaskRunner(traits, thread_mode);
+ }
+ 
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+ // static
+ scoped_refptr<SingleThreadTaskRunner> ThreadPool::CreateCOMSTATaskRunner(
+     const TaskTraits& traits,
+     SingleThreadTaskRunnerThreadMode thread_mode) {
+   return GetThreadPoolImpl()->CreateCOMSTATaskRunner(traits, thread_mode);
+ }
+-#endif  // defined(OS_WIN)
++#endif  // defined(COMPILER_MSVC)
+ 
+ }  // namespace base
+diff --git a/src/3rdparty/chromium/base/task/thread_pool.h b/src/3rdparty/chromium/base/task/thread_pool.h
+index 085c249..936a3d2 100644
+--- a/src/3rdparty/chromium/base/task/thread_pool.h
++++ b/src/3rdparty/chromium/base/task/thread_pool.h
+@@ -225,7 +225,7 @@ class BASE_EXPORT ThreadPool {
+       SingleThreadTaskRunnerThreadMode thread_mode =
+           SingleThreadTaskRunnerThreadMode::SHARED);
+ 
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+   // Returns a SingleThreadTaskRunner whose PostTask invocations result in
+   // scheduling tasks using |traits| in a COM Single-Threaded Apartment on a
+   // thread determined by |thread_mode|. See
+@@ -242,7 +242,7 @@ class BASE_EXPORT ThreadPool {
+       const TaskTraits& traits,
+       SingleThreadTaskRunnerThreadMode thread_mode =
+           SingleThreadTaskRunnerThreadMode::SHARED);
+-#endif  // defined(OS_WIN)
++#endif  // defined(COMPILER_MSVC)
+ };
+ 
+ }  // namespace base
+diff --git a/src/3rdparty/chromium/base/template_util.h b/src/3rdparty/chromium/base/template_util.h
+index 16a2826..441aaa0 100644
+--- a/src/3rdparty/chromium/base/template_util.h
++++ b/src/3rdparty/chromium/base/template_util.h
+@@ -211,21 +211,6 @@ struct conjunction<B1, Bn...>
+     : std::conditional_t<static_cast<bool>(B1::value), conjunction<Bn...>, B1> {
+ };
+ 
+-// C++14 implementation of C++17's std::disjunction.
+-//
+-// Reference: https://en.cppreference.com/w/cpp/types/disjunction
+-// Specification: https://wg21.link/meta.logical#itemdecl:2
+-template <typename...>
+-struct disjunction : std::false_type {};
+-
+-template <typename B1>
+-struct disjunction<B1> : B1 {};
+-
+-template <typename B1, typename... Bn>
+-struct disjunction<B1, Bn...>
+-    : std::conditional_t<static_cast<bool>(B1::value), B1, disjunction<Bn...>> {
+-};
+-
+ // C++14 implementation of C++17's std::negation.
+ //
+ // Reference: https://en.cppreference.com/w/cpp/types/negation
+diff --git a/src/3rdparty/chromium/base/threading/thread.cc b/src/3rdparty/chromium/base/threading/thread.cc
+index 2a07813..b1fc739 100644
+--- a/src/3rdparty/chromium/base/threading/thread.cc
++++ b/src/3rdparty/chromium/base/threading/thread.cc
+@@ -31,7 +31,7 @@
+ #include "base/files/file_descriptor_watcher_posix.h"
+ #endif
+ 
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+ #include "base/win/scoped_com_initializer.h"
+ #endif
+ 
+@@ -132,7 +132,7 @@ bool Thread::Start() {
+   DCHECK(owning_sequence_checker_.CalledOnValidSequence());
+ 
+   Options options;
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+   if (com_status_ == STA)
+     options.message_pump_type = MessagePumpType::UI;
+ #endif
+@@ -145,7 +145,7 @@ bool Thread::StartWithOptions(const Options& options) {
+   DCHECK(!IsRunning());
+   DCHECK(!stopping_) << "Starting a non-joinable thread a second time? That's "
+                      << "not allowed!";
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+   DCHECK((com_status_ != STA) ||
+          (options.message_pump_type == MessagePumpType::UI));
+ #endif
+@@ -357,7 +357,7 @@ void Thread::ThreadMain() {
+   }
+ #endif
+ 
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+   std::unique_ptr<win::ScopedCOMInitializer> com_initializer;
+   if (com_status_ != NONE) {
+     com_initializer.reset(
+@@ -389,7 +389,7 @@ void Thread::ThreadMain() {
+   // Let the thread do extra cleanup.
+   CleanUp();
+ 
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+   com_initializer.reset();
+ #endif
+ 
+diff --git a/src/3rdparty/chromium/base/threading/thread.h b/src/3rdparty/chromium/base/threading/thread.h
+index 13f35d2..348d617 100644
+--- a/src/3rdparty/chromium/base/threading/thread.h
++++ b/src/3rdparty/chromium/base/threading/thread.h
+@@ -136,7 +136,7 @@ class BASE_EXPORT Thread : PlatformThread::Delegate {
+   // before it is destructed.
+   ~Thread() override;
+ 
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+   // Causes the thread to initialize COM.  This must be called before calling
+   // Start() or StartWithOptions().  If |use_mta| is false, the thread is also
+   // started with a TYPE_UI message loop.  It is an error to call
+@@ -273,7 +273,7 @@ class BASE_EXPORT Thread : PlatformThread::Delegate {
+   friend class MessageLoopTaskRunnerTest;
+   friend class ScheduleWorkTest;
+ 
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+   enum ComStatus {
+     NONE,
+     STA,
+@@ -286,7 +286,7 @@ class BASE_EXPORT Thread : PlatformThread::Delegate {
+ 
+   void ThreadQuitHelper();
+ 
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+   // Whether this thread needs to initialize COM, and if so, in what mode.
+   ComStatus com_status_ = NONE;
+ #endif
+diff --git a/src/3rdparty/chromium/base/time/time_win.cc b/src/3rdparty/chromium/base/time/time_win.cc
+index 36ab0f6..0ae6f23 100644
+--- a/src/3rdparty/chromium/base/time/time_win.cc
++++ b/src/3rdparty/chromium/base/time/time_win.cc
+@@ -33,8 +33,22 @@
+ 
+ #include "base/time/time.h"
+ 
++#ifndef _MSC_VER
++#include <windows.h>
++namespace ABI {
++    namespace Windows {
++        namespace Foundation {
++            struct DateTime {
++                INT64 UniversalTime;
++            };
++        }
++    }
++}
++#else
+ #include <windows.foundation.h>
+ #include <windows.h>
++#endif
++
+ #include <mmsystem.h>
+ #include <stdint.h>
+ 
+diff --git a/src/3rdparty/chromium/base/trace_event/trace_arguments.h b/src/3rdparty/chromium/base/trace_event/trace_arguments.h
+index ca8af5b..4e57385 100644
+--- a/src/3rdparty/chromium/base/trace_event/trace_arguments.h
++++ b/src/3rdparty/chromium/base/trace_event/trace_arguments.h
+@@ -636,7 +636,7 @@ class BASE_EXPORT TraceArguments {
+ 
+   // Allow move operations.
+   TraceArguments(TraceArguments&& other) noexcept {
+-    ::memcpy(this, &other, sizeof(*this));
++    ::memcpy(reinterpret_cast<void*>(this), &other, sizeof(*this));
+     // All owning pointers were copied to |this|. Setting |other.size_| will
+     // mask the pointer values still in |other|.
+     other.size_ = 0;
+diff --git a/src/3rdparty/chromium/base/trace_event/trace_log.cc b/src/3rdparty/chromium/base/trace_event/trace_log.cc
+index 27d132b..1df5edb 100644
+--- a/src/3rdparty/chromium/base/trace_event/trace_log.cc
++++ b/src/3rdparty/chromium/base/trace_event/trace_log.cc
+@@ -49,7 +49,7 @@
+ #include "base/trace_event/trace_event.h"
+ #include "build/build_config.h"
+ 
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+ #include "base/trace_event/trace_event_etw_export_win.h"
+ #endif
+ 
+@@ -505,7 +505,7 @@ void TraceLog::UpdateCategoryState(TraceCategory* category) {
+     state_flags |= TraceCategory::ENABLED_FOR_RECORDING;
+   }
+ 
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+   if (base::trace_event::TraceEventETWExport::IsCategoryGroupEnabled(
+           category->name())) {
+     state_flags |= TraceCategory::ENABLED_FOR_ETW_EXPORT;
+@@ -1135,7 +1135,7 @@ bool TraceLog::ShouldAddAfterUpdatingState(
+     }
+   }
+ 
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+   // This is done sooner rather than later, to avoid creating the event and
+   // acquiring the lock, which is not needed for ETW as it's already threadsafe.
+   if (*category_group_enabled & TraceCategory::ENABLED_FOR_ETW_EXPORT) {
+@@ -1481,7 +1481,7 @@ void TraceLog::UpdateTraceEventDurationExplicit(
+     return;
+   AutoThreadLocalBoolean thread_is_in_trace_event(&thread_is_in_trace_event_);
+ 
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+   // Generate an ETW event that marks the end of a complete event.
+   if (category_group_enabled_local & TraceCategory::ENABLED_FOR_ETW_EXPORT)
+     TraceEventETWExport::AddCompleteEndEvent(category_group_enabled, name);
+@@ -1746,7 +1746,7 @@ TraceBuffer* TraceLog::CreateTraceBuffer() {
+                                : kTraceEventVectorBufferChunks);
+ }
+ 
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+ void TraceLog::UpdateETWCategoryGroupEnabledFlags() {
+   // Go through each category and set/clear the ETW bit depending on whether the
+   // category is enabled.
+diff --git a/src/3rdparty/chromium/base/trace_event/trace_logging_minimal_win.h b/src/3rdparty/chromium/base/trace_event/trace_logging_minimal_win.h
+index e7b640e..cfbb7a5 100644
+--- a/src/3rdparty/chromium/base/trace_event/trace_logging_minimal_win.h
++++ b/src/3rdparty/chromium/base/trace_event/trace_logging_minimal_win.h
+@@ -222,11 +222,6 @@ class TlmProvider {
+   template <class... FieldTys>
+   struct DataDescCountSum;  // undefined
+ 
+-  template <>
+-  struct DataDescCountSum<> {
+-    static constexpr uint8_t value = 0;
+-  };
+-
+   template <class FieldTy1, class... FieldTyRest>
+   struct DataDescCountSum<FieldTy1, FieldTyRest...> {
+     static constexpr uint8_t value =
+@@ -285,6 +280,11 @@ class TlmProvider {
+   char provider_metadata_[kMaxProviderMetadataSize] = {};
+ };
+ 
++template <>
++struct TlmProvider::DataDescCountSum<> {
++  static constexpr uint8_t value = 0;
++};
++
+ // Base class for field types.
+ template <uint8_t data_desc_count,
+           uint8_t in_type,
+diff --git a/src/3rdparty/chromium/base/traits_bag.h b/src/3rdparty/chromium/base/traits_bag.h
+index 859c4c9..e6f3528 100644
+--- a/src/3rdparty/chromium/base/traits_bag.h
++++ b/src/3rdparty/chromium/base/traits_bag.h
+@@ -201,7 +201,7 @@ struct RequiredEnumTraitFilter : public BasicTraitFilter<ArgType> {
+ 
+ // Note EmptyTrait is always regarded as valid to support filtering.
+ template <class ValidTraits, class T>
+-using IsValidTrait = disjunction<std::is_constructible<ValidTraits, T>,
++using IsValidTrait = std::disjunction<std::is_constructible<ValidTraits, T>,
+                                  std::is_same<T, EmptyTrait>>;
+ 
+ // Tests whether a given trait type is valid or invalid by testing whether it is
+diff --git a/src/3rdparty/chromium/base/win/atl.h b/src/3rdparty/chromium/base/win/atl.h
+index 464438e..aba8b29 100644
+--- a/src/3rdparty/chromium/base/win/atl.h
++++ b/src/3rdparty/chromium/base/win/atl.h
+@@ -5,6 +5,8 @@
+ #ifndef BASE_WIN_ATL_H_
+ #define BASE_WIN_ATL_H_
+ 
++#ifdef _MSC_VER
++
+ // Check no prior poisonous defines were made.
+ #include "base/win/windows_defines.inc"
+ // Undefine before windows header will make the poisonous defines
+@@ -35,4 +37,6 @@ using void_t = void;
+ // Check no poisonous defines follow this include
+ #include "base/win/windows_defines.inc"
+ 
++#endif // _MSC_VER
++
+ #endif  // BASE_WIN_ATL_H_
+diff --git a/src/3rdparty/chromium/base/win/com_init_balancer.h b/src/3rdparty/chromium/base/win/com_init_balancer.h
+index cf7860c..68b7bfc 100644
+--- a/src/3rdparty/chromium/base/win/com_init_balancer.h
++++ b/src/3rdparty/chromium/base/win/com_init_balancer.h
+@@ -7,7 +7,9 @@
+ 
+ #include <objidl.h>
+ #include <winnt.h>
++#if defined(COMPILER_MSVC)
+ #include <wrl/implements.h>
++#endif
+ 
+ #include "base/base_export.h"
+ #include "base/optional.h"
+@@ -27,9 +29,13 @@ namespace internal {
+ // revoke the registered spy and allow for the successful uninitialization of
+ // the COM library.
+ class BASE_EXPORT ComInitBalancer
++#if defined(COMPILER_MSVC)
+     : public Microsoft::WRL::RuntimeClass<
+           Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>,
+           IInitializeSpy> {
++#else
++    : public IInitializeSpy {
++#endif
+  public:
+   // Constructs a COM initialize balancer. |co_init| defines the apartment's
+   // concurrency model used by the balancer.
+@@ -38,7 +44,7 @@ class BASE_EXPORT ComInitBalancer
+   ComInitBalancer(const ComInitBalancer&) = delete;
+   ComInitBalancer& operator=(const ComInitBalancer&) = delete;
+ 
+-  ~ComInitBalancer() override;
++  ~ComInitBalancer();
+ 
+   // Disables balancer by revoking the registered spy and consequently
+   // unblocking attempts to uninitialize the COM library.
+@@ -49,12 +55,12 @@ class BASE_EXPORT ComInitBalancer
+  private:
+   // IInitializeSpy:
+   IFACEMETHODIMP PreInitialize(DWORD apartment_type,
+-                               DWORD reference_count) override;
++                               DWORD reference_count);
+   IFACEMETHODIMP PostInitialize(HRESULT result,
+                                 DWORD apartment_type,
+-                                DWORD new_reference_count) override;
+-  IFACEMETHODIMP PreUninitialize(DWORD reference_count) override;
+-  IFACEMETHODIMP PostUninitialize(DWORD new_reference_count) override;
++                                DWORD new_reference_count);
++  IFACEMETHODIMP PreUninitialize(DWORD reference_count);
++  IFACEMETHODIMP PostUninitialize(DWORD new_reference_count);
+ 
+   const DWORD co_init_;
+ 
+diff --git a/src/3rdparty/chromium/base/win/core_winrt_util.h b/src/3rdparty/chromium/base/win/core_winrt_util.h
+index 29a4151..61802c8 100644
+--- a/src/3rdparty/chromium/base/win/core_winrt_util.h
++++ b/src/3rdparty/chromium/base/win/core_winrt_util.h
+@@ -40,12 +40,14 @@ BASE_EXPORT HRESULT RoActivateInstance(HSTRING class_id,
+ // Retrieves an activation factory for the type specified.
+ template <typename InterfaceType, wchar_t const* runtime_class_id>
+ HRESULT GetActivationFactory(InterfaceType** factory) {
++#if defined(COMPILER_MSVC)
+   ScopedHString class_id_hstring = ScopedHString::Create(runtime_class_id);
+   if (!class_id_hstring.is_valid())
+     return E_FAIL;
+ 
+   return base::win::RoGetActivationFactory(class_id_hstring.get(),
+                                            IID_PPV_ARGS(factory));
++#endif
+ }
+ 
+ }  // namespace win
+diff --git a/src/3rdparty/chromium/base/win/pe_image.cc b/src/3rdparty/chromium/base/win/pe_image.cc
+index 817e5c5..3d52964 100644
+--- a/src/3rdparty/chromium/base/win/pe_image.cc
++++ b/src/3rdparty/chromium/base/win/pe_image.cc
+@@ -7,7 +7,6 @@
+ 
+ #include "base/win/pe_image.h"
+ 
+-#include <delayimp.h>
+ #include <stddef.h>
+ #include <set>
+ #include <string>
+diff --git a/src/3rdparty/chromium/base/win/pe_image.h b/src/3rdparty/chromium/base/win/pe_image.h
+index 97a4d30..e9609e5 100644
+--- a/src/3rdparty/chromium/base/win/pe_image.h
++++ b/src/3rdparty/chromium/base/win/pe_image.h
+@@ -19,7 +19,7 @@
+ // The Windows 8 SDK defines FACILITY_VISUALCPP in winerror.h.
+ #undef FACILITY_VISUALCPP
+ #endif
+-#include <DelayIMP.h>
++#include <delayimp.h>
+ 
+ namespace base {
+ namespace win {
+diff --git a/src/3rdparty/chromium/base/win/propvarutil.h b/src/3rdparty/chromium/base/win/propvarutil.h
+index d95c5ad..e1c7a40 100644
+--- a/src/3rdparty/chromium/base/win/propvarutil.h
++++ b/src/3rdparty/chromium/base/win/propvarutil.h
+@@ -9,7 +9,12 @@
+ // Undefine before windows header will make the poisonous defines
+ #include "base/win/windows_undefines.inc"
+ 
++#ifdef _MSC_VER
+ #include <propvarutil.h>
++#else
++#define _PROPSYS_
++#include_next <propvarutil.h>
++#endif
+ 
+ // Undefine the poisonous defines
+ #include "base/win/windows_undefines.inc"
+diff --git a/src/3rdparty/chromium/base/win/scoped_com_initializer.cc b/src/3rdparty/chromium/base/win/scoped_com_initializer.cc
+index 6d80ff4..9ef7883 100644
+--- a/src/3rdparty/chromium/base/win/scoped_com_initializer.cc
++++ b/src/3rdparty/chromium/base/win/scoped_com_initializer.cc
+@@ -4,7 +4,9 @@
+ 
+ #include "base/win/scoped_com_initializer.h"
+ 
++#if defined(COMPILER_MSVC)
+ #include <wrl/implements.h>
++#endif
+ 
+ #include "base/check_op.h"
+ 
+@@ -44,6 +46,7 @@ DWORD ScopedCOMInitializer::GetCOMBalancerReferenceCountForTesting() const {
+ void ScopedCOMInitializer::Initialize(COINIT init,
+                                       Uninitialization uninitialization) {
+   DCHECK_CALLED_ON_VALID_THREAD(thread_checker_);
++#if defined(COMPILER_MSVC)
+   // COINIT_DISABLE_OLE1DDE is always added based on:
+   // https://docs.microsoft.com/en-us/windows/desktop/learnwin32/initializing-the-com-library
+   if (uninitialization == Uninitialization::kBlockPremature) {
+@@ -52,6 +55,7 @@ void ScopedCOMInitializer::Initialize(COINIT init,
+   }
+   hr_ = ::CoInitializeEx(nullptr, init | COINIT_DISABLE_OLE1DDE);
+   DCHECK_NE(RPC_E_CHANGED_MODE, hr_) << "Invalid COM thread model change";
++#endif
+ }
+ 
+ }  // namespace win
+diff --git a/src/3rdparty/chromium/base/win/scoped_variant.cc b/src/3rdparty/chromium/base/win/scoped_variant.cc
+index 352c22b..3d20750 100644
+--- a/src/3rdparty/chromium/base/win/scoped_variant.cc
++++ b/src/3rdparty/chromium/base/win/scoped_variant.cc
+@@ -108,7 +108,11 @@ VARIANT* ScopedVariant::Receive() {
+ 
+ VARIANT ScopedVariant::Copy() const {
+   VARIANT ret = {{{VT_EMPTY}}};
++#if defined(COMPILER_GCC) // FIXME: VariantCopy is implemented differently
++  ::VariantCopy(&ret, const_cast<VARIANT*>(&var_));
++#else
+   ::VariantCopy(&ret, &var_);
++#endif
+   return ret;
+ }
+ 
+@@ -176,7 +180,15 @@ int ScopedVariant::Compare(const VARIANT& other, bool ignore_case) const {
+ 
+   // 5. Otherwise returns the lexicographical comparison of the values held by
+   //    the two VARIANTS that share the same VARTYPE.
++#if defined(COMPILER_GCC) // FIXME: VariantCompare is not yet supported
++  PROPVARIANT var1;
++  PROPVARIANT var2;
++  VariantToPropVariant(&var_, &var1);
++  VariantToPropVariant(&other, &var2);
++  return PropVariantCompareEx(var1, var2, PVCU_DEFAULT, PVCHF_DEFAULT);
++#else
+   return ::VariantCompare(var_, other);
++#endif
+ }
+ 
+ void ScopedVariant::Set(const wchar_t* str) {
+@@ -286,7 +298,11 @@ void ScopedVariant::Set(SAFEARRAY* array) {
+ 
+ void ScopedVariant::Set(const VARIANT& var) {
+   DCHECK(!IsLeakableVarType(var_.vt)) << "leaking variant: " << var_.vt;
++#if defined(COMPILER_GCC) // FIXME: VariantCopy is implemented differently
++  if (FAILED(::VariantCopy(&var_, const_cast<VARIANT*>(&var)))) {
++#else
+   if (FAILED(::VariantCopy(&var_, &var))) {
++#endif
+     DLOG(ERROR) << "VariantCopy failed";
+     var_.vt = VT_EMPTY;
+   }
+diff --git a/src/3rdparty/chromium/base/win/shlwapi.h b/src/3rdparty/chromium/base/win/shlwapi.h
+index b60353c..d5ca1de 100644
+--- a/src/3rdparty/chromium/base/win/shlwapi.h
++++ b/src/3rdparty/chromium/base/win/shlwapi.h
+@@ -9,7 +9,11 @@
+ // Undefine before windows header will make the poisonous defines
+ #include "base/win/windows_undefines.inc"
+ 
++#ifdef _MSC_VER
+ #include <shlwapi.h>
++#else
++#include_next <shlwapi.h>
++#endif
+ 
+ // Undefine the poisonous defines
+ #include "base/win/windows_undefines.inc"
+diff --git a/src/3rdparty/chromium/base/win/shortcut.cc b/src/3rdparty/chromium/base/win/shortcut.cc
+index a9d8ece..7a75b24 100644
+--- a/src/3rdparty/chromium/base/win/shortcut.cc
++++ b/src/3rdparty/chromium/base/win/shortcut.cc
+@@ -156,6 +156,7 @@ bool CreateOrUpdateShortcutLink(const FilePath& shortcut_path,
+                                                 properties.app_id.c_str())) {
+       return false;
+     }
++#if !defined(COMPILER_GCC) // FIXME: missing PKEY_AppUserModel_IsDualMode, PKEY_AppUserModel_ToastActivatorCLSID
+     if (has_dual_mode && !SetBooleanValueForPropertyStore(
+                              property_store.Get(), PKEY_AppUserModel_IsDualMode,
+                              properties.dual_mode)) {
+@@ -167,6 +168,7 @@ bool CreateOrUpdateShortcutLink(const FilePath& shortcut_path,
+                                   properties.toast_activator_clsid)) {
+       return false;
+     }
++#endif
+   }
+ 
+   // Release the interfaces to the old shortcut to make sure it doesn't prevent
+@@ -289,6 +291,7 @@ bool ResolveShortcutProperties(const FilePath& shortcut_path,
+       }
+     }
+ 
++#if !defined(COMPILER_GCC) // FIXME: missing PKEY_AppUserModel_IsDualMode, PKEY_AppUserModel_ToastActivatorCLSID
+     if (options & ShortcutProperties::PROPERTIES_DUAL_MODE) {
+       ScopedPropVariant pv_dual_mode;
+       if (property_store->GetValue(PKEY_AppUserModel_IsDualMode,
+@@ -329,6 +332,7 @@ bool ResolveShortcutProperties(const FilePath& shortcut_path,
+           return false;
+       }
+     }
++#endif
+   }
+ 
+   return true;
+diff --git a/src/3rdparty/chromium/base/win/sphelper.h b/src/3rdparty/chromium/base/win/sphelper.h
+index 38a547f..f115668 100644
+--- a/src/3rdparty/chromium/base/win/sphelper.h
++++ b/src/3rdparty/chromium/base/win/sphelper.h
+@@ -9,7 +9,11 @@
+ // Undefine before windows header will make the poisonous defines
+ #include "base/win/windows_undefines.inc"
+ 
++#ifdef _MSC_VER
+ #include <sphelper.h>
++#else
++#include_next <sphelper.h>
++#endif
+ 
+ // Undefine the poisonous defines
+ #include "base/win/windows_undefines.inc"
+diff --git a/src/3rdparty/chromium/base/win/variant_vector.h b/src/3rdparty/chromium/base/win/variant_vector.h
+index a65e39d..d807ebb 100644
+--- a/src/3rdparty/chromium/base/win/variant_vector.h
++++ b/src/3rdparty/chromium/base/win/variant_vector.h
+@@ -81,18 +81,6 @@ class BASE_EXPORT VariantVector final {
+     vector_.push_back(std::move(scoped_variant));
+   }
+ 
+-  // Specialize VT_DATE because ScopedVariant has a separate SetDate method,
+-  // this is because VT_R8 and VT_DATE share the same underlying type.
+-  template <>
+-  void Insert<VT_DATE>(typename internal::VariantUtil<VT_DATE>::Type value) {
+-    if (vartype_ == VT_EMPTY)
+-      vartype_ = VT_DATE;
+-    AssertVartype<VT_DATE>();
+-    ScopedVariant scoped_variant;
+-    scoped_variant.SetDate(value);
+-    vector_.push_back(std::move(scoped_variant));
+-  }
+-
+   // Populates a VARIANT based on what is stored, transferring ownership
+   // of managed contents.
+   // This is only valid when the VariantVector is empty or has a single element.
+@@ -134,6 +122,18 @@ class BASE_EXPORT VariantVector final {
+   std::vector<ScopedVariant> vector_;
+ };
+ 
++// Specialize VT_DATE because ScopedVariant has a separate SetDate method,
++// this is because VT_R8 and VT_DATE share the same underlying type.
++template <>
++void VariantVector::Insert<VT_DATE>(typename internal::VariantUtil<VT_DATE>::Type value) {
++  if (vartype_ == VT_EMPTY)
++    vartype_ = VT_DATE;
++  AssertVartype<VT_DATE>();
++  ScopedVariant scoped_variant;
++  scoped_variant.SetDate(value);
++  vector_.push_back(std::move(scoped_variant));
++}
++
+ }  // namespace win
+ }  // namespace base
+ 
+diff --git a/src/3rdparty/chromium/base/win/vector.h b/src/3rdparty/chromium/base/win/vector.h
+index 9773415..c361cb6 100644
+--- a/src/3rdparty/chromium/base/win/vector.h
++++ b/src/3rdparty/chromium/base/win/vector.h
+@@ -5,6 +5,7 @@
+ #ifndef BASE_WIN_VECTOR_H_
+ #define BASE_WIN_VECTOR_H_
+ 
++#if defined(COMPILER_MSVC)
+ #include <ivectorchangedeventargs.h>
+ #include <windows.foundation.collections.h>
+ #include <wrl/implements.h>
+@@ -400,4 +401,6 @@ class Vector
+ }  // namespace win
+ }  // namespace base
+ 
++#endif // COMPILER_MSVC
++
+ #endif  // BASE_WIN_VECTOR_H_
+diff --git a/src/3rdparty/chromium/base/win/win_util.cc b/src/3rdparty/chromium/base/win/win_util.cc
+index 6101564..936789a 100644
+--- a/src/3rdparty/chromium/base/win/win_util.cc
++++ b/src/3rdparty/chromium/base/win/win_util.cc
+@@ -11,7 +11,9 @@
+ #include <shobjidl.h>  // Must be before propkey.
+ 
+ #include <inspectable.h>
++#if defined(COMPILER_MSVC)
+ #include <mdmregistration.h>
++#endif
+ #include <objbase.h>
+ #include <propkey.h>
+ #include <psapi.h>
+@@ -22,8 +24,8 @@
+ #include <signal.h>
+ #include <stddef.h>
+ #include <stdlib.h>
+-#include <strsafe.h>
+ #include <tchar.h>  // Must be before tpcshrd.h or for any use of _T macro
++#include <strsafe.h> // Must be after tchar.h on MinGW
+ #include <tpcshrd.h>
+ #include <uiviewsettingsinterop.h>
+ #include <windows.ui.viewmanagement.h>
+@@ -155,6 +157,7 @@ bool* GetDomainEnrollmentStateStorage() {
+ }
+ 
+ bool* GetRegisteredWithManagementStateStorage() {
++#if defined(COMPILER_MSVC)
+   static bool state = []() {
+     // Mitigate the issues caused by loading DLLs on a background thread
+     // (http://crbug/973868).
+@@ -181,6 +184,7 @@ bool* GetRegisteredWithManagementStateStorage() {
+   }();
+ 
+   return &state;
++#endif
+ }
+ 
+ NativeLibrary PinUser32Internal(NativeLibraryLoadError* error) {
+@@ -208,6 +212,7 @@ bool IsWindows10TabletMode(HWND hwnd) {
+     return false;
+   }
+ 
++#if defined(COMPILER_MSVC)
+   ScopedHString view_settings_guid = ScopedHString::Create(
+       RuntimeClass_Windows_UI_ViewManagement_UIViewSettings);
+   Microsoft::WRL::ComPtr<IUIViewSettingsInterop> view_settings_interop;
+@@ -226,6 +231,7 @@ bool IsWindows10TabletMode(HWND hwnd) {
+       ABI::Windows::UI::ViewManagement::UserInteractionMode_Mouse;
+   view_settings->get_UserInteractionMode(&mode);
+   return mode == ABI::Windows::UI::ViewManagement::UserInteractionMode_Touch;
++#endif
+ }
+ 
+ // Returns true if a physical keyboard is detected on Windows 8 and up.
+@@ -495,7 +501,9 @@ void SetAbortBehaviorForCrashReporting() {
+   // Disabling the _CALL_REPORTFAULT behavior is important since otherwise it
+   // has the sideffect of clearing our exception filter, which means we
+   // don't get any crash.
++#if defined(COMPILER_MSVC) || (defined(COMPILER_GCC) && defined(_UCRT))
+   _set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
++#endif
+ 
+   // Set a SIGABRT handler for good measure. We will crash even if the default
+   // is left in place, however this allows us to crash earlier. And it also
+@@ -589,7 +597,11 @@ bool IsEnrolledToDomain() {
+ }
+ 
+ bool IsDeviceRegisteredWithManagement() {
++#if defined(COMPILER_MSVC)
+   return *GetRegisteredWithManagementStateStorage();
++#else
++  return false;
++#endif
+ }
+ 
+ bool IsUser32AndGdi32Available() {
+@@ -665,13 +677,17 @@ bool GetLoadedModulesSnapshot(HANDLE process, std::vector<HMODULE>* snapshot) {
+ }
+ 
+ void EnableFlicks(HWND hwnd) {
++#if defined(COMPILER_MSVC)
+   ::RemoveProp(hwnd, MICROSOFT_TABLETPENSERVICE_PROPERTY);
++#endif
+ }
+ 
+ void DisableFlicks(HWND hwnd) {
++#if defined(COMPILER_MSVC)
+   ::SetProp(hwnd, MICROSOFT_TABLETPENSERVICE_PROPERTY,
+             reinterpret_cast<HANDLE>(TABLET_DISABLE_FLICKS |
+                                      TABLET_DISABLE_FLICKFALLBACKKEYS));
++#endif
+ }
+ 
+ bool IsProcessPerMonitorDpiAware() {
+@@ -820,12 +836,16 @@ ScopedDomainStateForTesting::~ScopedDomainStateForTesting() {
+ ScopedDeviceRegisteredWithManagementForTesting::
+     ScopedDeviceRegisteredWithManagementForTesting(bool state)
+     : initial_state_(IsDeviceRegisteredWithManagement()) {
++#if defined(COMPILER_MSVC)
+   *GetRegisteredWithManagementStateStorage() = state;
++#endif
+ }
+ 
+ ScopedDeviceRegisteredWithManagementForTesting::
+     ~ScopedDeviceRegisteredWithManagementForTesting() {
++#if defined(COMPILER_MSVC)
+   *GetRegisteredWithManagementStateStorage() = initial_state_;
++#endif
+ }
+ 
+ }  // namespace win
+diff --git a/src/3rdparty/chromium/base/win/windows_types.h b/src/3rdparty/chromium/base/win/windows_types.h
+index d1f3e8d..bb3f5f3 100644
+--- a/src/3rdparty/chromium/base/win/windows_types.h
++++ b/src/3rdparty/chromium/base/win/windows_types.h
+@@ -12,6 +12,8 @@
+ #include <concurrencysal.h>
+ #include <sal.h>
+ #include <specstrings.h>
++#include <share.h> // for _SH_DENYNO
++#include <stdint.h>
+ 
+ #ifdef __cplusplus
+ extern "C" {
+@@ -21,8 +23,8 @@ extern "C" {
+ 
+ typedef unsigned long DWORD;
+ typedef long LONG;
+-typedef __int64 LONGLONG;
+-typedef unsigned __int64 ULONGLONG;
++typedef int64_t LONGLONG;
++typedef uint64_t ULONGLONG;
+ 
+ #define VOID void
+ typedef char CHAR;
+@@ -43,11 +45,11 @@ typedef WORD UWORD;
+ typedef WORD ATOM;
+ 
+ #if defined(_WIN64)
+-typedef __int64 INT_PTR, *PINT_PTR;
+-typedef unsigned __int64 UINT_PTR, *PUINT_PTR;
++typedef int64_t INT_PTR, *PINT_PTR;
++typedef uint64_t UINT_PTR, *PUINT_PTR;
+ 
+-typedef __int64 LONG_PTR, *PLONG_PTR;
+-typedef unsigned __int64 ULONG_PTR, *PULONG_PTR;
++typedef int64_t LONG_PTR, *PLONG_PTR;
++typedef uint64_t ULONG_PTR, *PULONG_PTR;
+ #else
+ typedef __w64 int INT_PTR, *PINT_PTR;
+ typedef __w64 unsigned int UINT_PTR, *PUINT_PTR;
+@@ -144,11 +146,28 @@ struct CHROME_CONDITION_VARIABLE {
+ // Work around there being two slightly different definitions in the SDK.
+ #define INVALID_HANDLE_VALUE ((HANDLE)(LONG_PTR)-1)
+ #endif
++#ifndef TLS_OUT_OF_INDEXES
+ #define TLS_OUT_OF_INDEXES ((DWORD)0xFFFFFFFF)
++#endif
+ #define HTNOWHERE 0
+ #define MAX_PATH 260
+ #define CS_GLOBALCLASS 0x4000
+ 
++#ifndef _MSC_VER
++#undef ERROR_SUCCESS
++#undef ERROR_FILE_NOT_FOUND
++#undef ERROR_ACCESS_DENIED
++#undef ERROR_INVALID_HANDLE
++#undef ERROR_SHARING_VIOLATION
++#undef ERROR_LOCK_VIOLATION
++#undef REG_BINARY
++#undef READ_CONTROL
++#undef SYNCHRONIZE
++#undef HKEY_CLASSES_ROOT
++#undef HKEY_LOCAL_MACHINE
++#undef HKEY_CURRENT_USER
++#endif
++
+ #define ERROR_SUCCESS 0L
+ #define ERROR_FILE_NOT_FOUND 2L
+ #define ERROR_ACCESS_DENIED 5L
+@@ -157,10 +176,16 @@ struct CHROME_CONDITION_VARIABLE {
+ #define ERROR_LOCK_VIOLATION 33L
+ #define REG_BINARY ( 3ul )
+ 
++#ifndef STATUS_PENDING
+ #define STATUS_PENDING ((DWORD   )0x00000103L)
++#endif
+ #define STILL_ACTIVE STATUS_PENDING
++#ifndef SUCCEEDED
+ #define SUCCEEDED(hr) (((HRESULT)(hr)) >= 0)
++#endif
++#ifndef FAILED
+ #define FAILED(hr) (((HRESULT)(hr)) < 0)
++#endif
+ 
+ #define HKEY_CLASSES_ROOT (( HKEY ) (ULONG_PTR)((LONG)0x80000000) )
+ #define HKEY_LOCAL_MACHINE (( HKEY ) (ULONG_PTR)((LONG)0x80000002) )
+@@ -180,7 +205,9 @@ struct CHROME_CONDITION_VARIABLE {
+ 
+ #define STANDARD_RIGHTS_READ (READ_CONTROL)
+ #define STANDARD_RIGHTS_WRITE (READ_CONTROL)
++#ifndef STANDARD_RIGHTS_ALL
+ #define STANDARD_RIGHTS_ALL (0x001F0000L)
++#endif
+ 
+ #define KEY_READ                ((STANDARD_RIGHTS_READ       |\
+                                   KEY_QUERY_VALUE            |\
+@@ -210,14 +237,22 @@ struct CHROME_CONDITION_VARIABLE {
+ 
+ // Define some macros needed when prototyping Windows functions.
+ 
++#ifndef DECLSPEC_IMPORT
+ #define DECLSPEC_IMPORT __declspec(dllimport)
++#endif
+ #define WINBASEAPI DECLSPEC_IMPORT
+ #define WINUSERAPI DECLSPEC_IMPORT
+ #define WINAPI __stdcall
++#ifndef CALLBACK
+ #define CALLBACK __stdcall
++#endif
+ 
+ // Needed for LockImpl.
++#ifdef _MSC_VER
+ WINBASEAPI _Releases_exclusive_lock_(*SRWLock) VOID WINAPI
++#else
++VOID WINAPI
++#endif
+     ReleaseSRWLockExclusive(_Inout_ PSRWLOCK SRWLock);
+ WINBASEAPI BOOLEAN WINAPI TryAcquireSRWLockExclusive(_Inout_ PSRWLOCK SRWLock);
+ 
+@@ -246,6 +281,36 @@ WINBASEAPI VOID WINAPI SetLastError(_In_ DWORD dwErrCode);
+ // ensures that the same renaming will happen everywhere. Includes of this file
+ // can be added wherever needed to ensure this consistent renaming.
+ 
++#ifndef _MSC_VER
++#undef CopyFile
++#undef CreateDirectory
++#undef CreateEvent
++#undef CreateFile
++#undef CreateService
++#undef DeleteFile
++#undef DispatchMessage
++#undef DrawText
++#undef FindFirstFile
++#undef FindNextFile
++#undef GetComputerName
++#undef GetCurrentDirectory
++#undef GetCurrentTime
++#undef GetFileAttributes
++#undef GetMessage
++#undef GetUserName
++#undef LoadIcon
++#undef LoadImage
++#undef PostMessage
++#undef RemoveDirectory
++#undef ReplaceFile
++#undef ReportEvent
++#undef SendMessage
++#undef SendMessageCallback
++#undef SetCurrentDirectory
++#undef StartService
++#undef UpdateResource
++#endif
++
+ #define CopyFile CopyFileW
+ #define CreateDirectory CreateDirectoryW
+ #define CreateEvent CreateEventW
+diff --git a/src/3rdparty/chromium/base/win/windows_version.cc b/src/3rdparty/chromium/base/win/windows_version.cc
+index 5010309..0d52d9e 100644
+--- a/src/3rdparty/chromium/base/win/windows_version.cc
++++ b/src/3rdparty/chromium/base/win/windows_version.cc
+@@ -19,7 +19,7 @@
+ #include "base/strings/utf_string_conversions.h"
+ #include "base/win/registry.h"
+ 
+-#if !defined(__clang__) && _MSC_FULL_VER < 191125507
++#if !defined(__clang__) && defined(_MSC_VER) && _MSC_FULL_VER < 191125507
+ #error VS 2017 Update 3.2 or higher is required
+ #endif
+ 
+diff --git a/src/3rdparty/chromium/base/win/wrapped_window_proc.h b/src/3rdparty/chromium/base/win/wrapped_window_proc.h
+index 79dff1e..31417b3 100644
+--- a/src/3rdparty/chromium/base/win/wrapped_window_proc.h
++++ b/src/3rdparty/chromium/base/win/wrapped_window_proc.h
+@@ -13,6 +13,7 @@
+ #include <windows.h>
+ 
+ #include "base/base_export.h"
++#include "build/build_config.h"
+ 
+ namespace base {
+ namespace win {

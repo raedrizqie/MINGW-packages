@@ -1,0 +1,312 @@
+diff --git a/src/3rdparty/chromium/third_party/perfetto/BUILD.gn b/src/3rdparty/chromium/third_party/perfetto/BUILD.gn
+index ecae546..35736f2 100644
+--- a/src/3rdparty/chromium/third_party/perfetto/BUILD.gn
++++ b/src/3rdparty/chromium/third_party/perfetto/BUILD.gn
+@@ -223,7 +223,7 @@ if (!build_with_chromium) {
+       "src/tracing:platform_posix",
+     ]
+     sources = [ "include/perfetto/tracing.h" ]
+-    assert_no_deps = [ "//gn:protobuf_lite" ]
++    assert_no_deps = [ "gn:protobuf_lite" ]
+   }
+ }
+ 
+diff --git a/src/3rdparty/chromium/third_party/perfetto/gn/BUILD.gn b/src/3rdparty/chromium/third_party/perfetto/gn/BUILD.gn
+index fc5dcd8..85058ed 100644
+--- a/src/3rdparty/chromium/third_party/perfetto/gn/BUILD.gn
++++ b/src/3rdparty/chromium/third_party/perfetto/gn/BUILD.gn
+@@ -271,7 +271,7 @@ config("protobuf_gen_config") {
+       # Using -isystem instead of include_dirs (-I), so we don't need to
+       # suppress warnings coming from libprotobuf headers. Doing so would mask
+       # warnings in our own code.
+-      "-isystem",
++      "-I",
+       rebase_path("../buildtools/protobuf/src", root_build_dir),
+     ]
+   }
+diff --git a/src/3rdparty/chromium/third_party/perfetto/gn/standalone/BUILD.gn b/src/3rdparty/chromium/third_party/perfetto/gn/standalone/BUILD.gn
+index 3938a89..3a48fc2 100644
+--- a/src/3rdparty/chromium/third_party/perfetto/gn/standalone/BUILD.gn
++++ b/src/3rdparty/chromium/third_party/perfetto/gn/standalone/BUILD.gn
+@@ -76,7 +76,9 @@ config("c++17") {
+ }
+ 
+ config("visibility_hidden") {
+-  cflags = [ "-fvisibility=hidden" ]
++  if (!is_mingw) {
++    cflags = [ "-fvisibility=hidden" ]
++  }
+ }
+ 
+ config("default") {
+@@ -95,11 +97,16 @@ config("default") {
+   cflags += [
+     "-fstrict-aliasing",
+     "-fstack-protector-strong",
+-    "-fPIC",
+-    "-g",
+-    "-Wformat",
+   ]
+ 
++  if (!is_mingw) {
++    cflags += [
++      "-fPIC",
++      "-g",
++      "-Wformat",
++    ]
++  }
++
+   if (!is_fuzzer) {
+     cflags += [ "-Werror" ]
+   }
+@@ -140,8 +147,9 @@ config("default") {
+       "-m32",
+       "-lgcc",
+     ]
+-  } else if (current_cpu == "arm64") {
++  } else if (current_cpu == "x64" || current_cpu == "arm64") {
+     cflags += [ "-fno-omit-frame-pointer" ]
++    ldflags += [ "-m64" ]
+   }
+ 
+   if (is_linux) {
+@@ -152,7 +160,11 @@ config("default") {
+   }
+ 
+   if (is_debug) {
+-    libs += [ "dl" ]
++    if (is_mingw) {
++      cflags += [ "-g" ]
++    } else {
++      libs += [ "dl" ]
++    }
+   }
+ 
+   if (is_android) {
+@@ -227,6 +239,8 @@ config("release") {
+   }
+   if (is_mac) {
+     ldflags = [ "-dead_strip" ]
++  } else if (is_mingw) {
++    ldflags = [ "-Wl,--gc-sections" ]
+   } else {
+     ldflags = [
+       "-Wl,--gc-sections",
+diff --git a/src/3rdparty/chromium/third_party/perfetto/gn/standalone/BUILDCONFIG.gn b/src/3rdparty/chromium/third_party/perfetto/gn/standalone/BUILDCONFIG.gn
+index df49ef7..d2f1c79 100644
+--- a/src/3rdparty/chromium/third_party/perfetto/gn/standalone/BUILDCONFIG.gn
++++ b/src/3rdparty/chromium/third_party/perfetto/gn/standalone/BUILDCONFIG.gn
+@@ -36,10 +36,10 @@ is_linux = current_os == "linux"
+ is_linux_host = host_os == "linux"
+ is_mac = current_os == "mac"
+ is_mac_host = host_os == "mac"
++is_win = current_os == "win"
+ 
+ # Building with Windows/Fuchsia/nacl is currently only supported in the Chromium
+ # tree so always set this to false.
+-is_win = false
+ is_fuchsia = false
+ is_nacl = false
+ 
+diff --git a/src/3rdparty/chromium/third_party/perfetto/gn/standalone/proto_library.gni b/src/3rdparty/chromium/third_party/perfetto/gn/standalone/proto_library.gni
+index 81ee63c..352e95e 100644
+--- a/src/3rdparty/chromium/third_party/perfetto/gn/standalone/proto_library.gni
++++ b/src/3rdparty/chromium/third_party/perfetto/gn/standalone/proto_library.gni
+@@ -14,6 +14,12 @@
+ 
+ import("../perfetto.gni")
+ 
++if (host_os == "win") {
++  _host_executable_suffix = ".exe"
++} else {
++  _host_executable_suffix = ""
++}
++
+ template("proto_library") {
+   assert(defined(invoker.sources))
+   proto_sources = invoker.sources
+@@ -53,7 +59,7 @@ template("proto_library") {
+   if (defined(invoker.generator_plugin_label)) {
+     plugin_host_label = invoker.generator_plugin_label + "($host_toolchain)"
+     plugin_path = get_label_info(plugin_host_label, "root_out_dir") + "/" +
+-                  get_label_info(plugin_host_label, "name")
++                  get_label_info(plugin_host_label, "name") + _host_executable_suffix
+     generate_with_plugin = true
+   } else if (defined(invoker.generator_plugin_script)) {
+     plugin_path = invoker.generator_plugin_script
+@@ -138,7 +144,7 @@ template("proto_library") {
+       protoc_rebased_path = "protoc"  # from PATH
+     } else {
+       protoc_label = "//gn:protoc($host_toolchain)"
+-      protoc_path = get_label_info(protoc_label, "root_out_dir") + "/protoc"
++      protoc_path = get_label_info(protoc_label, "root_out_dir") + "/protoc" + _host_executable_suffix
+       protoc_rebased_path = "./" + rebase_path(protoc_path, root_build_dir)
+     }
+     args = [
+diff --git a/src/3rdparty/chromium/third_party/perfetto/gn/write_buildflag_header.py b/src/3rdparty/chromium/third_party/perfetto/gn/write_buildflag_header.py
+index 702c70f..a142d95 100755
+--- a/src/3rdparty/chromium/third_party/perfetto/gn/write_buildflag_header.py
++++ b/src/3rdparty/chromium/third_party/perfetto/gn/write_buildflag_header.py
+@@ -54,7 +54,7 @@ def main():
+   args = parser.parse_args()
+ 
+   flags = []
+-  with open(args.rsp, 'r') as def_file:
++  with open(args.rsp, 'r', encoding='utf-8') as def_file:
+     marker_seen = False
+     for flag in shlex.split(def_file.read()):
+       if not marker_seen:
+@@ -81,7 +81,7 @@ def main():
+   lines.append('#endif  // %s' % guard)
+   lines.append('')
+ 
+-  with open(args.out, 'w') as out:
++  with open(args.out, 'w', encoding='utf-8') as out:
+     out.write(COPYRIGHT_HEADER)
+     out.write('\n'.join(lines))
+ 
+diff --git a/src/3rdparty/chromium/third_party/perfetto/include/perfetto/base/build_config.h b/src/3rdparty/chromium/third_party/perfetto/include/perfetto/base/build_config.h
+index bd3623f..22dca69 100644
+--- a/src/3rdparty/chromium/third_party/perfetto/include/perfetto/base/build_config.h
++++ b/src/3rdparty/chromium/third_party/perfetto/include/perfetto/base/build_config.h
+@@ -105,21 +105,19 @@
+ #error OS not supported (see build_config.h)
+ #endif
+ 
++#if defined(__GNUC__)
++#define PERFETTO_BUILDFLAG_DEFINE_PERFETTO_COMPILER_GCC() 1
++#else
++#define PERFETTO_BUILDFLAG_DEFINE_PERFETTO_COMPILER_GCC() 0
++#endif
+ #if defined(__clang__)
+ #define PERFETTO_BUILDFLAG_DEFINE_PERFETTO_COMPILER_CLANG() 1
+-#define PERFETTO_BUILDFLAG_DEFINE_PERFETTO_COMPILER_GCC() 0
+-#define PERFETTO_BUILDFLAG_DEFINE_PERFETTO_COMPILER_MSVC() 0
+-#elif defined(__GNUC__) // Careful: Clang also defines this!
+-#define PERFETTO_BUILDFLAG_DEFINE_PERFETTO_COMPILER_CLANG() 0
+-#define PERFETTO_BUILDFLAG_DEFINE_PERFETTO_COMPILER_GCC() 1
+-#define PERFETTO_BUILDFLAG_DEFINE_PERFETTO_COMPILER_MSVC() 0
+-#elif defined(_MSC_VER)
++#else
+ #define PERFETTO_BUILDFLAG_DEFINE_PERFETTO_COMPILER_CLANG() 0
+-#define PERFETTO_BUILDFLAG_DEFINE_PERFETTO_COMPILER_GCC() 0
++#endif
++#if defined(_MSC_VER)
+ #define PERFETTO_BUILDFLAG_DEFINE_PERFETTO_COMPILER_MSVC() 1
+ #else
+-#define PERFETTO_BUILDFLAG_DEFINE_PERFETTO_COMPILER_CLANG() 0
+-#define PERFETTO_BUILDFLAG_DEFINE_PERFETTO_COMPILER_GCC() 0
+ #define PERFETTO_BUILDFLAG_DEFINE_PERFETTO_COMPILER_MSVC() 0
+ #endif
+ 
+@@ -129,6 +127,12 @@
+ #define PERFETTO_BUILDFLAG_DEFINE_PERFETTO_ANDROID_USERDEBUG_BUILD() 0
+ #endif
+ 
++#if defined(__aarch64__) || defined(_M_ARM64)
++#define PERFETTO_BUILDFLAG_DEFINE_PERFETTO_ARCH_CPU_ARM64() 1
++#else
++#define PERFETTO_BUILDFLAG_DEFINE_PERFETTO_ARCH_CPU_ARM64() 0
++#endif
++
+ // perfetto_build_flags.h contains the tweakable build flags defined via GN.
+ // - In GN builds (e.g., standalone, chromium, v8) this file is generated at
+ //   build time via the gen_rule //gn/gen_buildflags.
+diff --git a/src/3rdparty/chromium/third_party/perfetto/include/perfetto/ext/tracing/core/slice.h b/src/3rdparty/chromium/third_party/perfetto/include/perfetto/ext/tracing/core/slice.h
+index 4ce66fd..3f3932b 100644
+--- a/src/3rdparty/chromium/third_party/perfetto/include/perfetto/ext/tracing/core/slice.h
++++ b/src/3rdparty/chromium/third_party/perfetto/include/perfetto/ext/tracing/core/slice.h
+@@ -20,6 +20,7 @@
+ #include <stddef.h>
+ #include <string.h>
+ 
++#include <cstdint>
+ #include <memory>
+ #include <string>
+ #include <vector>
+diff --git a/src/3rdparty/chromium/third_party/perfetto/include/perfetto/tracing/internal/track_event_data_source.h b/src/3rdparty/chromium/third_party/perfetto/include/perfetto/tracing/internal/track_event_data_source.h
+index bbae795..5a6538f 100644
+--- a/src/3rdparty/chromium/third_party/perfetto/include/perfetto/tracing/internal/track_event_data_source.h
++++ b/src/3rdparty/chromium/third_party/perfetto/include/perfetto/tracing/internal/track_event_data_source.h
+@@ -107,7 +107,7 @@ class TrackEventDataSource
+   }
+ 
+   static void Flush() {
+-    Base::template Trace([](typename Base::TraceContext ctx) { ctx.Flush(); });
++    Base::Trace([](typename Base::TraceContext ctx) { ctx.Flush(); });
+   }
+ 
+   // Determine if tracing for the given static category is enabled.
+@@ -121,7 +121,7 @@ class TrackEventDataSource
+   static bool IsDynamicCategoryEnabled(
+       const DynamicCategory& dynamic_category) {
+     bool enabled = false;
+-    Base::template Trace([&](typename Base::TraceContext ctx) {
++    Base::Trace([&](typename Base::TraceContext ctx) {
+       enabled = IsDynamicCategoryEnabled(&ctx, dynamic_category);
+     });
+     return enabled;
+@@ -428,7 +428,7 @@ class TrackEventDataSource
+                                  const protos::gen::TrackDescriptor& desc) {
+     PERFETTO_DCHECK(track.uuid == desc.uuid());
+     TrackRegistry::Get()->UpdateTrack(track, desc.SerializeAsString());
+-    Base::template Trace([&](typename Base::TraceContext ctx) {
++    Base::Trace([&](typename Base::TraceContext ctx) {
+       TrackEventInternal::WriteTrackDescriptor(
+           track, ctx.tls_inst_->trace_writer.get());
+     });
+@@ -545,7 +545,7 @@ class TrackEventDataSource
+   static void TraceWithInstances(uint32_t instances,
+                                  Lambda lambda) PERFETTO_ALWAYS_INLINE {
+     if (CategoryIndex == TrackEventCategoryRegistry::kDynamicCategoryIndex) {
+-      Base::template TraceWithInstances(instances, std::move(lambda));
++      Base::TraceWithInstances(instances, std::move(lambda));
+     } else {
+       Base::template TraceWithInstances<
+           CategoryTracePointTraits<CategoryIndex>>(instances,
+@@ -560,7 +560,7 @@ class TrackEventDataSource
+       const TrackType& track,
+       std::function<void(protos::pbzero::TrackDescriptor*)> callback) {
+     TrackRegistry::Get()->UpdateTrack(track, std::move(callback));
+-    Base::template Trace([&](typename Base::TraceContext ctx) {
++    Base::Trace([&](typename Base::TraceContext ctx) {
+       TrackEventInternal::WriteTrackDescriptor(
+           track, ctx.tls_inst_->trace_writer.get());
+     });
+diff --git a/src/3rdparty/chromium/third_party/perfetto/include/perfetto/tracing/tracing_backend.h b/src/3rdparty/chromium/third_party/perfetto/include/perfetto/tracing/tracing_backend.h
+index 67b0d2e..3c2462d 100644
+--- a/src/3rdparty/chromium/third_party/perfetto/include/perfetto/tracing/tracing_backend.h
++++ b/src/3rdparty/chromium/third_party/perfetto/include/perfetto/tracing/tracing_backend.h
+@@ -17,6 +17,7 @@
+ #ifndef INCLUDE_PERFETTO_TRACING_TRACING_BACKEND_H_
+ #define INCLUDE_PERFETTO_TRACING_TRACING_BACKEND_H_
+ 
++#include <cstdint>
+ #include <memory>
+ #include <string>
+ 
+diff --git a/src/3rdparty/chromium/third_party/perfetto/src/base/file_utils.cc b/src/3rdparty/chromium/third_party/perfetto/src/base/file_utils.cc
+index b8020ad..fd544e5 100644
+--- a/src/3rdparty/chromium/third_party/perfetto/src/base/file_utils.cc
++++ b/src/3rdparty/chromium/third_party/perfetto/src/base/file_utils.cc
+@@ -22,7 +22,7 @@
+ #include "perfetto/ext/base/scoped_file.h"
+ #include "perfetto/ext/base/utils.h"
+ 
+-#if !PERFETTO_BUILDFLAG(PERFETTO_OS_WIN) || \
++#if !PERFETTO_BUILDFLAG(PERFETTO_COMPILER_MSVC) || \
+     PERFETTO_BUILDFLAG(PERFETTO_COMPILER_GCC)
+ #include <unistd.h>
+ #else
+diff --git a/src/3rdparty/chromium/third_party/perfetto/src/trace_processor/importers/gzip/gzip_utils.h b/src/3rdparty/chromium/third_party/perfetto/src/trace_processor/importers/gzip/gzip_utils.h
+index 624363f..6d717fb 100644
+--- a/src/3rdparty/chromium/third_party/perfetto/src/trace_processor/importers/gzip/gzip_utils.h
++++ b/src/3rdparty/chromium/third_party/perfetto/src/trace_processor/importers/gzip/gzip_utils.h
+@@ -17,6 +17,7 @@
+ #ifndef SRC_TRACE_PROCESSOR_IMPORTERS_GZIP_GZIP_UTILS_H_
+ #define SRC_TRACE_PROCESSOR_IMPORTERS_GZIP_GZIP_UTILS_H_
+ 
++#include <cstdint>
+ #include <memory>
+ 
+ struct z_stream_s;

@@ -1,0 +1,608 @@
+diff --git a/src/3rdparty/chromium/ui/accessibility/ax_node_text_styles.h b/B/src/3rdparty/chromium/ui/accessibility/ax_node_text_styles.h
+index 2dd98a9..f0f1524 100644
+--- a/src/3rdparty/chromium/ui/accessibility/ax_node_text_styles.h
++++ b/B/src/3rdparty/chromium/ui/accessibility/ax_node_text_styles.h
+@@ -5,6 +5,7 @@
+ #ifndef UI_ACCESSIBILITY_AX_NODE_TEXT_STYLES_H_
+ #define UI_ACCESSIBILITY_AX_NODE_TEXT_STYLES_H_
+ 
++#include <cstdint>
+ #include <string>
+ 
+ #include "ui/accessibility/ax_base_export.h"
+diff --git a/src/3rdparty/chromium/ui/accessibility/platform/ax_platform_node_win.h b/B/src/3rdparty/chromium/ui/accessibility/platform/ax_platform_node_win.h
+index 720dc43..086b219 100644
+--- a/src/3rdparty/chromium/ui/accessibility/platform/ax_platform_node_win.h
++++ b/B/src/3rdparty/chromium/ui/accessibility/platform/ax_platform_node_win.h
+@@ -345,6 +345,7 @@ extern AX_EXPORT
+     base::ObserverList<WinAccessibilityAPIUsageObserver>::Unchecked&
+     GetWinAccessibilityAPIUsageObserverList();
+ 
++#if defined(COMPILER_MSVC)
+ // TODO(nektar): Remove multithread superclass since we don't support it.
+ class AX_EXPORT __declspec(uuid("26f5641a-246d-457b-a96d-07f3fae6acf2"))
+     AXPlatformNodeWin : public CComObjectRootEx<CComMultiThreadModel>,
+@@ -1446,6 +1447,7 @@ class AX_EXPORT __declspec(uuid("26f5641a-246d-457b-a96d-07f3fae6acf2"))
+   // Start and end offsets of an active composition
+   gfx::Range active_composition_range_;
+ };
++#endif
+ 
+ }  // namespace ui
+ 
+diff --git a/src/3rdparty/chromium/ui/aura/BUILD.gn b/src/3rdparty/chromium/ui/aura/BUILD.gn
+index 95fe829..626cf3d 100644
+--- a/src/3rdparty/chromium/ui/aura/BUILD.gn
++++ b/src/3rdparty/chromium/ui/aura/BUILD.gn
+@@ -166,8 +166,8 @@ jumbo_component("aura") {
+ 
+   if (is_win) {
+     libs = [
+-      "wtsapi32.lib",
+-      "dwmapi.lib",
++      "wtsapi32",
++      "dwmapi",
+     ]
+   }
+ 
+@@ -337,7 +337,7 @@ test("aura_unittests") {
+ 
+   if (is_win) {
+     sources += [ "native_window_occlusion_tracker_unittest.cc" ]
+-    libs = [ "dwmapi.lib" ]
++    libs = [ "dwmapi" ]
+   }
+ 
+   deps = [
+diff --git a/src/3rdparty/chromium/ui/aura/native_window_occlusion_tracker_win.cc b/src/3rdparty/chromium/ui/aura/native_window_occlusion_tracker_win.cc
+index 66fd0b9..7aff795 100644
+--- a/src/3rdparty/chromium/ui/aura/native_window_occlusion_tracker_win.cc
++++ b/src/3rdparty/chromium/ui/aura/native_window_occlusion_tracker_win.cc
+@@ -106,6 +106,7 @@ void NativeWindowOcclusionTrackerWin::OnWindowDestroying(Window* window) {
+ }
+ 
+ NativeWindowOcclusionTrackerWin::NativeWindowOcclusionTrackerWin()
++#if defined(COMPILER_MSVC)
+     :  // Use a COMSTATaskRunner so that registering and unregistering
+        // event hooks will happen on the same thread, as required by Windows,
+        // and the task runner will have a message loop to call
+@@ -118,6 +119,9 @@ NativeWindowOcclusionTrackerWin::NativeWindowOcclusionTrackerWin()
+            // Occlusion calculation doesn't need to happen on shutdown.
+            // event hooks should also be cleaned up by Windows.
+            base::TaskShutdownBehavior::SKIP_ON_SHUTDOWN})),
++#else
++    :
++#endif
+       session_change_observer_(
+           base::BindRepeating(&NativeWindowOcclusionTrackerWin::OnSessionChange,
+                               base::Unretained(this))) {
+diff --git a/src/3rdparty/chromium/ui/base/BUILD.gn b/src/3rdparty/chromium/ui/base/BUILD.gn
+index f86b718..b3bb379 100644
+--- a/src/3rdparty/chromium/ui/base/BUILD.gn
++++ b/src/3rdparty/chromium/ui/base/BUILD.gn
+@@ -233,10 +233,18 @@ jumbo_component("base") {
+       "win/window_event_target.cc",
+       "win/window_event_target.h",
+     ]
+-    ldflags = [ "/DELAYLOAD:dwmapi.dll" ]
++    if (is_mingw) {
++      sources -= [
++        "win/accessibility_misc_utils.cc",
++        "win/accessibility_misc_utils.h",
++      ]
++      cflags_cc = [ "-Wno-sign-conversion" ]
++    } else {
++      ldflags = [ "/DELAYLOAD:dwmapi.dll" ]
++    }
+     libs += [
+-      "dwmapi.lib",
+-      "wtsapi32.lib",
++      "dwmapi",
++      "wtsapi32",
+     ]
+   }
+ 
+diff --git a/src/3rdparty/chromium/ui/base/ime/init/input_method_factory.cc b/src/3rdparty/chromium/ui/base/ime/init/input_method_factory.cc
+index 07ee458..0eccc30 100644
+--- a/src/3rdparty/chromium/ui/base/ime/init/input_method_factory.cc
++++ b/src/3rdparty/chromium/ui/base/ime/init/input_method_factory.cc
+@@ -13,7 +13,7 @@
+ #include "ui/base/ui_base_features.h"
+ #include "ui/gfx/switches.h"
+ 
+-#if defined(OS_WIN)
++#if defined(OS_WIN) && defined(COMPILER_MSVC)
+ #include "ui/base/ime/win/input_method_win_imm32.h"
+ #include "ui/base/ime/win/input_method_win_tsf.h"
+ #elif defined(OS_APPLE)
+@@ -59,7 +59,7 @@ std::unique_ptr<InputMethod> CreateInputMethod(
+   if (base::CommandLine::ForCurrentProcess()->HasSwitch(switches::kHeadless))
+     return base::WrapUnique(new MockInputMethod(delegate));
+ 
+-#if defined(OS_WIN)
++#if defined(OS_WIN) && defined(COMPILER_MSVC)
+   if (base::FeatureList::IsEnabled(features::kTSFImeSupport) &&
+       base::win::GetVersion() > base::win::Version::WIN7) {
+     return std::make_unique<InputMethodWinTSF>(delegate, widget);
+diff --git a/src/3rdparty/chromium/ui/base/ime/init/input_method_initializer.cc b/src/3rdparty/chromium/ui/base/ime/init/input_method_initializer.cc
+index 92d616a..9ec4437 100644
+--- a/src/3rdparty/chromium/ui/base/ime/init/input_method_initializer.cc
++++ b/src/3rdparty/chromium/ui/base/ime/init/input_method_initializer.cc
+@@ -13,7 +13,7 @@
+ #elif defined(USE_AURA) && defined(OS_LINUX)
+ #include "base/check.h"
+ #include "ui/base/ime/linux/fake_input_method_context_factory.h"
+-#elif defined(OS_WIN)
++#elif defined(OS_WIN) && defined(COMPILER_MSVC)
+ #include "ui/base/ime/init/input_method_factory.h"
+ #include "ui/base/ime/win/tsf_bridge.h"
+ #endif
+@@ -32,7 +32,7 @@ namespace ui {
+ void InitializeInputMethod() {
+ #if defined(OS_CHROMEOS)
+   IMEBridge::Initialize();
+-#elif defined(OS_WIN)
++#elif defined(OS_WIN) && defined(COMPILER_MSVC)
+   TSFBridge::Initialize();
+ #endif
+ }
+@@ -40,7 +40,7 @@ void InitializeInputMethod() {
+ void ShutdownInputMethod() {
+ #if defined(OS_CHROMEOS)
+   IMEBridge::Shutdown();
+-#elif defined(OS_WIN)
++#elif defined(OS_WIN) && defined(COMPILER_MSVC)
+   TSFBridge::Shutdown();
+ #endif
+ }
+@@ -59,7 +59,7 @@ void InitializeInputMethodForTesting() {
+       << "else.";
+   LinuxInputMethodContextFactory::SetInstance(
+       g_linux_input_method_context_factory_for_testing);
+-#elif defined(OS_WIN)
++#elif defined(OS_WIN) && defined(COMPILER_MSVC)
+   TSFBridge::InitializeForTesting();
+ #endif
+ }
+@@ -75,7 +75,7 @@ void ShutdownInputMethodForTesting() {
+   LinuxInputMethodContextFactory::SetInstance(nullptr);
+   delete g_linux_input_method_context_factory_for_testing;
+   g_linux_input_method_context_factory_for_testing = nullptr;
+-#elif defined(OS_WIN)
++#elif defined(OS_WIN) && defined(COMPILER_MSVC)
+   TSFBridge::Shutdown();
+ #endif
+ }
+diff --git a/src/3rdparty/chromium/ui/base/ime/win/BUILD.gn b/src/3rdparty/chromium/ui/base/ime/win/BUILD.gn
+index 5e82201..2882cf6 100644
+--- a/src/3rdparty/chromium/ui/base/ime/win/BUILD.gn
++++ b/src/3rdparty/chromium/ui/base/ime/win/BUILD.gn
+@@ -34,7 +34,24 @@ jumbo_component("win") {
+     "virtual_keyboard_debounce_timer.cc",
+     "virtual_keyboard_debounce_timer.h",
+   ]
+-  jumbo_excluded_sources = [ "tsf_text_store.cc" ]
++  if (is_mingw) {
++    sources -= [
++      "input_method_win_tsf.cc",
++      "input_method_win_tsf.h",
++      "on_screen_keyboard_display_manager_input_pane.cc", # requires <wrl/event.h>
++      "on_screen_keyboard_display_manager_input_pane.h",
++      "tsf_bridge.cc",
++      "tsf_bridge.h",
++      "tsf_event_router.cc",
++      "tsf_event_router.h",
++      "tsf_input_scope.cc",
++      "tsf_input_scope.h",
++      "tsf_text_store.cc",
++      "tsf_text_store.h",
++    ]
++  } else {
++    jumbo_excluded_sources = [ "tsf_text_store.cc" ]
++  }
+ 
+   defines = [ "IS_UI_BASE_IME_WIN_IMPL" ]
+ 
+diff --git a/src/3rdparty/chromium/ui/base/ime/win/input_method_win_base.cc b/src/3rdparty/chromium/ui/base/ime/win/input_method_win_base.cc
+index fc9c8d3..3b75b46 100644
+--- a/src/3rdparty/chromium/ui/base/ime/win/input_method_win_base.cc
++++ b/src/3rdparty/chromium/ui/base/ime/win/input_method_win_base.cc
+@@ -33,11 +33,15 @@ constexpr size_t kExtraNumberOfChars = 20;
+ 
+ std::unique_ptr<InputMethodKeyboardController> CreateKeyboardController(
+     HWND toplevel_window_handle) {
++#if defined(COMPILER_MSVC)
+   if (base::FeatureList::IsEnabled(features::kInputPaneOnScreenKeyboard) &&
+       base::win::GetVersion() >= base::win::Version::WIN10_RS4) {
+     return std::make_unique<OnScreenKeyboardDisplayManagerInputPane>(
+         toplevel_window_handle);
+   } else if (base::win::GetVersion() >= base::win::Version::WIN8) {
++#else
++  if (base::win::GetVersion() >= base::win::Version::WIN8) {
++#endif
+     return std::make_unique<OnScreenKeyboardDisplayManagerTabTip>(
+         toplevel_window_handle);
+   }
+diff --git a/src/3rdparty/chromium/ui/base/ime/win/on_screen_keyboard_display_manager_input_pane.h b/src/3rdparty/chromium/ui/base/ime/win/on_screen_keyboard_display_manager_input_pane.h
+index 68b15c2..9779692 100644
+--- a/src/3rdparty/chromium/ui/base/ime/win/on_screen_keyboard_display_manager_input_pane.h
++++ b/src/3rdparty/chromium/ui/base/ime/win/on_screen_keyboard_display_manager_input_pane.h
+@@ -5,6 +5,8 @@
+ #ifndef UI_BASE_IME_WIN_ON_SCREEN_KEYBOARD_DISPLAY_MANAGER_INPUT_PANE_H_
+ #define UI_BASE_IME_WIN_ON_SCREEN_KEYBOARD_DISPLAY_MANAGER_INPUT_PANE_H_
+ 
++#if defined(COMPILER_MSVC)
++
+ #include <inputpaneinterop.h>
+ #include <windows.ui.viewmanagement.h>
+ #include <wrl/client.h>
+@@ -80,4 +82,6 @@ class COMPONENT_EXPORT(UI_BASE_IME_WIN)
+ 
+ }  // namespace ui
+ 
++#endif // COMPILER_MSVC
++
+ #endif  // UI_BASE_IME_WIN_ON_SCREEN_KEYBOARD_DISPLAY_MANAGER_INPUT_PANE_H_
+diff --git a/src/3rdparty/chromium/ui/base/win/atl_module.h b/src/3rdparty/chromium/ui/base/win/atl_module.h
+index 7d6b917..9021ca7 100644
+--- a/src/3rdparty/chromium/ui/base/win/atl_module.h
++++ b/src/3rdparty/chromium/ui/base/win/atl_module.h
+@@ -24,10 +24,12 @@ namespace win {
+ // source file so that it's inlined into the module where it's included,
+ // rather than in the "ui" module.
+ inline void CreateATLModuleIfNeeded() {
++#ifdef _MSC_VER
+   if (_pAtlModule == NULL) {
+     // This creates the module and automatically updates _pAtlModule.
+     new CComModule;
+   }
++#endif
+ }
+ 
+ }  // namespace win
+diff --git a/src/3rdparty/chromium/ui/base/win/session_change_observer.cc b/src/3rdparty/chromium/ui/base/win/session_change_observer.cc
+index 44c20e2..af20ec9 100644
+--- a/src/3rdparty/chromium/ui/base/win/session_change_observer.cc
++++ b/src/3rdparty/chromium/ui/base/win/session_change_observer.cc
+@@ -39,8 +39,13 @@ class SessionChangeObserver::WtsRegistrationNotificationManager {
+         base::IgnoreResult(&WTSRegisterSessionNotification),
+         gfx::SingletonHwnd::GetInstance()->hwnd(), NOTIFY_FOR_THIS_SESSION);
+ 
++#if defined(COMPILER_MSVC)
+     base::ThreadPool::CreateCOMSTATaskRunner({})->PostTask(
+         FROM_HERE, std::move(wts_register));
++#else
++    base::ThreadPool::CreateTaskRunner({})->PostTask(
++        FROM_HERE, std::move(wts_register));
++#endif
+   }
+ 
+   ~WtsRegistrationNotificationManager() { RemoveSingletonHwndObserver(); }
+diff --git a/src/3rdparty/chromium/ui/display/BUILD.gn b/src/3rdparty/chromium/ui/display/BUILD.gn
+index 2e9af87..7e7a7a2 100644
+--- a/src/3rdparty/chromium/ui/display/BUILD.gn
++++ b/src/3rdparty/chromium/ui/display/BUILD.gn
+@@ -75,6 +75,12 @@ jumbo_component("display") {
+       "win/uwp_text_scale_factor.cc",
+       "win/uwp_text_scale_factor.h",
+     ]
++    if (is_mingw) {
++      sources -= [
++        "win/uwp_text_scale_factor.cc",
++        "win/uwp_text_scale_factor.h",
++      ]
++    }
+   }
+ 
+   if (is_ios) {
+diff --git a/src/3rdparty/chromium/ui/display/win/dpi.cc b/src/3rdparty/chromium/ui/display/win/dpi.cc
+index 5014d34..26d0841 100644
+--- a/src/3rdparty/chromium/ui/display/win/dpi.cc
++++ b/src/3rdparty/chromium/ui/display/win/dpi.cc
+@@ -8,7 +8,9 @@
+ 
+ #include "base/win/scoped_hdc.h"
+ #include "ui/display/display.h"
++#if defined(COMPILER_MSVC)
+ #include "ui/display/win/uwp_text_scale_factor.h"
++#endif
+ 
+ namespace display {
+ namespace win {
+@@ -37,7 +39,9 @@ int GetDPIFromScalingFactor(float device_scaling_factor) {
+ }
+ 
+ double GetAccessibilityFontScale() {
++#if defined(COMPILER_MSVC)
+   return 1.0 / UwpTextScaleFactor::Instance()->GetTextScaleFactor();
++#endif
+ }
+ 
+ namespace internal {
+diff --git a/src/3rdparty/chromium/ui/display/win/screen_win.cc b/src/3rdparty/chromium/ui/display/win/screen_win.cc
+index 49eda43..9f530fe 100644
+--- a/src/3rdparty/chromium/ui/display/win/screen_win.cc
++++ b/src/3rdparty/chromium/ui/display/win/screen_win.cc
+@@ -65,9 +65,13 @@ base::Optional<int> GetPerMonitorDPI(HMONITOR monitor) {
+ 
+ float GetScaleFactorForDPI(int dpi, bool include_accessibility) {
+   const float scale = display::win::internal::GetScalingFactorFromDPI(dpi);
++#if defined(COMPILER_MSVC)
+   return include_accessibility
+              ? (scale * UwpTextScaleFactor::Instance()->GetTextScaleFactor())
+              : scale;
++#else
++  return scale;
++#endif
+ }
+ 
+ // Gets the raw monitor scale factor.
+@@ -776,10 +780,12 @@ void ScreenWin::Initialize() {
+   UpdateFromDisplayInfos(GetDisplayInfosFromSystem());
+   RecordDisplayScaleFactors();
+ 
++#if defined(COMPILER_MSVC)
+   // We want to remember that we've observed a screen metrics object so that we
+   // can remove ourselves as an observer at some later point (either when the
+   // metrics object notifies us it's going away or when we are destructed).
+   scale_factor_observer_.Add(UwpTextScaleFactor::Instance());
++#endif
+ }
+ 
+ MONITORINFOEX ScreenWin::MonitorInfoFromScreenPoint(
+@@ -947,6 +953,7 @@ void ScreenWin::RecordDisplayScaleFactors() const {
+   }
+ }
+ 
++#if defined(COMPILER_MSVC)
+ void ScreenWin::OnUwpTextScaleFactorChanged() {
+   UpdateAllDisplaysAndNotify();
+ }
+@@ -956,6 +963,7 @@ void ScreenWin::OnUwpTextScaleFactorCleanup(UwpTextScaleFactor* source) {
+     scale_factor_observer_.Remove(source);
+   UwpTextScaleFactor::Observer::OnUwpTextScaleFactorCleanup(source);
+ }
++#endif
+ 
+ }  // namespace win
+ }  // namespace display
+diff --git a/src/3rdparty/chromium/ui/display/win/screen_win.h b/src/3rdparty/chromium/ui/display/win/screen_win.h
+index dfffbef..f0b77e6 100644
+--- a/src/3rdparty/chromium/ui/display/win/screen_win.h
++++ b/src/3rdparty/chromium/ui/display/win/screen_win.h
+@@ -36,8 +36,12 @@ class DisplayInfo;
+ class ScreenWinDisplay;
+ 
+ class DISPLAY_EXPORT ScreenWin : public Screen,
++#if defined(COMPILER_MSVC)
+                                  public ColorProfileReader::Client,
+                                  public UwpTextScaleFactor::Observer {
++#else
++                                 public ColorProfileReader::Client {
++#endif
+  public:
+   ScreenWin();
+   ~ScreenWin() override;
+@@ -237,8 +241,10 @@ class DISPLAY_EXPORT ScreenWin : public Screen,
+   //-----------------------------------------------------------------
+   // UwpTextScaleFactor::Observer:
+ 
++#if defined(COMPILER_MSVC)
+   void OnUwpTextScaleFactorChanged() override;
+   void OnUwpTextScaleFactorCleanup(UwpTextScaleFactor* source) override;
++#endif
+ 
+   // Helper implementing the DisplayObserver handling.
+   DisplayChangeNotifier change_notifier_;
+@@ -263,8 +269,10 @@ class DISPLAY_EXPORT ScreenWin : public Screen,
+   // advanced color" setting.
+   bool hdr_enabled_ = false;
+ 
++#if defined(COMPILER_MSVC)
+   ScopedObserver<UwpTextScaleFactor, UwpTextScaleFactor::Observer>
+       scale_factor_observer_{this};
++#endif
+ 
+   DISALLOW_COPY_AND_ASSIGN(ScreenWin);
+ };
+diff --git a/src/3rdparty/chromium/ui/events/BUILD.gn b/src/3rdparty/chromium/ui/events/BUILD.gn
+index e3d21dd..2490c0c 100644
+--- a/src/3rdparty/chromium/ui/events/BUILD.gn
++++ b/src/3rdparty/chromium/ui/events/BUILD.gn
+@@ -440,6 +440,10 @@ jumbo_component("gesture_detection") {
+ 
+   defines = [ "GESTURE_DETECTION_IMPLEMENTATION" ]
+ 
++  if (is_mingw && is_clang) {
++    cflags_cc = [ "-Wno-vla-cxx-extension" ]
++  }
++
+   if (is_android) {
+     sources += [ "gesture_detection/gesture_configuration_android.cc" ]
+   } else if (is_chromecast) {
+diff --git a/src/3rdparty/chromium/ui/gfx/BUILD.gn b/src/3rdparty/chromium/ui/gfx/BUILD.gn
+index a368ec1..e831197 100644
+--- a/src/3rdparty/chromium/ui/gfx/BUILD.gn
++++ b/src/3rdparty/chromium/ui/gfx/BUILD.gn
+@@ -212,6 +212,12 @@ jumbo_component("gfx") {
+       "win/window_impl.cc",
+       "win/window_impl.h",
+     ]
++    if (is_mingw) {
++      sources -= [
++        "win/text_analysis_source.cc",
++        "win/text_analysis_source.h",
++      ]
++    }
+   }
+   if (is_ios) {
+     sources += [
+@@ -364,8 +370,8 @@ jumbo_component("gfx") {
+   # Windows.
+   if (is_win) {
+     libs = [
+-      "setupapi.lib",
+-      "dwrite.lib",
++      "setupapi",
++      "dwrite",
+     ]
+     deps += [ "//components/crash/core/common" ]
+   } else {
+@@ -827,11 +833,11 @@ test("gfx_unittests") {
+     ]
+ 
+     libs = [
+-      "d2d1.lib",
+-      "d3d10_1.lib",
+-      "dwrite.lib",
+-      "imm32.lib",
+-      "oleacc.lib",
++      "d2d1",
++      "d3d10_1",
++      "dwrite",
++      "imm32",
++      "oleacc",
+     ]
+   }
+ 
+diff --git a/src/3rdparty/chromium/ui/gfx/codec/BUILD.gn b/src/3rdparty/chromium/ui/gfx/codec/BUILD.gn
+index 45fa24e..e29591b 100644
+--- a/src/3rdparty/chromium/ui/gfx/codec/BUILD.gn
++++ b/src/3rdparty/chromium/ui/gfx/codec/BUILD.gn
+@@ -34,7 +34,7 @@ jumbo_component("codec") {
+     deps += [ "//third_party:jpeg" ]
+   }
+ 
+-  if (is_win) {
++  if (is_msvc) {
+     cflags = [ "/wd4324" ]  # Structure was padded due to __declspec(align()),
+                             # which is uninteresting.
+   }
+diff --git a/src/3rdparty/chromium/ui/gfx/win/crash_id_helper.h b/src/3rdparty/chromium/ui/gfx/win/crash_id_helper.h
+index d27d439..9d0b125 100644
+--- a/src/3rdparty/chromium/ui/gfx/win/crash_id_helper.h
++++ b/src/3rdparty/chromium/ui/gfx/win/crash_id_helper.h
+@@ -5,6 +5,7 @@
+ #ifndef UI_GFX_WIN_CRASH_ID_HELPER_H_
+ #define UI_GFX_WIN_CRASH_ID_HELPER_H_
+ 
++#include <memory>
+ #include <string>
+ #include <vector>
+ 
+diff --git a/src/3rdparty/chromium/ui/gl/BUILD.gn b/src/3rdparty/chromium/ui/gl/BUILD.gn
+index cfcac64..e15b280 100644
+--- a/src/3rdparty/chromium/ui/gl/BUILD.gn
++++ b/src/3rdparty/chromium/ui/gl/BUILD.gn
+@@ -335,13 +335,18 @@ jumbo_component("gl") {
+     ]
+ 
+     libs = [
+-      "dxgi.lib",
+-      "dwmapi.lib",
+-    ]
+-    ldflags = [
+-      "/DELAYLOAD:dwmapi.dll",
+-      "/DELAYLOAD:dxgi.dll",
++      "dxgi",
++      "dwmapi",
+     ]
++    if (is_mingw) {
++      configs -= [ "//build/config/compiler:no_rtti" ]
++      configs += [ "//build/config/compiler:rtti" ]
++    } else {
++      ldflags = [
++        "/DELAYLOAD:dwmapi.dll",
++        "/DELAYLOAD:dxgi.dll",
++      ]
++    }
+ 
+     assert(use_egl)
+     data_deps += [
+diff --git a/src/3rdparty/chromium/ui/gl/init/BUILD.gn b/src/3rdparty/chromium/ui/gl/init/BUILD.gn
+index 0eadfaa..e64333b 100644
+--- a/src/3rdparty/chromium/ui/gl/init/BUILD.gn
++++ b/src/3rdparty/chromium/ui/gl/init/BUILD.gn
+@@ -47,8 +47,10 @@ jumbo_component("init") {
+       "gl_initializer_win.cc",
+     ]
+ 
+-    libs = [ "dwmapi.lib" ]
+-    ldflags = [ "/DELAYLOAD:dwmapi.dll" ]
++    libs = [ "dwmapi" ]
++    if (is_msvc) {
++      ldflags = [ "/DELAYLOAD:dwmapi.dll" ]
++    }
+   } else if (is_mac) {
+     sources += [
+       "gl_factory_mac.cc",
+diff --git a/src/3rdparty/chromium/ui/native_theme/BUILD.gn b/src/3rdparty/chromium/ui/native_theme/BUILD.gn
+index fd8e438..4fc5cf9 100644
+--- a/src/3rdparty/chromium/ui/native_theme/BUILD.gn
++++ b/src/3rdparty/chromium/ui/native_theme/BUILD.gn
+@@ -104,7 +104,7 @@ if (is_win) {
+       "//ui/gfx",
+     ]
+ 
+-    libs = [ "uxtheme.lib" ]
++    libs = [ "uxtheme" ]
+   }
+ } else {
+   source_set("native_theme_browser") {
+diff --git a/src/3rdparty/chromium/ui/native_theme/native_theme.cc b/src/3rdparty/chromium/ui/native_theme/native_theme.cc
+index 7a9ae49..578b8b0 100644
+--- a/src/3rdparty/chromium/ui/native_theme/native_theme.cc
++++ b/src/3rdparty/chromium/ui/native_theme/native_theme.cc
+@@ -159,11 +159,11 @@ void ReportHistogramBooleanUsesColorProvider(bool uses_color_provider) {
+ }  // namespace
+ 
+ NativeTheme::ExtraParams::ExtraParams() {
+-  memset(this, 0, sizeof(*this));
++  memset(reinterpret_cast<void*>(this), 0, sizeof(*this));
+ }
+ 
+ NativeTheme::ExtraParams::ExtraParams(const ExtraParams& other) {
+-  memcpy(this, &other, sizeof(*this));
++  memcpy(reinterpret_cast<void*>(this), &other, sizeof(*this));
+ }
+ 
+ #if !defined(OS_WIN) && !defined(OS_APPLE)
+diff --git a/src/3rdparty/chromium/ui/shell_dialogs/base_shell_dialog_win.cc b/src/3rdparty/chromium/ui/shell_dialogs/base_shell_dialog_win.cc
+index 46fd116..0f17989 100644
+--- a/src/3rdparty/chromium/ui/shell_dialogs/base_shell_dialog_win.cc
++++ b/src/3rdparty/chromium/ui/shell_dialogs/base_shell_dialog_win.cc
+@@ -21,10 +21,14 @@ namespace {
+ // have a situation where a modal dialog in one window blocks the appearance
+ // of a modal dialog in another.
+ scoped_refptr<base::SingleThreadTaskRunner> CreateDialogTaskRunner() {
++#if defined(COMPILER_MSVC)
+   return base::ThreadPool::CreateCOMSTATaskRunner(
+       {base::TaskPriority::USER_BLOCKING,
+        base::TaskShutdownBehavior::CONTINUE_ON_SHUTDOWN, base::MayBlock()},
+       base::SingleThreadTaskRunnerThreadMode::DEDICATED);
++#else
++  return nullptr;
++#endif
+ }
+ 
+ // Enables the window |owner|. Can only be run from the UI thread.
+diff --git a/src/3rdparty/chromium/ui/webui/resources/tools/js_modulizer.py b/src/3rdparty/chromium/ui/webui/resources/tools/js_modulizer.py
+index 2e1d0aa..7611111 100644
+--- a/src/3rdparty/chromium/ui/webui/resources/tools/js_modulizer.py
++++ b/src/3rdparty/chromium/ui/webui/resources/tools/js_modulizer.py
+@@ -43,13 +43,13 @@ _CWD = os.getcwd()
+ 
+ IMPORT_LINE_REGEX = '// #import'
+ EXPORT_LINE_REGEX = '/* #export */'
+-IGNORE_LINE_REGEX = '\s*/\* #ignore \*/(\S|\s)*'
++IGNORE_LINE_REGEX = r'\s*/\* #ignore \*/(\S|\s)*'
+ 
+ # Ignore lines that contain <include> tags, (for example see util.js).
+ INCLUDE_LINE_REGEX = '^// <include '
+ 
+ # Ignore this line.
+-CR_DEFINE_START_REGEX = 'cr.define\('
++CR_DEFINE_START_REGEX = r'cr.define\('
+ 
+ # Ignore all lines after this comment.
+ CR_DEFINE_END_REGEX = r'\s+// #cr_define_end'

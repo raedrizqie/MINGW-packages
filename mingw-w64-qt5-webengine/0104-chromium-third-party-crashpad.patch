@@ -1,0 +1,413 @@
+diff --git a/src/3rdparty/chromium/third_party/crashpad/crashpad/client/BUILD.gn b/src/3rdparty/chromium/third_party/crashpad/crashpad/client/BUILD.gn
+index ca55ad4..7140c03 100644
+--- a/src/3rdparty/chromium/third_party/crashpad/crashpad/client/BUILD.gn
++++ b/src/3rdparty/chromium/third_party/crashpad/crashpad/client/BUILD.gn
+@@ -96,8 +96,10 @@ crashpad_static_library("client") {
+   deps = []
+ 
+   if (crashpad_is_win) {
+-    libs = [ "rpcrt4.lib" ]
+-    cflags = [ "/wd4201" ]  # nonstandard extension used : nameless struct/union
++    libs = [ "rpcrt4" ]
++    if (is_msvc) {
++      cflags = [ "/wd4201" ]  # nonstandard extension used : nameless struct/union
++    }
+   }
+ 
+   # TODO(justincohen): Temporary dependency to bring up the iOS client.
+diff --git a/src/3rdparty/chromium/third_party/crashpad/crashpad/compat/win/strings.cc b/src/3rdparty/chromium/third_party/crashpad/crashpad/compat/win/strings.cc
+index 6af256e..68ef22a 100644
+--- a/src/3rdparty/chromium/third_party/crashpad/crashpad/compat/win/strings.cc
++++ b/src/3rdparty/chromium/third_party/crashpad/crashpad/compat/win/strings.cc
+@@ -16,6 +16,7 @@
+ 
+ #include <string.h>
+ 
++#ifdef _MSC_VER
+ extern "C" {
+ 
+ int strcasecmp(const char* s1, const char* s2) {
+@@ -23,3 +24,4 @@ int strcasecmp(const char* s1, const char* s2) {
+ }
+ 
+ }  // extern "C"
++#endif
+diff --git a/src/3rdparty/chromium/third_party/crashpad/crashpad/compat/win/strings.h b/src/3rdparty/chromium/third_party/crashpad/crashpad/compat/win/strings.h
+index 50360b1..1108409 100644
+--- a/src/3rdparty/chromium/third_party/crashpad/crashpad/compat/win/strings.h
++++ b/src/3rdparty/chromium/third_party/crashpad/crashpad/compat/win/strings.h
+@@ -15,6 +15,7 @@
+ #ifndef CRASHPAD_COMPAT_WIN_STRINGS_H_
+ #define CRASHPAD_COMPAT_WIN_STRINGS_H_
+ 
++#ifdef _MSC_VER
+ #ifdef __cplusplus
+ extern "C" {
+ #endif
+@@ -25,4 +26,8 @@ int strcasecmp(const char* s1, const char* s2);
+ }  // extern "C"
+ #endif
+ 
++#else
++#include_next <strings.h>
++#endif
++
+ #endif  // CRASHPAD_COMPAT_WIN_STRINGS_H_
+diff --git a/src/3rdparty/chromium/third_party/crashpad/crashpad/compat/win/sys/time.h b/src/3rdparty/chromium/third_party/crashpad/crashpad/compat/win/sys/time.h
+index 71ddcdc..5348dd6 100644
+--- a/src/3rdparty/chromium/third_party/crashpad/crashpad/compat/win/sys/time.h
++++ b/src/3rdparty/chromium/third_party/crashpad/crashpad/compat/win/sys/time.h
+@@ -15,6 +15,10 @@
+ #ifndef CRASHPAD_COMPAT_WIN_SYS_TIME_H_
+ #define CRASHPAD_COMPAT_WIN_SYS_TIME_H_
+ 
++#ifdef _MSC_VER
+ #include <winsock2.h>
++#else
++#include_next <sys/time.h>
++#endif
+ 
+ #endif  // CRASHPAD_COMPAT_WIN_SYS_TIME_H_
+diff --git a/src/3rdparty/chromium/third_party/crashpad/crashpad/compat/win/sys/types.h b/src/3rdparty/chromium/third_party/crashpad/crashpad/compat/win/sys/types.h
+index e8fae88..7e19e34 100644
+--- a/src/3rdparty/chromium/third_party/crashpad/crashpad/compat/win/sys/types.h
++++ b/src/3rdparty/chromium/third_party/crashpad/crashpad/compat/win/sys/types.h
+@@ -15,8 +15,12 @@
+ #ifndef CRASHPAD_COMPAT_WIN_SYS_TYPES_H_
+ #define CRASHPAD_COMPAT_WIN_SYS_TYPES_H_
+ 
++#ifdef _MSC_VER
+ // This is intended to be roughly equivalent to #include_next.
+ #include <../ucrt/sys/types.h>
++#else
++#include_next <sys/types.h>
++#endif
+ 
+ #include <stdint.h>
+ 
+diff --git a/src/3rdparty/chromium/third_party/crashpad/crashpad/compat/win/time.cc b/src/3rdparty/chromium/third_party/crashpad/crashpad/compat/win/time.cc
+index e673887..0f45ebd 100644
+--- a/src/3rdparty/chromium/third_party/crashpad/crashpad/compat/win/time.cc
++++ b/src/3rdparty/chromium/third_party/crashpad/crashpad/compat/win/time.cc
+@@ -33,8 +33,38 @@ const char* strptime(const char* buf, const char* format, struct tm* tm) {
+   return nullptr;
+ }
+ 
++#ifdef _MSC_VER
+ time_t timegm(struct tm* tm) {
+   return _mkgmtime(tm);
+ }
++#else
++// https://stackoverflow.com/questions/16647819/timegm-cross-platform
++// Algorithm: http://howardhinnant.github.io/date_algorithms.html
++int days_from_epoch(int y, int m, int d) {
++    y -= m <= 2;
++    int era = y / 400;
++    int yoe = y - era * 400;                                   // [0, 399]
++    int doy = (153 * (m + (m > 2 ? -3 : 9)) + 2) / 5 + d - 1;  // [0, 365]
++    int doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;           // [0, 146096]
++    return era * 146097 + doe - 719468;
++}
++
++// It  does not modify broken-down time
++time_t timegm(struct tm* tm) {
++    int year = tm->tm_year + 1900;
++    int month = tm->tm_mon;          // 0-11
++    if (month > 11) {
++        year += month / 12;
++        month %= 12;
++    } else if (month < 0) {
++        int years_diff = (11 - month) / 12;
++        year -= years_diff;
++        month += 12 * years_diff;
++    }
++    int days_since_epoch = days_from_epoch(year, month + 1, tm->tm_mday);
++
++    return 60 * (60 * (24L * days_since_epoch + tm->tm_hour) + tm->tm_min) + tm->tm_sec;
++}
++#endif
+ 
+ }  // extern "C"
+diff --git a/src/3rdparty/chromium/third_party/crashpad/crashpad/compat/win/time.h b/src/3rdparty/chromium/third_party/crashpad/crashpad/compat/win/time.h
+index 37048da..11fb07a 100644
+--- a/src/3rdparty/chromium/third_party/crashpad/crashpad/compat/win/time.h
++++ b/src/3rdparty/chromium/third_party/crashpad/crashpad/compat/win/time.h
+@@ -15,8 +15,12 @@
+ #ifndef CRASHPAD_COMPAT_WIN_TIME_H_
+ #define CRASHPAD_COMPAT_WIN_TIME_H_
+ 
++#ifdef _MSC_VER
+ // This is intended to be roughly equivalent to #include_next.
+ #include <../ucrt/time.h>
++#else
++#include_next <time.h>
++#endif
+ 
+ #ifdef __cplusplus
+ extern "C" {
+diff --git a/src/3rdparty/chromium/third_party/crashpad/crashpad/compat/win/winbase.h b/src/3rdparty/chromium/third_party/crashpad/crashpad/compat/win/winbase.h
+index ffd850b..9b3d524 100644
+--- a/src/3rdparty/chromium/third_party/crashpad/crashpad/compat/win/winbase.h
++++ b/src/3rdparty/chromium/third_party/crashpad/crashpad/compat/win/winbase.h
+@@ -15,8 +15,12 @@
+ #ifndef CRASHPAD_COMPAT_WIN_WINBASE_H_
+ #define CRASHPAD_COMPAT_WIN_WINBASE_H_
+ 
++#ifdef _MSC_VER
+ // include_next <winbase.h>
+ #include <../um/winbase.h>
++#else
++#include_next <winbase.h>
++#endif
+ 
+ // 10.0.15063.0 SDK
+ 
+diff --git a/src/3rdparty/chromium/third_party/crashpad/crashpad/compat/win/winnt.h b/src/3rdparty/chromium/third_party/crashpad/crashpad/compat/win/winnt.h
+index 34ea80f..8c047cd 100644
+--- a/src/3rdparty/chromium/third_party/crashpad/crashpad/compat/win/winnt.h
++++ b/src/3rdparty/chromium/third_party/crashpad/crashpad/compat/win/winnt.h
+@@ -15,8 +15,12 @@
+ #ifndef CRASHPAD_COMPAT_WIN_WINNT_H_
+ #define CRASHPAD_COMPAT_WIN_WINNT_H_
+ 
++#ifdef _MSC_VER
+ // include_next <winnt.h>
+ #include <../um/winnt.h>
++#else
++#include_next <winnt.h>
++#endif
+ 
+ // https://msdn.microsoft.com/library/aa373184.aspx: "Note that this structure
+ // definition was accidentally omitted from WinNT.h."
+diff --git a/src/3rdparty/chromium/third_party/crashpad/crashpad/compat/win/winternl.h b/src/3rdparty/chromium/third_party/crashpad/crashpad/compat/win/winternl.h
+index ee4f53c..94d94e2 100644
+--- a/src/3rdparty/chromium/third_party/crashpad/crashpad/compat/win/winternl.h
++++ b/src/3rdparty/chromium/third_party/crashpad/crashpad/compat/win/winternl.h
+@@ -15,8 +15,12 @@
+ #ifndef CRASHPAD_COMPAT_WIN_WINTERNL_H_
+ #define CRASHPAD_COMPAT_WIN_WINTERNL_H_
+ 
++#ifdef _MSC_VER
+ // include_next <winternl.h>
+ #include <../um/winternl.h>
++#else
++#include_next <winternl.h>
++#endif
+ 
+ // 10.0.16299.0 SDK
+ 
+diff --git a/src/3rdparty/chromium/third_party/crashpad/crashpad/handler/BUILD.gn b/src/3rdparty/chromium/third_party/crashpad/crashpad/handler/BUILD.gn
+index 332117d..831560f 100644
+--- a/src/3rdparty/chromium/third_party/crashpad/crashpad/handler/BUILD.gn
++++ b/src/3rdparty/chromium/third_party/crashpad/crashpad/handler/BUILD.gn
+@@ -263,7 +263,9 @@ if (crashpad_is_win) {
+ 
+     sources = [ "win/crashy_signal.cc" ]
+ 
+-    cflags = [ "/wd4702" ]  # Unreachable code.
++    if (is_msvc) {
++      cflags = [ "/wd4702" ]  # Unreachable code.
++    }
+ 
+     deps = [
+       "../client",
+diff --git a/src/3rdparty/chromium/third_party/crashpad/crashpad/minidump/BUILD.gn b/src/3rdparty/chromium/third_party/crashpad/crashpad/minidump/BUILD.gn
+index d07c1dd..0cb809a 100644
+--- a/src/3rdparty/chromium/third_party/crashpad/crashpad/minidump/BUILD.gn
++++ b/src/3rdparty/chromium/third_party/crashpad/crashpad/minidump/BUILD.gn
+@@ -84,7 +84,7 @@ crashpad_static_library("minidump") {
+     "../util",
+   ]
+ 
+-  if (crashpad_is_win) {
++  if (crashpad_is_win && is_msvc) {
+     cflags = [
+       "/wd4201",  # nonstandard extension used : nameless struct/union
+       "/wd4324",  # 'struct' : structure was padded due to __declspec(align())
+@@ -145,7 +145,7 @@ static_library("test_support") {
+     "../util",
+   ]
+ 
+-  if (crashpad_is_win) {
++  if (crashpad_is_win && is_msvc) {
+     cflags = [ "/wd4201" ]  # nonstandard extension used : nameless struct/union
+   }
+ }
+@@ -188,7 +188,7 @@ source_set("minidump_test") {
+     "../util",
+   ]
+ 
+-  if (crashpad_is_win) {
++  if (crashpad_is_win && is_msvc) {
+     cflags = [ "/wd4201" ]  # nonstandard extension used : nameless struct/union
+   }
+ 
+diff --git a/src/3rdparty/chromium/third_party/crashpad/crashpad/snapshot/BUILD.gn b/src/3rdparty/chromium/third_party/crashpad/crashpad/snapshot/BUILD.gn
+index 49a809a..fd0a0cd 100644
+--- a/src/3rdparty/chromium/third_party/crashpad/crashpad/snapshot/BUILD.gn
++++ b/src/3rdparty/chromium/third_party/crashpad/crashpad/snapshot/BUILD.gn
+@@ -259,8 +259,10 @@ crashpad_static_library("snapshot") {
+   }
+ 
+   if (crashpad_is_win) {
+-    cflags = [ "/wd4201" ]  # nonstandard extension used : nameless struct/union
+-    libs = [ "powrprof.lib" ]
++    if (is_msvc) {
++      cflags = [ "/wd4201" ]  # nonstandard extension used : nameless struct/union
++    }
++    libs = [ "powrprof" ]
+   }
+ }
+ 
+@@ -279,7 +281,7 @@ static_library("context") {
+     "../util",
+   ]
+ 
+-  if (crashpad_is_win) {
++  if (crashpad_is_win && is_msvc) {
+     cflags = [ "/wd4201" ]  # nonstandard extension used : nameless struct/union
+   }
+ }
+@@ -328,7 +330,7 @@ static_library("test_support") {
+     "../util",
+   ]
+ 
+-  if (crashpad_is_win) {
++  if (crashpad_is_win && is_msvc) {
+     cflags = [ "/wd4201" ]  # nonstandard extension used : nameless struct/union
+   }
+ }
+@@ -459,7 +461,9 @@ source_set("snapshot_test") {
+   }
+ 
+   if (crashpad_is_win) {
+-    cflags = [ "/wd4201" ]  # nonstandard extension used : nameless struct/union
++    if (is_msvc) {
++      cflags = [ "/wd4201" ]  # nonstandard extension used : nameless struct/union
++    }
+ 
+     data_deps += [
+       ":crashpad_snapshot_test_annotations",
+diff --git a/src/3rdparty/chromium/third_party/crashpad/crashpad/util/BUILD.gn b/src/3rdparty/chromium/third_party/crashpad/crashpad/util/BUILD.gn
+index 0ce8359..ba4d758 100644
+--- a/src/3rdparty/chromium/third_party/crashpad/crashpad/util/BUILD.gn
++++ b/src/3rdparty/chromium/third_party/crashpad/crashpad/util/BUILD.gn
+@@ -524,7 +524,7 @@ crashpad_static_library("util") {
+     #
+     # TODO(thakis): Use the .asm file in cross builds somehow,
+     # https://crbug.com/762167.
+-    if (host_os == "win") {
++    if (is_msvc) {
+       if (current_cpu != "arm64") {
+         sources += [
+           "misc/capture_context_win.asm",
+@@ -601,19 +601,21 @@ crashpad_static_library("util") {
+ 
+   if (crashpad_is_win) {
+     libs = [
+-      "user32.lib",
++      "user32",
+ 
+       # TODO(jperaza): version.lib is needed for Windows 7 compatibility.
+       # mincore.lib may be linked against instead when targeting Windows 8+.
+-      "version.lib",
++      "version",
+ 
+-      "winhttp.lib",
++      "winhttp",
+     ]
+ 
+-    cflags = [ "/wd4201" ]  # nonstandard extension used: nameless struct/union.
++    if (is_msvc) {
++      cflags = [ "/wd4201" ]  # nonstandard extension used: nameless struct/union.
+ 
+-    if (current_cpu == "x86") {
+-      asmflags = [ "/safeseh" ]
++      if (current_cpu == "x86") {
++        asmflags = [ "/safeseh" ]
++      }
+     }
+   }
+ 
+@@ -647,7 +649,7 @@ if (!crashpad_is_android && !crashpad_is_ios) {
+     }
+ 
+     if (crashpad_is_win) {
+-      libs = [ "ws2_32.lib" ]
++      libs = [ "ws2_32" ]
+     }
+ 
+     if (crashpad_use_boringssl_for_http_transport_socket) {
+@@ -868,8 +870,8 @@ source_set("util_test") {
+ 
+   if (crashpad_is_win) {
+     libs = [
+-      "rpcrt4.lib",
+-      "dbghelp.lib",
++      "rpcrt4",
++      "dbghelp",
+     ]
+     data_deps += [
+       ":crashpad_util_test_loader_lock_test",
+diff --git a/src/3rdparty/chromium/third_party/crashpad/crashpad/util/stdlib/aligned_allocator.cc b/src/3rdparty/chromium/third_party/crashpad/crashpad/util/stdlib/aligned_allocator.cc
+index 797a3ac..05221db 100644
+--- a/src/3rdparty/chromium/third_party/crashpad/crashpad/util/stdlib/aligned_allocator.cc
++++ b/src/3rdparty/chromium/third_party/crashpad/crashpad/util/stdlib/aligned_allocator.cc
+@@ -22,7 +22,9 @@
+ #include <stdlib.h>
+ #elif defined(OS_WIN)
+ #include <malloc.h>
++#if defined(COMPILER_MSVC)
+ #include <xutility>
++#endif
+ #endif  // OS_POSIX
+ 
+ namespace {
+@@ -35,7 +37,11 @@ void ThrowBadAlloc() {
+   // This works with both libc++ and libstdc++.
+   std::__throw_bad_alloc();
+ #elif defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+   std::_Xbad_alloc();
++#else
++  std::bad_alloc();
++#endif
+ #endif  // OS_POSIX
+ }
+ 
+diff --git a/src/3rdparty/chromium/third_party/crashpad/crashpad/util/win/exception_handler_server.cc b/src/3rdparty/chromium/third_party/crashpad/crashpad/util/win/exception_handler_server.cc
+index c841f7b..b7ed7de 100644
+--- a/src/3rdparty/chromium/third_party/crashpad/crashpad/util/win/exception_handler_server.cc
++++ b/src/3rdparty/chromium/third_party/crashpad/crashpad/util/win/exception_handler_server.cc
+@@ -18,6 +18,7 @@
+ #include <string.h>
+ #include <sys/types.h>
+ 
++#include <memory>
+ #include <utility>
+ 
+ #include "base/logging.h"
+diff --git a/src/3rdparty/chromium/third_party/crashpad/crashpad/util/win/process_info.cc b/src/3rdparty/chromium/third_party/crashpad/crashpad/util/win/process_info.cc
+index 49a6f27..aff2bed 100644
+--- a/src/3rdparty/chromium/third_party/crashpad/crashpad/util/win/process_info.cc
++++ b/src/3rdparty/chromium/third_party/crashpad/crashpad/util/win/process_info.cc
+@@ -115,11 +115,19 @@ bool ReadStruct(HANDLE process, WinVMAddress at, T* into) {
+                          &bytes_read)) {
+     // We don't have a name for the type we're reading, so include the signature
+     // to get the type of T.
++#if defined(COMPILER_MSVC)
+     PLOG(ERROR) << "ReadProcessMemory " << __FUNCSIG__;
++#else
++    PLOG(ERROR) << "ReadProcessMemory " << __PRETTY_FUNCTION__;
++#endif
+     return false;
+   }
+   if (bytes_read != sizeof(T)) {
++#if defined(COMPILER_MSVC)
+     LOG(ERROR) << "ReadProcessMemory " << __FUNCSIG__ << " incorrect size";
++#else
++    LOG(ERROR) << "ReadProcessMemory " << __PRETTY_FUNCTION__ << " incorrect size";
++#endif
+     return false;
+   }
+   return true;

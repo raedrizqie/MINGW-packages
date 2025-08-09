@@ -1,0 +1,760 @@
+diff --git a/src/3rdparty/chromium/v8/BUILD.gn b/src/3rdparty/chromium/v8/BUILD.gn
+index ba99c75..e223c9f 100644
+--- a/src/3rdparty/chromium/v8/BUILD.gn
++++ b/src/3rdparty/chromium/v8/BUILD.gn
+@@ -819,18 +819,22 @@ config("toolchain") {
+ 
+   if (v8_current_cpu == "x86") {
+     defines += [ "V8_TARGET_ARCH_IA32" ]
+-    if (is_win) {
++    if (is_msvc) {
+       # Ensure no surprising artifacts from 80bit double math with x86.
+       cflags += [ "/arch:SSE2" ]
++    } else {
++      cflags += [ "-msse2" ]
+     }
+   }
+   if (v8_current_cpu == "x64") {
+     defines += [ "V8_TARGET_ARCH_X64" ]
+-    if (is_win) {
++    if (is_msvc) {
+       # Increase the initial stack size. The default is 1MB, this is 2MB. This
+       # applies only to executables and shared libraries produced by V8 since
+       # ldflags are not pushed to dependants.
+       ldflags += [ "/STACK:2097152" ]
++    } else {
++      ldflags += [ "-Wl,--stack,2097152" ]
+     }
+   }
+   if (is_android && v8_android_log_stdout) {
+@@ -886,7 +890,7 @@ config("toolchain") {
+   }
+ 
+   if (v8_no_inline) {
+-    if (is_win) {
++    if (is_msvc) {
+       cflags += [ "/Ob0" ]
+     } else {
+       cflags += [
+@@ -910,7 +914,7 @@ config("toolchain") {
+     }
+   }
+ 
+-  if (is_win) {
++  if (is_msvc) {
+     cflags += [
+       "/wd4245",  # Conversion with signed/unsigned mismatch.
+       "/wd4267",  # Conversion with possible loss of data.
+@@ -932,11 +936,11 @@ config("toolchain") {
+     ]
+   }
+ 
+-  if (!is_clang && is_win) {
++  if (!is_clang && is_msvc) {
+     cflags += [ "/wd4506" ]  # Benign "no definition for inline function"
+   }
+ 
+-  if (!is_clang && !is_win) {
++  if (!is_clang && !is_msvc) {
+     cflags += [
+       # Disable gcc warnings for optimizations based on the assumption that
+       # signed overflow does not occur. Generates false positives (see
+@@ -3792,7 +3796,7 @@ v8_source_set("v8_base_without_compiler") {
+   if (v8_enable_i18n_support) {
+     deps += [ ":run_gen-regexp-special-case" ]
+     sources += [ "$target_gen_dir/src/regexp/special-case.cc" ]
+-    if (is_win) {
++    if (is_msvc) {
+       deps += [ "//third_party/icu:icudata" ]
+     }
+   } else {
+@@ -4180,9 +4184,9 @@ v8_component("v8_libbase") {
+     defines += [ "_CRT_RAND_S" ]  # for rand_s()
+ 
+     libs = [
+-      "dbghelp.lib",
+-      "winmm.lib",
+-      "ws2_32.lib",
++      "dbghelp",
++      "winmm",
++      "ws2_32",
+     ]
+ 
+     data_deps += [ "//build/win:runtime_libs" ]
+@@ -4311,7 +4315,7 @@ v8_source_set("v8_cppgc_shared") {
+     "src/heap/base/worklist.h",
+   ]
+ 
+-  if (is_clang || !is_win) {
++  if (is_clang || !is_msvc) {
+     if (current_cpu == "x64") {
+       sources += [ "src/heap/base/asm/x64/push_registers_asm.cc" ]
+     } else if (current_cpu == "x86") {
+@@ -4329,7 +4333,7 @@ v8_source_set("v8_cppgc_shared") {
+     } else if (current_cpu == "mips64el") {
+       sources += [ "src/heap/base/asm/mips64/push_registers_asm.cc" ]
+     }
+-  } else if (is_win) {
++  } else if (is_msvc) {
+     if (current_cpu == "x64") {
+       sources += [ "src/heap/base/asm/x64/push_registers_masm.S" ]
+     } else if (current_cpu == "x86") {
+diff --git a/src/3rdparty/chromium/v8/gni/snapshot_toolchain.gni b/src/3rdparty/chromium/v8/gni/snapshot_toolchain.gni
+index 5e444ef..a6a1734 100644
+--- a/src/3rdparty/chromium/v8/gni/snapshot_toolchain.gni
++++ b/src/3rdparty/chromium/v8/gni/snapshot_toolchain.gni
+@@ -123,6 +123,8 @@ if (v8_snapshot_toolchain == "") {
+ 
+     if (_cpus != "") {
+       v8_snapshot_toolchain = "//build/toolchain/${host_os}:${_clang}${_cpus}"
++    } else if (is_win && v8_current_cpu == "arm64") {
++      v8_snapshot_toolchain = current_toolchain
+     }
+   }
+ }
+diff --git a/src/3rdparty/chromium/v8/include/v8.h b/src/3rdparty/chromium/v8/include/v8.h
+index 2ce1a4f..a059f27 100644
+--- a/src/3rdparty/chromium/v8/include/v8.h
++++ b/src/3rdparty/chromium/v8/include/v8.h
+@@ -31,6 +31,10 @@
+ #include "v8-version.h"   // NOLINT(build/include_directory)
+ #include "v8config.h"     // NOLINT(build/include_directory)
+ 
++#if defined(V8_OS_WIN)
++struct _EXCEPTION_POINTERS;
++#endif
++
+ // We reserve the V8_* prefix for macros defined in V8 public API and
+ // assume there are no name conflicts with the embedder's code.
+ 
+@@ -7887,8 +7891,8 @@ typedef void (*JitCodeEventHandler)(const JitCodeEvent* event);
+  * Callback function passed to SetUnhandledExceptionCallback.
+  */
+ #if defined(V8_OS_WIN)
+-typedef int (*UnhandledExceptionCallback)(
+-    _EXCEPTION_POINTERS* exception_pointers);
++using UnhandledExceptionCallback =
++    int (*)(_EXCEPTION_POINTERS* exception_pointers);
+ #endif
+ 
+ /**
+@@ -9807,7 +9811,7 @@ class V8_EXPORT V8 {
+    * exceptions in V8-generated code.
+    */
+   static void SetUnhandledExceptionCallback(
+-      UnhandledExceptionCallback unhandled_exception_callback);
++      UnhandledExceptionCallback callback);
+ #endif
+ 
+   /**
+diff --git a/src/3rdparty/chromium/v8/include/v8config.h b/src/3rdparty/chromium/v8/include/v8config.h
+index a047874..6caa834 100644
+--- a/src/3rdparty/chromium/v8/include/v8config.h
++++ b/src/3rdparty/chromium/v8/include/v8config.h
+@@ -266,6 +266,13 @@
+ 
+ #if defined(__GNUC__)  // Clang in gcc mode.
+ # define V8_CC_GNU 1
++# if defined(__MINGW32__)
++#  define V8_CC_MINGW32 1
++# endif
++# if defined(__MINGW64__)
++#  define V8_CC_MINGW64 1
++# endif
++# define V8_CC_MINGW (V8_CC_MINGW32 || V8_CC_MINGW64)
+ #endif
+ 
+ # define V8_HAS_ATTRIBUTE_ALWAYS_INLINE (__has_attribute(always_inline))
+@@ -446,13 +453,18 @@
+ #define V8_CLANG_NO_SANITIZE(what)
+ #endif
+ 
++// Exposing private symbols requires exposing public symbols too.
++#ifdef BUILDING_V8_SHARED_PRIVATE
++#define BUILDING_V8_SHARED
++#endif
++
+ #if defined(BUILDING_V8_SHARED) && defined(USING_V8_SHARED)
+ #error Inconsistent build configuration: To build the V8 shared library \
+ set BUILDING_V8_SHARED, to include its headers for linking against the \
+ V8 shared library set USING_V8_SHARED.
+ #endif
+ 
+-#ifdef V8_OS_WIN
++#ifdef V8_CC_MSVC
+ 
+ // Setup for Windows DLL export/import. When building the V8 DLL the
+ // BUILDING_V8_SHARED needs to be defined. When building a program which uses
+@@ -467,7 +479,7 @@ V8 shared library set USING_V8_SHARED.
+ # define V8_EXPORT
+ #endif  // BUILDING_V8_SHARED
+ 
+-#else  // V8_OS_WIN
++#else  // V8_CC_MSVC
+ 
+ // Setup for Linux shared library export.
+ #if V8_HAS_ATTRIBUTE_VISIBILITY
+@@ -480,7 +492,7 @@ V8 shared library set USING_V8_SHARED.
+ # define V8_EXPORT
+ #endif
+ 
+-#endif  // V8_OS_WIN
++#endif  // V8_CC_MSVC
+ 
+ // Support for floating point parameters in calls to C.
+ // It's currently enabled only for the platforms listed below. We don't plan
+diff --git a/src/3rdparty/chromium/v8/src/api/api.cc b/src/3rdparty/chromium/v8/src/api/api.cc
+index 851a6fb..3db3215 100644
+--- a/src/3rdparty/chromium/v8/src/api/api.cc
++++ b/src/3rdparty/chromium/v8/src/api/api.cc
+@@ -123,8 +123,11 @@
+ #endif
+ 
+ #if V8_OS_WIN
+-#include <versionhelpers.h>
+ #include <windows.h>
++
++// This has to come after windows.h.
++#include <versionhelpers.h>
++
+ #include "include/v8-wasm-trap-handler-win.h"
+ #include "src/trap-handler/handler-inside-win.h"
+ #if defined(V8_OS_WIN64)
+diff --git a/src/3rdparty/chromium/v8/src/base/bits.h b/src/3rdparty/chromium/v8/src/base/bits.h
+index cf4b77f..457480f 100644
+--- a/src/3rdparty/chromium/v8/src/base/bits.h
++++ b/src/3rdparty/chromium/v8/src/base/bits.h
+@@ -17,6 +17,13 @@
+ #include "src/base/win32-headers.h"
+ #endif
+ 
++#if V8_CC_MINGW
++#undef RotateLeft32
++#undef RotateLeft64
++#undef RotateRight32
++#undef RotateRight64
++#endif
++
+ namespace v8 {
+ namespace base {
+ namespace bits {
+diff --git a/src/3rdparty/chromium/v8/src/base/debug/stack_trace_win.cc b/src/3rdparty/chromium/v8/src/base/debug/stack_trace_win.cc
+index f981bec..16655d5 100644
+--- a/src/3rdparty/chromium/v8/src/base/debug/stack_trace_win.cc
++++ b/src/3rdparty/chromium/v8/src/base/debug/stack_trace_win.cc
+@@ -81,7 +81,7 @@ bool InitializeSymbols() {
+   }
+ 
+   wchar_t exe_path[MAX_PATH];
+-  GetModuleFileName(nullptr, exe_path, MAX_PATH);
++  GetModuleFileNameW(nullptr, exe_path, MAX_PATH);
+   std::wstring exe_path_wstring(exe_path);
+   // To get the path without the filename, we just need to remove the final
+   // slash and everything after it.
+diff --git a/src/3rdparty/chromium/v8/src/base/export-template.h b/src/3rdparty/chromium/v8/src/base/export-template.h
+index 861cfe4..8107672 100644
+--- a/src/3rdparty/chromium/v8/src/base/export-template.h
++++ b/src/3rdparty/chromium/v8/src/base/export-template.h
+@@ -153,8 +153,10 @@
+ 
+ EXPORT_TEMPLATE_TEST(DEFAULT, );
+ EXPORT_TEMPLATE_TEST(DEFAULT, __attribute__((visibility("default"))));
++#ifdef _MSC_VER
+ EXPORT_TEMPLATE_TEST(MSVC_HACK, __declspec(dllexport));
+ EXPORT_TEMPLATE_TEST(DEFAULT, __declspec(dllimport));
++#endif
+ 
+ #undef EXPORT_TEMPLATE_TEST
+ #undef EXPORT_TEMPLATE_TEST_DEFAULT_DEFAULT
+diff --git a/src/3rdparty/chromium/v8/src/base/macros.h b/src/3rdparty/chromium/v8/src/base/macros.h
+index 4220eac..e97f0f1 100644
+--- a/src/3rdparty/chromium/v8/src/base/macros.h
++++ b/src/3rdparty/chromium/v8/src/base/macros.h
+@@ -177,7 +177,7 @@ V8_INLINE Dest bit_cast(Source const& source) {
+ 
+ // DISABLE_CFI_ICALL -- Disable Control Flow Integrity indirect call checks,
+ // useful because calls into JITed code can not be CFI verified.
+-#ifdef V8_OS_WIN
++#ifdef V8_CC_MSVC
+ // On Windows, also needs __declspec(guard(nocf)) for CFG.
+ #define DISABLE_CFI_ICALL           \
+   V8_CLANG_NO_SANITIZE("cfi-icall") \
+@@ -281,8 +281,12 @@ V8_INLINE A implicit_cast(A x) {
+ # else
+ #  define V8_PTR_PREFIX   ""
+ # endif  // V8_HOST_ARCH_64_BIT
+-#elif V8_CC_MINGW64
+-# define V8_PTR_PREFIX    "I64"
++#elif V8_CC_MINGW
++# if V8_TARGET_ARCH_X64
++#  define V8_PTR_PREFIX   "I64"
++# else
++#  define V8_PTR_PREFIX   ""
++# endif
+ #elif V8_HOST_ARCH_64_BIT
+ # define V8_PTR_PREFIX    "l"
+ #else
+diff --git a/src/3rdparty/chromium/v8/src/base/platform/platform-win32.cc b/src/3rdparty/chromium/v8/src/base/platform/platform-win32.cc
+index 3eb11d8..d1e2eac 100644
+--- a/src/3rdparty/chromium/v8/src/base/platform/platform-win32.cc
++++ b/src/3rdparty/chromium/v8/src/base/platform/platform-win32.cc
+@@ -48,8 +48,6 @@ inline void MemoryFence() {
+   __asm__ __volatile__("xchgl %%eax,%0 ":"=r" (barrier));
+ }
+ 
+-#endif  // __MINGW64_VERSION_MAJOR
+-
+ 
+ int localtime_s(tm* out_tm, const time_t* time) {
+   tm* posix_local_time_struct = localtime_r(time, out_tm);
+@@ -96,6 +94,7 @@ int strncpy_s(char* dest, size_t dest_size, const char* source, size_t count) {
+   return 0;
+ }
+ 
++#endif  // __MINGW64_VERSION_MAJOR
+ #endif  // __MINGW32__
+ 
+ namespace v8 {
+@@ -887,7 +886,7 @@ bool OS::DiscardSystemPages(void* address, size_t size) {
+       reinterpret_cast<DiscardVirtualMemoryFunction>(-1))
+     discard_virtual_memory =
+         reinterpret_cast<DiscardVirtualMemoryFunction>(GetProcAddress(
+-            GetModuleHandle(L"Kernel32.dll"), "DiscardVirtualMemory"));
++            GetModuleHandleW(L"Kernel32.dll"), "DiscardVirtualMemory"));
+   // Use DiscardVirtualMemory when available because it releases faster than
+   // MEM_RESET.
+   DiscardVirtualMemoryFunction discard_function = discard_virtual_memory.load();
+diff --git a/src/3rdparty/chromium/v8/src/base/platform/time.cc b/src/3rdparty/chromium/v8/src/base/platform/time.cc
+index 78574b7..4db9980 100644
+--- a/src/3rdparty/chromium/v8/src/base/platform/time.cc
++++ b/src/3rdparty/chromium/v8/src/base/platform/time.cc
+@@ -693,6 +693,17 @@ TimeTicks InitialTimeTicksNowFunction() {
+ 
+ #undef ATOMIC_THREAD_FENCE
+ 
++#if V8_HOST_ARCH_ARM64
++// From MSDN, FILETIME "Contains a 64-bit value representing the number of
++// 100-nanosecond intervals since January 1, 1601 (UTC)."
++int64_t FileTimeToMicroseconds(const FILETIME& ft) {
++  // Need to bit_cast to fix alignment, then divide by 10 to convert
++  // 100-nanoseconds to microseconds. This only works on little-endian
++  // machines.
++  return bit_cast<int64_t, FILETIME>(ft) / 10;
++}
++#endif
++
+ }  // namespace
+ 
+ // static
+@@ -784,13 +795,13 @@ ThreadTicks ThreadTicks::Now() {
+ #endif
+ #elif V8_OS_MACOSX
+   return ThreadTicks(ComputeThreadTicks());
++#elif V8_OS_WIN
++  return ThreadTicks::GetForThread(::GetCurrentThread());
+ #elif(defined(_POSIX_THREAD_CPUTIME) && (_POSIX_THREAD_CPUTIME >= 0)) || \
+   defined(V8_OS_ANDROID)
+   return ThreadTicks(ClockNow(CLOCK_THREAD_CPUTIME_ID));
+ #elif V8_OS_SOLARIS
+   return ThreadTicks(gethrvtime() / Time::kNanosecondsPerMicrosecond);
+-#elif V8_OS_WIN
+-  return ThreadTicks::GetForThread(::GetCurrentThread());
+ #else
+   UNREACHABLE();
+ #endif
+@@ -801,6 +812,20 @@ ThreadTicks ThreadTicks::Now() {
+ ThreadTicks ThreadTicks::GetForThread(const HANDLE& thread_handle) {
+   DCHECK(IsSupported());
+ 
++#if V8_HOST_ARCH_ARM64
++  // QueryThreadCycleTime versus TSCTicksPerSecond doesn't have much relation to
++  // actual elapsed time on Windows on Arm, because QueryThreadCycleTime is
++  // backed by the actual number of CPU cycles executed, rather than a
++  // constant-rate timer like Intel. To work around this, use GetThreadTimes
++  // (which isn't as accurate but is meaningful as a measure of elapsed
++  // per-thread time).
++  FILETIME creation_time, exit_time, kernel_time, user_time;
++  ::GetThreadTimes(thread_handle, &creation_time, &exit_time, &kernel_time,
++                   &user_time);
++
++  int64_t us = FileTimeToMicroseconds(user_time);
++  return ThreadTicks(us);
++#else
+   // Get the number of TSC ticks used by the current thread.
+   ULONG64 thread_cycle_time = 0;
+   ::QueryThreadCycleTime(thread_handle, &thread_cycle_time);
+@@ -814,6 +839,7 @@ ThreadTicks ThreadTicks::GetForThread(const HANDLE& thread_handle) {
+   double thread_time_seconds = thread_cycle_time / tsc_ticks_per_second;
+   return ThreadTicks(
+       static_cast<int64_t>(thread_time_seconds * Time::kMicrosecondsPerSecond));
++#endif
+ }
+ 
+ // static
+@@ -824,16 +850,19 @@ bool ThreadTicks::IsSupportedWin() {
+ 
+ // static
+ void ThreadTicks::WaitUntilInitializedWin() {
++#ifndef V8_HOST_ARCH_ARM64
+   while (TSCTicksPerSecond() == 0)
+     ::Sleep(10);
++#endif
+ }
+ 
+-#ifdef V8_HOST_ARCH_ARM64
+-#define ReadCycleCounter() _ReadStatusReg(ARM64_PMCCNTR_EL0)
+-#else
+-#define ReadCycleCounter() __rdtsc()
++#ifdef V8_CC_MINGW
++extern "C" {
++  extern uint64_t __rdtsc(void);
++}
+ #endif
+ 
++#ifndef V8_HOST_ARCH_ARM64
+ double ThreadTicks::TSCTicksPerSecond() {
+   DCHECK(IsSupported());
+ 
+@@ -854,12 +883,12 @@ double ThreadTicks::TSCTicksPerSecond() {
+ 
+   // The first time that this function is called, make an initial reading of the
+   // TSC and the performance counter.
+-  static const uint64_t tsc_initial = ReadCycleCounter();
++  static const uint64_t tsc_initial = __rdtsc();
+   static const uint64_t perf_counter_initial = QPCNowRaw();
+ 
+   // Make a another reading of the TSC and the performance counter every time
+   // that this function is called.
+-  uint64_t tsc_now = ReadCycleCounter();
++  uint64_t tsc_now = __rdtsc();
+   uint64_t perf_counter_now = QPCNowRaw();
+ 
+   // Reset the thread priority.
+@@ -892,7 +921,7 @@ double ThreadTicks::TSCTicksPerSecond() {
+ 
+   return tsc_ticks_per_second;
+ }
+-#undef ReadCycleCounter
++#endif  // !V8_HOST_ARCH_ARM64
+ #endif  // V8_OS_WIN
+ 
+ }  // namespace base
+diff --git a/src/3rdparty/chromium/v8/src/base/platform/time.h b/src/3rdparty/chromium/v8/src/base/platform/time.h
+index 2fc7859..e56df91 100644
+--- a/src/3rdparty/chromium/v8/src/base/platform/time.h
++++ b/src/3rdparty/chromium/v8/src/base/platform/time.h
+@@ -499,9 +499,11 @@ class V8_BASE_EXPORT ThreadTicks final
+   explicit constexpr ThreadTicks(int64_t ticks) : TimeBase(ticks) {}
+ 
+ #if V8_OS_WIN
++#if !V8_HOST_ARCH_ARM64
+   // Returns the frequency of the TSC in ticks per second, or 0 if it hasn't
+   // been measured yet. Needs to be guarded with a call to IsSupported().
+   static double TSCTicksPerSecond();
++#endif
+   static bool IsSupportedWin();
+   static void WaitUntilInitializedWin();
+ #endif
+diff --git a/src/3rdparty/chromium/v8/src/compiler/branch-elimination.cc b/src/3rdparty/chromium/v8/src/compiler/branch-elimination.cc
+index 40ca16c..37fd6cb 100644
+--- a/src/3rdparty/chromium/v8/src/compiler/branch-elimination.cc
++++ b/src/3rdparty/chromium/v8/src/compiler/branch-elimination.cc
+@@ -263,7 +263,7 @@ Reduction BranchElimination::UpdateConditions(
+     Node* node, ControlPathConditions conditions) {
+   // Only signal that the node has Changed if the condition information has
+   // changed.
+-  if (reduced_.Set(node, true) | node_conditions_.Set(node, conditions)) {
++  if (reduced_.Set(node, true) || node_conditions_.Set(node, conditions)) {
+     return Changed(node);
+   }
+   return NoChange();
+diff --git a/src/3rdparty/chromium/v8/src/diagnostics/unwinding-info-win64.cc b/src/3rdparty/chromium/v8/src/diagnostics/unwinding-info-win64.cc
+index f3b9a75..5aec6ec 100644
+--- a/src/3rdparty/chromium/v8/src/diagnostics/unwinding-info-win64.cc
++++ b/src/3rdparty/chromium/v8/src/diagnostics/unwinding-info-win64.cc
+@@ -16,6 +16,11 @@
+ #error "Unsupported OS"
+ #endif  // V8_OS_WIN_X64
+ 
++#include <windows.h>
++
++// This has to come after windows.h.
++#include <versionhelpers.h>  // For IsWindows8OrGreater().
++
+ namespace v8 {
+ namespace internal {
+ namespace win64_unwindinfo {
+@@ -467,7 +472,7 @@ void LoadNtdllUnwindingFunctions() {
+   base::CallOnce(&load_ntdll_unwinding_functions_once, []() {
+     // Load functions from the ntdll.dll module.
+     HMODULE ntdll_module =
+-        LoadLibraryEx(L"ntdll.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
++        LoadLibraryExW(L"ntdll.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
+     DCHECK_NOT_NULL(ntdll_module);
+ 
+     // This fails on Windows 7.
+diff --git a/src/3rdparty/chromium/v8/src/inspector/string-16.cc b/src/3rdparty/chromium/v8/src/inspector/string-16.cc
+index 466852f..f36ee21 100644
+--- a/src/3rdparty/chromium/v8/src/inspector/string-16.cc
++++ b/src/3rdparty/chromium/v8/src/inspector/string-16.cc
+@@ -27,7 +27,7 @@ bool isSpaceOrNewLine(UChar c) {
+   return isASCII(c) && c <= ' ' && (c == ' ' || (c <= 0xD && c >= 0x9));
+ }
+ 
+-int64_t charactersToInteger(const UChar* characters, size_t length,
++int64_t charactersToInteger(const uint16_t* characters, size_t length,
+                             bool* ok = nullptr) {
+   std::vector<char> buffer;
+   buffer.reserve(length + 1);
+@@ -50,6 +50,8 @@ int64_t charactersToInteger(const UChar* characters, size_t length,
+ 
+ String16::String16(const UChar* characters, size_t size)
+     : m_impl(characters, size) {}
++String16::String16(const uint16_t* characters, size_t size)
++    : m_impl(reinterpret_cast<const UChar*>(characters), size) {}
+ 
+ String16::String16(const UChar* characters) : m_impl(characters) {}
+ 
+@@ -233,18 +235,12 @@ String16 String16::fromUTF16LE(const UChar* stringStart, size_t length) {
+ #endif  // V8_TARGET_BIG_ENDIAN
+ }
+ 
++String16 String16::fromUTF16LE(const uint16_t* stringStart, size_t length) {
++  return fromUTF16LE(reinterpret_cast<const UChar*>(stringStart), length);
++}
++
+ std::string String16::utf8() const {
+   return UTF16ToUTF8(m_impl.data(), m_impl.size());
+ }
+ 
+ }  // namespace v8_inspector
+-
+-namespace v8_crdtp {
+-void SerializerTraits<v8_inspector::String16>::Serialize(
+-    const v8_inspector::String16& str, std::vector<uint8_t>* out) {
+-  cbor::EncodeFromUTF16(
+-      span<uint16_t>(reinterpret_cast<const uint16_t*>(str.characters16()),
+-                     str.length()),
+-      out);
+-}
+-}  // namespace v8_crdtp
+diff --git a/src/3rdparty/chromium/v8/src/inspector/string-16.h b/src/3rdparty/chromium/v8/src/inspector/string-16.h
+index 4143f6c..2827914 100644
+--- a/src/3rdparty/chromium/v8/src/inspector/string-16.h
++++ b/src/3rdparty/chromium/v8/src/inspector/string-16.h
+@@ -10,14 +10,14 @@
+ #include <climits>
+ #include <cstring>
+ #include <string>
++#include <utility>
+ #include <vector>
+ 
+-#include "../../third_party/inspector_protocol/crdtp/serializer_traits.h"
+ #include "src/base/compiler-specific.h"
+ 
+ namespace v8_inspector {
+ 
+-using UChar = uint16_t;
++using UChar = char16_t;
+ 
+ class String16 {
+  public:
+@@ -27,6 +27,7 @@ class String16 {
+   String16(const String16&) V8_NOEXCEPT = default;
+   String16(String16&&) V8_NOEXCEPT = default;
+   String16(const UChar* characters, size_t size);
++  String16(const uint16_t* characters, size_t size);
+   V8_EXPORT String16(const UChar* characters);  // NOLINT(runtime/explicit)
+   V8_EXPORT String16(const char* characters);   // NOLINT(runtime/explicit)
+   String16(const char* characters, size_t size);
+@@ -39,13 +40,18 @@ class String16 {
+   static String16 fromInteger(int);
+   static String16 fromInteger(size_t);
+   static String16 fromInteger64(int64_t);
++  static String16 fromUInt64(uint64_t);
+   static String16 fromDouble(double);
+   static String16 fromDouble(double, int precision);
+ 
+   int64_t toInteger64(bool* ok = nullptr) const;
++  uint64_t toUInt64(bool* ok = nullptr) const;
+   int toInteger(bool* ok = nullptr) const;
++  std::pair<size_t, size_t> getTrimmedOffsetAndLength() const;
+   String16 stripWhiteSpace() const;
+-  const UChar* characters16() const { return m_impl.c_str(); }
++  const uint16_t* characters16() const {
++    return reinterpret_cast<const uint16_t*>(m_impl.c_str());
++  }
+   size_t length() const { return m_impl.length(); }
+   bool isEmpty() const { return !m_impl.length(); }
+   UChar operator[](size_t index) const { return m_impl[index]; }
+@@ -75,6 +81,8 @@ class String16 {
+   // On Big endian architectures, byte order needs to be flipped.
+   V8_EXPORT static String16 fromUTF16LE(const UChar* stringStart,
+                                         size_t length);
++  V8_EXPORT static String16 fromUTF16LE(const uint16_t* stringStart,
++                                        size_t length);
+ 
+   std::size_t hash() const {
+     if (!hash_code) {
+@@ -166,13 +174,4 @@ struct hash<v8_inspector::String16> {
+ 
+ #endif  // !defined(__APPLE__) || defined(_LIBCPP_VERSION)
+ 
+-// See third_party/inspector_protocol/crdtp/serializer_traits.h.
+-namespace v8_crdtp {
+-template <>
+-struct SerializerTraits<v8_inspector::String16> {
+-  static void Serialize(const v8_inspector::String16& str,
+-                        std::vector<uint8_t>* out);
+-};
+-}  // namespace v8_crdtp
+-
+ #endif  // V8_INSPECTOR_STRING_16_H_
+diff --git a/src/3rdparty/chromium/v8/src/inspector/string-util.cc b/src/3rdparty/chromium/v8/src/inspector/string-util.cc
+index 38ced64..0ddadab 100644
+--- a/src/3rdparty/chromium/v8/src/inspector/string-util.cc
++++ b/src/3rdparty/chromium/v8/src/inspector/string-util.cc
+@@ -305,8 +305,4 @@ void ProtocolTypeTraits<Binary>::Serialize(const Binary& value,
+   cbor::EncodeBinary(span<uint8_t>(value.data(), value.size()), bytes);
+ }
+ 
+-void SerializerTraits<Binary>::Serialize(
+-    const v8_inspector::protocol::Binary& binary, std::vector<uint8_t>* out) {
+-  cbor::EncodeBinary(span<uint8_t>(binary.data(), binary.size()), out);
+-}
+ }  // namespace v8_crdtp
+diff --git a/src/3rdparty/chromium/v8/src/inspector/string-util.h b/src/3rdparty/chromium/v8/src/inspector/string-util.h
+index 8b81d21..c43d2cf 100644
+--- a/src/3rdparty/chromium/v8/src/inspector/string-util.h
++++ b/src/3rdparty/chromium/v8/src/inspector/string-util.h
+@@ -104,12 +104,6 @@ struct ProtocolTypeTraits<v8_inspector::protocol::Binary> {
+                         std::vector<uint8_t>* bytes);
+ };
+ 
+-template <>
+-struct SerializerTraits<v8_inspector::protocol::Binary> {
+-  static void Serialize(const v8_inspector::protocol::Binary& binary,
+-                        std::vector<uint8_t>* out);
+-};
+-
+ namespace detail {
+ template <>
+ struct MaybeTypedef<v8_inspector::String16> {
+diff --git a/src/3rdparty/chromium/v8/src/inspector/v8-string-conversions.cc b/src/3rdparty/chromium/v8/src/inspector/v8-string-conversions.cc
+index 4ccf635..629e52e 100644
+--- a/src/3rdparty/chromium/v8/src/inspector/v8-string-conversions.cc
++++ b/src/3rdparty/chromium/v8/src/inspector/v8-string-conversions.cc
+@@ -12,7 +12,7 @@
+ 
+ namespace v8_inspector {
+ namespace {
+-using UChar = uint16_t;
++using UChar = char16_t;
+ using UChar32 = uint32_t;
+ 
+ bool isASCII(UChar c) { return !(c & ~0x7F); }
+@@ -362,8 +362,8 @@ std::string UTF16ToUTF8(const UChar* stringStart, size_t length) {
+   std::string output(length * 3, '\0');
+   const UChar* characters = stringStart;
+   const UChar* characters_end = characters + length;
+-  char* buffer = &*output.begin();
+-  char* buffer_end = &*output.end();
++  char* buffer = output.data();
++  char* buffer_end = output.data() + output.size();
+   while (characters < characters_end) {
+     // Use strict conversion to detect unpaired surrogates.
+     ConversionResult result = convertUTF16ToUTF8(
+@@ -389,7 +389,7 @@ std::string UTF16ToUTF8(const UChar* stringStart, size_t length) {
+ 
+ std::basic_string<UChar> UTF8ToUTF16(const char* stringStart, size_t length) {
+   if (!stringStart || !length) return std::basic_string<UChar>();
+-  std::vector<uint16_t> buffer(length);
++  std::vector<UChar> buffer(length);
+   UChar* bufferStart = buffer.data();
+ 
+   UChar* bufferCurrent = bufferStart;
+@@ -398,7 +398,7 @@ std::basic_string<UChar> UTF8ToUTF16(const char* stringStart, size_t length) {
+                          reinterpret_cast<const char*>(stringStart + length),
+                          &bufferCurrent, bufferCurrent + buffer.size(), nullptr,
+                          true) != conversionOK)
+-    return std::basic_string<uint16_t>();
++    return std::basic_string<UChar>();
+   size_t utf16Length = bufferCurrent - bufferStart;
+   return std::basic_string<UChar>(bufferStart, bufferStart + utf16Length);
+ }
+diff --git a/src/3rdparty/chromium/v8/src/inspector/v8-string-conversions.h b/src/3rdparty/chromium/v8/src/inspector/v8-string-conversions.h
+index eb33c68..a9f36d3 100644
+--- a/src/3rdparty/chromium/v8/src/inspector/v8-string-conversions.h
++++ b/src/3rdparty/chromium/v8/src/inspector/v8-string-conversions.h
+@@ -11,8 +11,8 @@
+ // Conversion routines between UT8 and UTF16, used by string-16.{h,cc}. You may
+ // want to use string-16.h directly rather than these.
+ namespace v8_inspector {
+-std::basic_string<uint16_t> UTF8ToUTF16(const char* stringStart, size_t length);
+-std::string UTF16ToUTF8(const uint16_t* stringStart, size_t length);
++std::basic_string<char16_t> UTF8ToUTF16(const char* stringStart, size_t length);
++std::string UTF16ToUTF8(const char16_t* stringStart, size_t length);
+ }  // namespace v8_inspector
+ 
+ #endif  // V8_INSPECTOR_V8_STRING_CONVERSIONS_H_
+diff --git a/src/3rdparty/chromium/v8/src/libplatform/default-platform.cc b/src/3rdparty/chromium/v8/src/libplatform/default-platform.cc
+index 19313e7..75e58e4 100644
+--- a/src/3rdparty/chromium/v8/src/libplatform/default-platform.cc
++++ b/src/3rdparty/chromium/v8/src/libplatform/default-platform.cc
+@@ -24,10 +24,12 @@ namespace platform {
+ namespace {
+ 
+ void PrintStackTrace() {
++#ifdef DEBUG
+   v8::base::debug::StackTrace trace;
+   trace.Print();
+   // Avoid dumping duplicate stack trace on abort signal.
+   v8::base::debug::DisableSignalStackDump();
++#endif
+ }
+ 
+ }  // namespace
+@@ -36,9 +38,11 @@ std::unique_ptr<v8::Platform> NewDefaultPlatform(
+     int thread_pool_size, IdleTaskSupport idle_task_support,
+     InProcessStackDumping in_process_stack_dumping,
+     std::unique_ptr<v8::TracingController> tracing_controller) {
++#ifdef DEBUG
+   if (in_process_stack_dumping == InProcessStackDumping::kEnabled) {
+     v8::base::debug::EnableInProcessStackDumping();
+   }
++#endif
+   auto platform = std::make_unique<DefaultPlatform>(
+       thread_pool_size, idle_task_support, std::move(tracing_controller));
+   platform->EnsureBackgroundTaskRunnerInitialized();
+diff --git a/src/3rdparty/chromium/v8/src/profiler/heap-snapshot-generator.cc b/src/3rdparty/chromium/v8/src/profiler/heap-snapshot-generator.cc
+index 0c5af20..b0b3f30 100644
+--- a/src/3rdparty/chromium/v8/src/profiler/heap-snapshot-generator.cc
++++ b/src/3rdparty/chromium/v8/src/profiler/heap-snapshot-generator.cc
+@@ -191,11 +191,11 @@ HeapSnapshot::HeapSnapshot(HeapProfiler* profiler, bool global_objects_as_roots)
+   STATIC_ASSERT(kSystemPointerSize != 4 || sizeof(HeapGraphEdge) == 12);
+   STATIC_ASSERT(kSystemPointerSize != 8 || sizeof(HeapGraphEdge) == 24);
+   STATIC_ASSERT(kSystemPointerSize != 4 || sizeof(HeapEntry) == 32);
+-#if V8_CC_MSVC
++#if V8_OS_WIN
+   STATIC_ASSERT(kSystemPointerSize != 8 || sizeof(HeapEntry) == 48);
+-#else   // !V8_CC_MSVC
++#else   // !V8_OS_WIN
+   STATIC_ASSERT(kSystemPointerSize != 8 || sizeof(HeapEntry) == 40);
+-#endif  // !V8_CC_MSVC
++#endif  // !V8_OS_WIN
+   memset(&gc_subroot_entries_, 0, sizeof(gc_subroot_entries_));
+ }
+ 
+diff --git a/src/3rdparty/chromium/v8/src/snapshot/snapshot-utils.cc b/src/3rdparty/chromium/v8/src/snapshot/snapshot-utils.cc
+index 319b828..248876c 100644
+--- a/src/3rdparty/chromium/v8/src/snapshot/snapshot-utils.cc
++++ b/src/3rdparty/chromium/v8/src/snapshot/snapshot-utils.cc
+@@ -5,7 +5,7 @@
+ #include "src/snapshot/snapshot-utils.h"
+ 
+ #include "src/sanitizer/msan.h"
+-#include "third_party/zlib/zlib.h"
++#include <zlib.h>
+ 
+ namespace v8 {
+ namespace internal {

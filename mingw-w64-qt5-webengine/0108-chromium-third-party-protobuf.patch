@@ -1,0 +1,277 @@
+diff --git a/src/3rdparty/chromium/third_party/protobuf/BUILD.gn b/src/3rdparty/chromium/third_party/protobuf/BUILD.gn
+index 4ebf457..b926700 100644
+--- a/src/3rdparty/chromium/third_party/protobuf/BUILD.gn
++++ b/src/3rdparty/chromium/third_party/protobuf/BUILD.gn
+@@ -117,7 +117,7 @@ protobuf_lite_sources = [
+ ]
+ 
+ protobuf_lite_cflags = []
+-if (is_win) {
++if (is_msvc) {
+   protobuf_lite_cflags = [
+     "/wd4018",  # signed/unsigned mismatch in comparison
+     "/wd4065",  # switch statement contains 'default' but no 'case' labels
+diff --git a/src/3rdparty/chromium/third_party/protobuf/proto_library.gni b/src/3rdparty/chromium/third_party/protobuf/proto_library.gni
+index e41ae5f..3dfb675 100644
+--- a/src/3rdparty/chromium/third_party/protobuf/proto_library.gni
++++ b/src/3rdparty/chromium/third_party/protobuf/proto_library.gni
+@@ -512,7 +512,7 @@ template("proto_library") {
+           public_deps += [ "//third_party/protobuf:protobuf_lite" ]
+         }
+ 
+-        if (is_win) {
++        if (is_msvc) {
+           cflags = [
+             # disable: C4125 decimal digit terminates octal escape sequence
+             # Protoc generates such sequences frequently, there's no obvious
+diff --git a/src/3rdparty/chromium/third_party/protobuf/src/google/protobuf/map.h b/src/3rdparty/chromium/third_party/protobuf/src/google/protobuf/map.h
+index bc97701..1331084 100644
+--- a/src/3rdparty/chromium/third_party/protobuf/src/google/protobuf/map.h
++++ b/src/3rdparty/chromium/third_party/protobuf/src/google/protobuf/map.h
+@@ -942,6 +942,13 @@ class Map {
+       uint32 hi, lo;
+       asm("rdtsc" : "=a"(lo), "=d"(hi));
+       s += ((static_cast<uint64>(hi) << 32) | lo);
++#elif defined(__aarch64__) && defined(__GNUC__)
++      // There is no rdtsc on ARMv8. CNTVCT_EL0 is the virtual counter of the
++      // system timer. It runs at a different frequency than the CPU's, but is
++      // the best source of time-based entropy we get.
++      uint64_t virtual_timer_value;
++      asm volatile("mrs %0, cntvct_el0" : "=r"(virtual_timer_value));
++      s += virtual_timer_value;
+ #endif
+       return s;
+     }
+diff --git a/src/3rdparty/chromium/third_party/protobuf/src/google/protobuf/port_def.inc b/src/3rdparty/chromium/third_party/protobuf/src/google/protobuf/port_def.inc
+index f1bd85d..a4180bb 100644
+--- a/src/3rdparty/chromium/third_party/protobuf/src/google/protobuf/port_def.inc
++++ b/src/3rdparty/chromium/third_party/protobuf/src/google/protobuf/port_def.inc
+@@ -510,8 +510,10 @@
+ 
+ PROTOBUF_EXPORT_TEMPLATE_TEST(DEFAULT, );
+ PROTOBUF_EXPORT_TEMPLATE_TEST(DEFAULT, __attribute__((visibility("default"))));
++#ifdef _MSC_VER
+ PROTOBUF_EXPORT_TEMPLATE_TEST(MSVC_HACK, __declspec(dllexport));
+ PROTOBUF_EXPORT_TEMPLATE_TEST(DEFAULT, __declspec(dllimport));
++#endif
+ 
+ #undef PROTOBUF_EXPORT_TEMPLATE_TEST
+ #undef PROTOBUF_EXPORT_TEMPLATE_TEST_DEFAULT_DEFAULT
+diff --git a/src/3rdparty/chromium/third_party/protobuf/src/google/protobuf/stubs/port.h b/src/3rdparty/chromium/third_party/protobuf/src/google/protobuf/stubs/port.h
+index 0bbbc87..b7be93d 100644
+--- a/src/3rdparty/chromium/third_party/protobuf/src/google/protobuf/stubs/port.h
++++ b/src/3rdparty/chromium/third_party/protobuf/src/google/protobuf/stubs/port.h
+@@ -171,10 +171,10 @@ typedef uint64_t uint64;
+ 
+ static const int32 kint32max = 0x7FFFFFFF;
+ static const int32 kint32min = -kint32max - 1;
+-static const int64 kint64max = PROTOBUF_LONGLONG(0x7FFFFFFFFFFFFFFF);
++static const int64 kint64max = int64{0x7FFFFFFFFFFFFFFF};
+ static const int64 kint64min = -kint64max - 1;
+ static const uint32 kuint32max = 0xFFFFFFFFu;
+-static const uint64 kuint64max = PROTOBUF_ULONGLONG(0xFFFFFFFFFFFFFFFF);
++static const uint64 kuint64max = uint64{0xFFFFFFFFFFFFFFFFu};
+ 
+ #if defined(ADDRESS_SANITIZER) || defined(THREAD_SANITIZER) ||\
+     defined(MEMORY_SANITIZER)
+@@ -304,14 +304,14 @@ static inline uint32 bswap_32(uint32 x) {
+ 
+ #ifndef bswap_64
+ static inline uint64 bswap_64(uint64 x) {
+-  return (((x & PROTOBUF_ULONGLONG(0xFF)) << 56) |
+-          ((x & PROTOBUF_ULONGLONG(0xFF00)) << 40) |
+-          ((x & PROTOBUF_ULONGLONG(0xFF0000)) << 24) |
+-          ((x & PROTOBUF_ULONGLONG(0xFF000000)) << 8) |
+-          ((x & PROTOBUF_ULONGLONG(0xFF00000000)) >> 8) |
+-          ((x & PROTOBUF_ULONGLONG(0xFF0000000000)) >> 24) |
+-          ((x & PROTOBUF_ULONGLONG(0xFF000000000000)) >> 40) |
+-          ((x & PROTOBUF_ULONGLONG(0xFF00000000000000)) >> 56));
++  return (((x & uint64{0xFFu}) << 56) |
++          ((x & uint64{0xFF00u}) << 40) |
++          ((x & uint64{0xFF0000u}) << 24) |
++          ((x & uint64{0xFF000000u}) << 8) |
++          ((x & uint64{0xFF00000000u}) >> 8) |
++          ((x & uint64{0xFF0000000000u}) >> 24) |
++          ((x & uint64{0xFF000000000000u}) >> 40) |
++          ((x & uint64{0xFF00000000000000u}) >> 56));
+ }
+ #define bswap_64(x) bswap_64(x)
+ #endif
+diff --git a/src/3rdparty/chromium/third_party/protobuf/src/google/protobuf/stubs/stringprintf.cc b/src/3rdparty/chromium/third_party/protobuf/src/google/protobuf/stubs/stringprintf.cc
+index e6019fc..1c950f5 100644
+--- a/src/3rdparty/chromium/third_party/protobuf/src/google/protobuf/stubs/stringprintf.cc
++++ b/src/3rdparty/chromium/third_party/protobuf/src/google/protobuf/stubs/stringprintf.cc
+@@ -54,7 +54,7 @@ enum { IS_COMPILER_MSVC = 1 };
+ enum { IS_COMPILER_MSVC = 0 };
+ #endif
+ 
+-void StringAppendV(string* dst, const char* format, va_list ap) {
++void StringAppendV(std::string* dst, const char* format, va_list ap) {
+   // First try with a small fixed size buffer
+   static const int kSpaceLength = 1024;
+   char space[kSpaceLength];
+@@ -106,16 +106,16 @@ void StringAppendV(string* dst, const char* format, va_list ap) {
+ }
+ 
+ 
+-string StringPrintf(const char* format, ...) {
++std::string StringPrintf(const char* format, ...) {
+   va_list ap;
+   va_start(ap, format);
+-  string result;
++  std::string result;
+   StringAppendV(&result, format, ap);
+   va_end(ap);
+   return result;
+ }
+ 
+-const string& SStringPrintf(string* dst, const char* format, ...) {
++const std::string& SStringPrintf(std::string* dst, const char* format, ...) {
+   va_list ap;
+   va_start(ap, format);
+   dst->clear();
+@@ -124,7 +124,7 @@ const string& SStringPrintf(string* dst, const char* format, ...) {
+   return *dst;
+ }
+ 
+-void StringAppendF(string* dst, const char* format, ...) {
++void StringAppendF(std::string* dst, const char* format, ...) {
+   va_list ap;
+   va_start(ap, format);
+   StringAppendV(dst, format, ap);
+@@ -139,7 +139,7 @@ const int kStringPrintfVectorMaxArgs = 32;
+ // and we can fix the problem or protect against an attack.
+ static const char string_printf_empty_block[256] = { '\0' };
+ 
+-string StringPrintfVector(const char* format, const std::vector<string>& v) {
++std::string StringPrintfVector(const char* format, const std::vector<string>& v) {
+   GOOGLE_CHECK_LE(v.size(), kStringPrintfVectorMaxArgs)
+       << "StringPrintfVector currently only supports up to "
+       << kStringPrintfVectorMaxArgs << " arguments. "
+@@ -162,7 +162,7 @@ string StringPrintfVector(const char* format, const std::vector<string>& v) {
+   // that accepts an array of arguments.  The best I can do is stick
+   // this COMPILE_ASSERT right next to the actual statement.
+ 
+-  GOOGLE_COMPILE_ASSERT(kStringPrintfVectorMaxArgs == 32, arg_count_mismatch);
++  static_assert(kStringPrintfVectorMaxArgs == 32, "arg_count_mismatch");
+   return StringPrintf(format,
+                       cstr[0], cstr[1], cstr[2], cstr[3], cstr[4],
+                       cstr[5], cstr[6], cstr[7], cstr[8], cstr[9],
+diff --git a/src/3rdparty/chromium/third_party/protobuf/src/google/protobuf/stubs/stringprintf.h b/src/3rdparty/chromium/third_party/protobuf/src/google/protobuf/stubs/stringprintf.h
+index 253d736..de7f517 100644
+--- a/src/3rdparty/chromium/third_party/protobuf/src/google/protobuf/stubs/stringprintf.h
++++ b/src/3rdparty/chromium/third_party/protobuf/src/google/protobuf/stubs/stringprintf.h
+@@ -52,18 +52,18 @@ namespace google {
+ namespace protobuf {
+ 
+ // Return a C++ string
+-PROTOBUF_EXPORT extern string StringPrintf(const char* format, ...);
++PROTOBUF_EXPORT extern std::string StringPrintf(const char* format, ...);
+ 
+ // Store result into a supplied string and return it
+-PROTOBUF_EXPORT extern const string& SStringPrintf(string* dst,
++PROTOBUF_EXPORT extern const std::string& SStringPrintf(std::string* dst,
+                                                    const char* format, ...);
+ 
+ // Append result to a supplied string
+-PROTOBUF_EXPORT extern void StringAppendF(string* dst, const char* format, ...);
++PROTOBUF_EXPORT extern void StringAppendF(std::string* dst, const char* format, ...);
+ 
+ // Lower-level routine that takes a va_list and appends to a specified
+ // string.  All other routines are just convenience wrappers around it.
+-PROTOBUF_EXPORT extern void StringAppendV(string* dst, const char* format,
++PROTOBUF_EXPORT extern void StringAppendV(std::string* dst, const char* format,
+                                           va_list ap);
+ 
+ // The max arguments supported by StringPrintfVector
+@@ -72,7 +72,7 @@ PROTOBUF_EXPORT extern const int kStringPrintfVectorMaxArgs;
+ // You can use this version when all your arguments are strings, but
+ // you don't know how many arguments you'll have at compile time.
+ // StringPrintfVector will LOG(FATAL) if v.size() > kStringPrintfVectorMaxArgs
+-PROTOBUF_EXPORT extern string StringPrintfVector(const char* format,
++PROTOBUF_EXPORT extern std::string StringPrintfVector(const char* format,
+                                                  const std::vector<string>& v);
+ 
+ }  // namespace protobuf
+diff --git a/src/3rdparty/chromium/third_party/protobuf/src/google/protobuf/stubs/time.cc b/src/3rdparty/chromium/third_party/protobuf/src/google/protobuf/stubs/time.cc
+index a1e5e1e..6efe4b9 100644
+--- a/src/3rdparty/chromium/third_party/protobuf/src/google/protobuf/stubs/time.cc
++++ b/src/3rdparty/chromium/third_party/protobuf/src/google/protobuf/stubs/time.cc
+@@ -130,7 +130,7 @@ int64 SecondsSinceCommonEra(const DateTime& time) {
+ 
+ // Format nanoseconds with either 3, 6, or 9 digits depending on the required
+ // precision to represent the exact value.
+-string FormatNanos(int32 nanos) {
++std::string FormatNanos(int32 nanos) {
+   if (nanos % kNanosPerMillisecond == 0) {
+     return StringPrintf("%03d", nanos / kNanosPerMillisecond);
+   } else if (nanos % kNanosPerMicrosecond == 0) {
+@@ -268,12 +268,12 @@ void GetCurrentTime(int64* seconds, int32* nanos) {
+   *nanos = 0;
+ }
+ 
+-string FormatTime(int64 seconds, int32 nanos) {
++std::string FormatTime(int64 seconds, int32 nanos) {
+   DateTime time;
+   if (nanos < 0 || nanos > 999999999 || !SecondsToDateTime(seconds, &time)) {
+     return "InvalidTime";
+   }
+-  string result = StringPrintf("%04d-%02d-%02dT%02d:%02d:%02d",
++  std::string result = StringPrintf("%04d-%02d-%02dT%02d:%02d:%02d",
+                                time.year, time.month, time.day,
+                                time.hour, time.minute, time.second);
+   if (nanos != 0) {
+@@ -282,7 +282,7 @@ string FormatTime(int64 seconds, int32 nanos) {
+   return result + "Z";
+ }
+ 
+-bool ParseTime(const string& value, int64* seconds, int32* nanos) {
++bool ParseTime(const std::string& value, int64* seconds, int32* nanos) {
+   DateTime time;
+   const char* data = value.c_str();
+   // We only accept:
+diff --git a/src/3rdparty/chromium/third_party/protobuf/src/google/protobuf/stubs/time.h b/src/3rdparty/chromium/third_party/protobuf/src/google/protobuf/stubs/time.h
+index 12091de..9a50084 100644
+--- a/src/3rdparty/chromium/third_party/protobuf/src/google/protobuf/stubs/time.h
++++ b/src/3rdparty/chromium/third_party/protobuf/src/google/protobuf/stubs/time.h
+@@ -65,10 +65,10 @@ void PROTOBUF_EXPORT GetCurrentTime(int64* seconds, int32* nanos);
+ // value.
+ //
+ // Note that "nanos" must in the range of [0, 999999999].
+-string PROTOBUF_EXPORT FormatTime(int64 seconds, int32 nanos);
++std::string PROTOBUF_EXPORT FormatTime(int64 seconds, int32 nanos);
+ // Parses a time string. This method accepts RFC3339 date/time string with UTC
+ // offset. For example, "2015-05-20T13:29:35.120-08:00".
+-bool PROTOBUF_EXPORT ParseTime(const string& value, int64* seconds,
++bool PROTOBUF_EXPORT ParseTime(const std::string& value, int64* seconds,
+                                int32* nanos);
+ 
+ }  // namespace internal
+diff --git a/src/3rdparty/chromium/third_party/protobuf/third_party/six/six.py b/src/3rdparty/chromium/third_party/protobuf/third_party/six/six.py
+index 89b2188..25c4a5c 100644
+--- a/src/3rdparty/chromium/third_party/protobuf/third_party/six/six.py
++++ b/src/3rdparty/chromium/third_party/protobuf/third_party/six/six.py
+@@ -71,6 +71,11 @@ else:
+             MAXSIZE = int((1 << 63) - 1)
+         del X
+ 
++if PY34:
++    from importlib.util import spec_from_loader
++else:
++    spec_from_loader = None
++
+ 
+ def _add_doc(func, doc):
+     """Add documentation to a function."""
+@@ -186,6 +191,11 @@ class _SixMetaPathImporter(object):
+             return self
+         return None
+ 
++    def find_spec(self, fullname, path, target=None):
++        if fullname in self.known_modules:
++            return spec_from_loader(fullname, self)
++        return None
++
+     def __get_module(self, fullname):
+         try:
+             return self.known_modules[fullname]

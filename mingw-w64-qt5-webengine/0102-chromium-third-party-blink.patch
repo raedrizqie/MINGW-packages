@@ -1,0 +1,687 @@
+diff --git a/src/3rdparty/chromium/third_party/blink/renderer/BUILD.gn b/src/3rdparty/chromium/third_party/blink/renderer/BUILD.gn
+index d36c9cd..9cbcd2b 100644
+--- a/src/3rdparty/chromium/third_party/blink/renderer/BUILD.gn
++++ b/src/3rdparty/chromium/third_party/blink/renderer/BUILD.gn
+@@ -40,7 +40,7 @@ config("inside_blink") {
+     "BLINK_IMPLEMENTATION=1",
+     "INSIDE_BLINK",
+   ]
+-  if (is_clang || !is_win) {
++  if (is_clang || !is_msvc) {
+     cflags += [
+       "-Wno-unused-variable",
+     ]
+@@ -74,7 +74,7 @@ import("//build/config/pch.gni")
+ 
+ config("blink_pch") {
+   if (enable_precompiled_headers) {
+-    if (is_win) {
++    if (is_msvc) {
+       # This is a string rather than a file GN knows about. It has to match
+       # exactly what's in the /FI flag below, and what might appear in the
+       # source code in quotes for an #include directive.
+@@ -88,6 +88,8 @@ config("blink_pch") {
+ 
+       # Force include the header.
+       cflags = [ "/FI$precompiled_header" ]
++    } else if (is_mingw) {
++      precompiled_source = "//third_party/blink/renderer/build/win/precompile.h"
+     } else if (is_mac) {
+       precompiled_source = "//third_party/blink/renderer/build/mac/prefix.h"
+     }
+@@ -100,7 +102,7 @@ config("config") {
+   cflags = []
+   defines = []
+ 
+-  if (is_win) {
++  if (is_msvc) {
+     cflags += [
+       "/wd4305",  # Truncation from 'type1' to 'type2'.
+       "/wd4324",  # Struct padded due to declspec(align).
+diff --git a/src/3rdparty/chromium/third_party/blink/renderer/build/scripts/gperf.py b/src/3rdparty/chromium/third_party/blink/renderer/build/scripts/gperf.py
+index db72660..4ab73df 100644
+--- a/src/3rdparty/chromium/third_party/blink/renderer/build/scripts/gperf.py
++++ b/src/3rdparty/chromium/third_party/blink/renderer/build/scripts/gperf.py
+@@ -36,10 +36,11 @@ def generate_gperf(gperf_path, gperf_input, gperf_args):
+         # https://savannah.gnu.org/bugs/index.php?53028
+         gperf_output = re.sub(r'\bregister ', '', gperf_output)
+         # -Wimplicit-fallthrough needs an explicit fallthrough statement,
+-        # so replace gperf's /*FALLTHROUGH*/ comment with the statement.
+-        # https://savannah.gnu.org/bugs/index.php?53029
+-        gperf_output = gperf_output.replace('/*FALLTHROUGH*/',
+-                                            '  FALLTHROUGH;')
++        if re.search(
++                r'/\* C\+\+ code produced by gperf version 3\.[01](\.\d+)? \*/',
++                gperf_output):
++            gperf_output = gperf_output.replace('/*FALLTHROUGH*/',
++                                                '  [[fallthrough]];')
+         # -Wpointer-to-int-cast warns about casting pointers to smaller ints
+         # Replace {(int)(long)&(foo), bar} with
+         # {static_cast<int>(reinterpret_cast<uintptr_t>(&(foo)), bar}
+diff --git a/src/3rdparty/chromium/third_party/blink/renderer/build/win/precompile.h b/src/3rdparty/chromium/third_party/blink/renderer/build/win/precompile.h
+index fde39b8..2c6ec62 100644
+--- a/src/3rdparty/chromium/third_party/blink/renderer/build/win/precompile.h
++++ b/src/3rdparty/chromium/third_party/blink/renderer/build/win/precompile.h
+@@ -3,7 +3,7 @@
+ // found in the LICENSE file.
+ 
+ #ifdef THIRD_PARTY_BLINK_RENDERER_BUILD_WIN_PRECOMPILE_H_
+-#error You shouldn't include the precompiled header file more than once.
++#error You should not include the precompiled header file more than once.
+ #endif
+ 
+ #define THIRD_PARTY_BLINK_RENDERER_BUILD_WIN_PRECOMPILE_H_
+diff --git a/src/3rdparty/chromium/third_party/blink/renderer/core/BUILD.gn b/src/3rdparty/chromium/third_party/blink/renderer/core/BUILD.gn
+index 5dc17a4..f7db43e 100644
+--- a/src/3rdparty/chromium/third_party/blink/renderer/core/BUILD.gn
++++ b/src/3rdparty/chromium/third_party/blink/renderer/core/BUILD.gn
+@@ -40,7 +40,7 @@ config("blink_core_pch") {
+   # Add precompiled header (pch) support when enabled, possible and
+   # making sense.
+   if (enable_precompiled_headers) {
+-    if (is_win) {
++    if (is_msvc) {
+       # This is a string rather than a file GN knows about. It has to match
+       # exactly what's in the /FI flag below, and what might appear in the
+       # source code in quotes for an #include directive.
+@@ -54,7 +54,7 @@ config("blink_core_pch") {
+ 
+       # Force include the header.
+       cflags = [ "/FI$precompiled_header" ]
+-    } else if (is_mac) {
++    } else if (is_mac || is_mingw) {
+       precompiled_source = "//third_party/blink/renderer/core/precompile_core.h"
+     }
+   }
+@@ -1001,7 +1001,7 @@ target("jumbo_" + core_generated_target_type, "core_generated") {
+     defines += [ "USING_V8_SHARED" ]
+   }
+ 
+-  if (is_win) {
++  if (is_msvc) {
+     cflags += [
+       # In generated bindings code: "switch contains default but no case".
+       # 4701 and 4702 are disabled because of issues in Bison-generated
+diff --git a/src/3rdparty/chromium/third_party/blink/renderer/core/css/css_numeric_literal_value.cc b/src/3rdparty/chromium/third_party/blink/renderer/core/css/css_numeric_literal_value.cc
+index 41e34de..3b40856 100644
+--- a/src/3rdparty/chromium/third_party/blink/renderer/core/css/css_numeric_literal_value.cc
++++ b/src/3rdparty/chromium/third_party/blink/renderer/core/css/css_numeric_literal_value.cc
+@@ -145,11 +145,11 @@ bool CSSNumericLiteralValue::IsComputationallyIndependent() const {
+ }
+ 
+ static String FormatNumber(double number, const char* suffix) {
+-#if defined(OS_WIN) && _MSC_VER < 1900
++#if defined(_MSC_VER) && _MSC_VER < 1900
+   unsigned oldFormat = _set_output_format(_TWO_DIGIT_EXPONENT);
+ #endif
+   String result = String::Format("%.6g%s", number, suffix);
+-#if defined(OS_WIN) && _MSC_VER < 1900
++#if defined(_MSC_VER) && _MSC_VER < 1900
+   _set_output_format(oldFormat);
+ #endif
+   return result;
+diff --git a/src/3rdparty/chromium/third_party/blink/renderer/core/css/css_selector_list.cc b/src/3rdparty/chromium/third_party/blink/renderer/core/css/css_selector_list.cc
+index 724a0cc..a18a047 100644
+--- a/src/3rdparty/chromium/third_party/blink/renderer/core/css/css_selector_list.cc
++++ b/src/3rdparty/chromium/third_party/blink/renderer/core/css/css_selector_list.cc
+@@ -79,7 +79,7 @@ CSSSelectorList CSSSelectorList::AdoptSelectorVector(
+       // Move item from the parser selector vector into selector_array_ without
+       // invoking destructor (Ugh.)
+       CSSSelector* current_selector = current->ReleaseSelector().release();
+-      memcpy(&list.selector_array_[array_index], current_selector,
++      memcpy(reinterpret_cast<void*>(&list.selector_array_[array_index]), current_selector,
+              sizeof(CSSSelector));
+       WTF::Partitions::FastFree(current_selector);
+ 
+diff --git a/src/3rdparty/chromium/third_party/blink/renderer/core/imagebitmap/image_bitmap_factories.cc b/src/3rdparty/chromium/third_party/blink/renderer/core/imagebitmap/image_bitmap_factories.cc
+index 32c3910..4966080 100644
+--- a/src/3rdparty/chromium/third_party/blink/renderer/core/imagebitmap/image_bitmap_factories.cc
++++ b/src/3rdparty/chromium/third_party/blink/renderer/core/imagebitmap/image_bitmap_factories.cc
+@@ -63,7 +63,7 @@ namespace blink {
+ 
+ namespace {
+ // This enum is used in a UMA histogram.
+-enum CreateImageBitmapSource {
++enum CreateImageBitmapSource : uint8_t {
+   kCreateImageBitmapSourceBlob = 0,
+   kCreateImageBitmapSourceImageBitmap = 1,
+   kCreateImageBitmapSourceImageData = 2,
+diff --git a/src/3rdparty/chromium/third_party/blink/renderer/core/inspector/BUILD.gn b/src/3rdparty/chromium/third_party/blink/renderer/core/inspector/BUILD.gn
+index 6296ef3..5508bdc 100644
+--- a/src/3rdparty/chromium/third_party/blink/renderer/core/inspector/BUILD.gn
++++ b/src/3rdparty/chromium/third_party/blink/renderer/core/inspector/BUILD.gn
+@@ -214,7 +214,7 @@ jumbo_source_set("generated") {
+                "//third_party/blink/renderer/core:core_include_dirs",
+              ]
+ 
+-  if (is_win) {
++  if (is_msvc) {
+     cflags = [ "/wd4702" ]  # Unreachable code.
+   }
+ 
+diff --git a/src/3rdparty/chromium/third_party/blink/renderer/core/intersection_observer/intersection_observation.cc b/src/3rdparty/chromium/third_party/blink/renderer/core/intersection_observer/intersection_observation.cc
+index 8e3ab1a..476ed16 100644
+--- a/src/3rdparty/chromium/third_party/blink/renderer/core/intersection_observer/intersection_observation.cc
++++ b/src/3rdparty/chromium/third_party/blink/renderer/core/intersection_observer/intersection_observation.cc
+@@ -101,7 +101,7 @@ void IntersectionObservation::Trace(Visitor* visitor) const {
+ 
+ bool IntersectionObservation::ShouldCompute(unsigned flags) {
+   DCHECK(Observer());
+-  if (!target_ || !observer_->RootIsValid() | !observer_->GetExecutionContext())
++  if (!target_ || !observer_->RootIsValid() || !observer_->GetExecutionContext())
+     return false;
+ 
+   // If we're processing post-layout deliveries only and we don't have a
+diff --git a/src/3rdparty/chromium/third_party/blink/renderer/core/layout/layout_object.cc b/src/3rdparty/chromium/third_party/blink/renderer/core/layout/layout_object.cc
+index 21c8a2e..1ff79f0 100644
+--- a/src/3rdparty/chromium/third_party/blink/renderer/core/layout/layout_object.cc
++++ b/src/3rdparty/chromium/third_party/blink/renderer/core/layout/layout_object.cc
+@@ -192,7 +192,9 @@ struct SameSizeAsLayoutObject : ImageResourceObserver, DisplayItemClient {
+   std::unique_ptr<int> rare_data_;
+ };
+ 
++#if !(defined(OS_WIN) && defined(COMPILER_GCC)) // FIXME: this check fails on MinGW
+ ASSERT_SIZE(LayoutObject, SameSizeAsLayoutObject);
++#endif
+ 
+ bool LayoutObject::affects_parent_block_ = false;
+ 
+diff --git a/src/3rdparty/chromium/third_party/blink/renderer/core/page/scrolling/text_fragment_selector_generator.cc b/src/3rdparty/chromium/third_party/blink/renderer/core/page/scrolling/text_fragment_selector_generator.cc
+index 8fcc799..e9714bb 100644
+--- a/src/3rdparty/chromium/third_party/blink/renderer/core/page/scrolling/text_fragment_selector_generator.cc
++++ b/src/3rdparty/chromium/third_party/blink/renderer/core/page/scrolling/text_fragment_selector_generator.cc
+@@ -308,7 +308,7 @@ void TextFragmentSelectorGenerator::ResolveSelectorState() {
+       break;
+     case kNeedsNewCandidate:
+       NOTREACHED();
+-      ABSL_FALLTHROUGH_INTENDED;
++      [[fallthrough]];
+     case kFailure:
+       NotifySelectorReady(
+           TextFragmentSelector(TextFragmentSelector::SelectorType::kInvalid));
+diff --git a/src/3rdparty/chromium/third_party/blink/renderer/core/precompile_core.h b/src/3rdparty/chromium/third_party/blink/renderer/core/precompile_core.h
+index 30a97e9..ab65858 100644
+--- a/src/3rdparty/chromium/third_party/blink/renderer/core/precompile_core.h
++++ b/src/3rdparty/chromium/third_party/blink/renderer/core/precompile_core.h
+@@ -3,13 +3,13 @@
+ // found in the LICENSE file.
+ 
+ #ifdef THIRD_PARTY_BLINK_RENDERER_CORE_PRECOMPILE_CORE_H_
+-#error You shouldn't include the precompiled header file more than once.
++#error You should not include the precompiled header file more than once.
+ #endif
+ 
+ #ifndef THIRD_PARTY_BLINK_RENDERER_CORE_PRECOMPILE_CORE_H_
+ #define THIRD_PARTY_BLINK_RENDERER_CORE_PRECOMPILE_CORE_H_
+ 
+-#if defined(_MSC_VER)
++#if defined(_WIN32)
+ #include "third_party/blink/renderer/build/win/precompile.h"
+ #elif defined(__APPLE__)
+ #include "third_party/blink/renderer/build/mac/prefix.h"
+diff --git a/src/3rdparty/chromium/third_party/blink/renderer/modules/BUILD.gn b/src/3rdparty/chromium/third_party/blink/renderer/modules/BUILD.gn
+index 1d95c7e..c2dfb09 100644
+--- a/src/3rdparty/chromium/third_party/blink/renderer/modules/BUILD.gn
++++ b/src/3rdparty/chromium/third_party/blink/renderer/modules/BUILD.gn
+@@ -198,7 +198,7 @@ jumbo_component("modules") {
+   public_deps = sub_modules
+   allow_circular_includes_from = sub_modules
+ 
+-  if (is_win) {
++  if (is_msvc) {
+     cflags =
+         [ "/wd4334" ]  # Result of 32-bit shift implicitly converted to 64 bits.
+   }
+diff --git a/src/3rdparty/chromium/third_party/blink/renderer/modules/gamepad/gamepad_shared_memory_reader.cc b/src/3rdparty/chromium/third_party/blink/renderer/modules/gamepad/gamepad_shared_memory_reader.cc
+index 724adad..88e032c 100644
+--- a/src/3rdparty/chromium/third_party/blink/renderer/modules/gamepad/gamepad_shared_memory_reader.cc
++++ b/src/3rdparty/chromium/third_party/blink/renderer/modules/gamepad/gamepad_shared_memory_reader.cc
+@@ -103,7 +103,7 @@ void GamepadSharedMemoryReader::SampleGamepads(device::Gamepads* gamepads) {
+   base::subtle::Atomic32 version;
+   do {
+     version = gamepad_hardware_buffer_->seqlock.ReadBegin();
+-    memcpy(&read_into, &gamepad_hardware_buffer_->data, sizeof(read_into));
++    memcpy(reinterpret_cast<void*>(&read_into), &gamepad_hardware_buffer_->data, sizeof(read_into));
+     ++contention_count;
+     if (contention_count == kMaximumContentionCount)
+       break;
+@@ -118,7 +118,7 @@ void GamepadSharedMemoryReader::SampleGamepads(device::Gamepads* gamepads) {
+   }
+ 
+   // New data was read successfully, copy it into the output buffer.
+-  memcpy(gamepads, &read_into, sizeof(*gamepads));
++  memcpy(reinterpret_cast<void*>(gamepads), &read_into, sizeof(*gamepads));
+ 
+   if (!ever_interacted_with_) {
+     // Clear the connected flag if the user hasn't interacted with any of the
+diff --git a/src/3rdparty/chromium/third_party/blink/renderer/modules/webaudio/BUILD.gn b/src/3rdparty/chromium/third_party/blink/renderer/modules/webaudio/BUILD.gn
+index 899b871..15ccef9 100644
+--- a/src/3rdparty/chromium/third_party/blink/renderer/modules/webaudio/BUILD.gn
++++ b/src/3rdparty/chromium/third_party/blink/renderer/modules/webaudio/BUILD.gn
+@@ -140,7 +140,7 @@ blink_modules_sources("webaudio") {
+     "wave_shaper_processor.h",
+   ]
+ 
+-  if (is_win) {
++  if (is_msvc) {
+     # Result of 32-bit shift implicitly converted to 64 bits.
+     cflags = [ "/wd4334" ]
+   }
+diff --git a/src/3rdparty/chromium/third_party/blink/renderer/platform/BUILD.gn b/src/3rdparty/chromium/third_party/blink/renderer/platform/BUILD.gn
+index 2e0d575..097127b 100644
+--- a/src/3rdparty/chromium/third_party/blink/renderer/platform/BUILD.gn
++++ b/src/3rdparty/chromium/third_party/blink/renderer/platform/BUILD.gn
+@@ -221,7 +221,7 @@ config("blink_platform_pch") {
+   visibility = []
+   visibility = [ "./*" ]
+   if (enable_precompiled_headers) {
+-    if (is_win) {
++    if (is_msvc) {
+       # This is a string rather than a file GN knows about. It has to match
+       # exactly what's in the /FI flag below, and what might appear in the
+       # source code in quotes for an #include directive.
+@@ -235,7 +235,7 @@ config("blink_platform_pch") {
+ 
+       # Force include the header.
+       cflags = [ "/FI$precompiled_header" ]
+-    } else if (is_mac) {
++    } else if (is_mac || is_mingw) {
+       precompiled_source =
+           "//third_party/blink/renderer/platform/precompile_platform.h"
+     }
+@@ -1694,10 +1694,12 @@ jumbo_component("platform") {
+       "text/locale_icu.cc",
+       "text/locale_icu.h",
+     ]
+-    cflags = [
+-      "/wd4334",  # Result of 32-bit shift implicitly converted to 64 bits.
+-      "/wd4724",  # Modulo by 0.
+-    ]
++    if (is_msvc) {
++      cflags = [
++        "/wd4334",  # Result of 32-bit shift implicitly converted to 64 bits.
++        "/wd4724",  # Modulo by 0.
++      ]
++    }
+   }
+ 
+   if (is_fuchsia) {
+@@ -2292,7 +2294,7 @@ if (current_cpu == "x86" || current_cpu == "x64") {
+       "//third_party/blink/renderer:non_test_config",
+     ]
+     public_deps = [ ":blink_platform_public_deps" ]
+-    if (is_win) {
++    if (is_msvc) {
+       cflags = [ "/arch:AVX" ]
+     } else {
+       cflags = [ "-mavx" ]
+diff --git a/src/3rdparty/chromium/third_party/blink/renderer/platform/fonts/font_description.cc b/src/3rdparty/chromium/third_party/blink/renderer/platform/fonts/font_description.cc
+index 4b2592e..2c773ad 100644
+--- a/src/3rdparty/chromium/third_party/blink/renderer/platform/fonts/font_description.cc
++++ b/src/3rdparty/chromium/third_party/blink/renderer/platform/fonts/font_description.cc
+@@ -65,13 +65,13 @@ bool FontDescription::use_subpixel_text_positioning_ = false;
+ // static
+ FontDescription FontDescription::CreateHashTableEmptyValue() {
+   FontDescription result;
+-  memset(&result, 0, sizeof(FontDescription));
++  memset(reinterpret_cast<void*>(&result), 0, sizeof(FontDescription));
+   DCHECK(result.IsHashTableEmptyValue());
+   return result;
+ }
+ 
+ FontDescription::FontDescription(WTF::HashTableDeletedValueType) {
+-  memset(this, 0, sizeof(FontDescription));
++  memset(reinterpret_cast<void*>(this), 0, sizeof(FontDescription));
+   fields_.hash_category_ = kHashDeletedValue;
+ }
+ 
+diff --git a/src/3rdparty/chromium/third_party/blink/renderer/platform/fonts/font_platform_data.cc b/src/3rdparty/chromium/third_party/blink/renderer/platform/fonts/font_platform_data.cc
+index e64f6ac..05c1c0e 100644
+--- a/src/3rdparty/chromium/third_party/blink/renderer/platform/fonts/font_platform_data.cc
++++ b/src/3rdparty/chromium/third_party/blink/renderer/platform/fonts/font_platform_data.cc
+@@ -49,6 +49,7 @@ namespace blink {
+ 
+ namespace {
+ 
++#if !(defined(OS_WIN) && defined(COMPILER_GCC))
+ // These functions are also implemented in sandbox_ipc_linux.cc
+ // Converts gfx::FontRenderParams::Hinting to WebFontRenderStyle::hintStyle.
+ // Returns an int for serialization, but the underlying Blink type is a char.
+@@ -78,6 +79,7 @@ int ConvertSubpixelRendering(
+   NOTREACHED() << "Unexpected subpixel rendering value " << rendering;
+   return 0;
+ }
++#endif
+ 
+ } // namespace
+ 
+diff --git a/src/3rdparty/chromium/third_party/blink/renderer/platform/geometry/length.h b/src/3rdparty/chromium/third_party/blink/renderer/platform/geometry/length.h
+index b1af363..3fbf6e3 100644
+--- a/src/3rdparty/chromium/third_party/blink/renderer/platform/geometry/length.h
++++ b/src/3rdparty/chromium/third_party/blink/renderer/platform/geometry/length.h
+@@ -97,7 +97,7 @@ class PLATFORM_EXPORT Length {
+   explicit Length(scoped_refptr<CalculationValue>);
+ 
+   Length(const Length& length) {
+-    memcpy(this, &length, sizeof(Length));
++    memcpy(reinterpret_cast<void*>(this), &length, sizeof(Length));
+     if (IsCalculated())
+       IncrementCalculatedRef();
+   }
+@@ -107,7 +107,7 @@ class PLATFORM_EXPORT Length {
+       length.IncrementCalculatedRef();
+     if (IsCalculated())
+       DecrementCalculatedRef();
+-    memcpy(this, &length, sizeof(Length));
++    memcpy(reinterpret_cast<void*>(this), &length, sizeof(Length));
+     return *this;
+   }
+ 
+diff --git a/src/3rdparty/chromium/third_party/blink/renderer/platform/image-encoders/image_encoder_utils.cc b/src/3rdparty/chromium/third_party/blink/renderer/platform/image-encoders/image_encoder_utils.cc
+index 97cf9c9..88b3a88 100644
+--- a/src/3rdparty/chromium/third_party/blink/renderer/platform/image-encoders/image_encoder_utils.cc
++++ b/src/3rdparty/chromium/third_party/blink/renderer/platform/image-encoders/image_encoder_utils.cc
+@@ -16,7 +16,7 @@ const char ImageEncoderUtils::kDefaultRequestedMimeType[] = "image/png";
+ 
+ namespace {
+ // This enum is used in a UMA histogram; the values should not be changed.
+-enum RequestedImageMimeType {
++enum RequestedImageMimeType : uint8_t {
+   kRequestedImageMimeTypePng = 0,
+   kRequestedImageMimeTypeJpeg = 1,
+   kRequestedImageMimeTypeWebp = 2,
+diff --git a/src/3rdparty/chromium/third_party/blink/renderer/platform/precompile_platform.h b/src/3rdparty/chromium/third_party/blink/renderer/platform/precompile_platform.h
+index bbd1574..15be9b1 100644
+--- a/src/3rdparty/chromium/third_party/blink/renderer/platform/precompile_platform.h
++++ b/src/3rdparty/chromium/third_party/blink/renderer/platform/precompile_platform.h
+@@ -3,12 +3,12 @@
+ // found in the LICENSE file.
+ 
+ #ifdef THIRD_PARTY_BLINK_RENDERER_PLATFORM_PRECOMPILE_PLATFORM_H_
+-#error You shouldn't include the precompiled header file more than once.
++#error You should not include the precompiled header file more than once.
+ #endif
+ 
+ #define THIRD_PARTY_BLINK_RENDERER_PLATFORM_PRECOMPILE_PLATFORM_H_
+ 
+-#if defined(_MSC_VER)
++#if defined(_WIN32)
+ #include "third_party/blink/renderer/build/win/precompile.h"
+ #elif defined(__APPLE__)
+ #include "third_party/blink/renderer/build/mac/prefix.h"
+diff --git a/src/3rdparty/chromium/third_party/blink/renderer/platform/text/text_break_iterator.cc b/src/3rdparty/chromium/third_party/blink/renderer/platform/text/text_break_iterator.cc
+index c0f9268..3eaf33a 100644
+--- a/src/3rdparty/chromium/third_party/blink/renderer/platform/text/text_break_iterator.cc
++++ b/src/3rdparty/chromium/third_party/blink/renderer/platform/text/text_break_iterator.cc
+@@ -163,7 +163,7 @@ static const unsigned char kAsciiLineBreakTable[][(kAsciiLineBreakTableLastChar
+ // clang-format on
+ 
+ #if U_ICU_VERSION_MAJOR_NUM >= 74
+-#define BA_LB_COUNT (U_LB_COUNT - 8)
++#define BA_LB_COUNT (40)
+ #elif U_ICU_VERSION_MAJOR_NUM >= 58
+ #define BA_LB_COUNT (U_LB_COUNT - 3)
+ #else
+@@ -226,11 +226,11 @@ static const unsigned char kBreakAllLineBreakClassTable[][BA_LB_COUNT / 8 + 1] =
+ #undef DI
+ #undef AL
+ 
+-static_assert(base::size(kAsciiLineBreakTable) ==
++static_assert(std::size(kAsciiLineBreakTable) ==
+                   kAsciiLineBreakTableLastChar - kAsciiLineBreakTableFirstChar +
+                       1,
+               "asciiLineBreakTable should be consistent");
+-static_assert(base::size(kBreakAllLineBreakClassTable) == BA_LB_COUNT,
++static_assert(std::size(kBreakAllLineBreakClassTable) == BA_LB_COUNT,
+               "breakAllLineBreakClassTable should be consistent");
+ 
+ static inline bool ShouldBreakAfter(UChar last_ch, UChar ch, UChar next_ch) {
+diff --git a/src/3rdparty/chromium/third_party/blink/renderer/platform/widget/input/elastic_overscroll_controller.cc b/src/3rdparty/chromium/third_party/blink/renderer/platform/widget/input/elastic_overscroll_controller.cc
+index 1d7dbc6..4881347 100644
+--- a/src/3rdparty/chromium/third_party/blink/renderer/platform/widget/input/elastic_overscroll_controller.cc
++++ b/src/3rdparty/chromium/third_party/blink/renderer/platform/widget/input/elastic_overscroll_controller.cc
+@@ -57,7 +57,7 @@ ElasticOverscrollController::ElasticOverscrollController(
+ 
+ std::unique_ptr<ElasticOverscrollController>
+ ElasticOverscrollController::Create(cc::ScrollElasticityHelper* helper) {
+-#if defined(OS_WIN)
++#if defined(OS_WIN) && defined(COMPILER_MSVC)
+   return base::FeatureList::IsEnabled(features::kElasticOverscrollWin)
+              ? std::make_unique<ElasticOverscrollControllerBezier>(helper)
+              : nullptr;
+diff --git a/src/3rdparty/chromium/third_party/blink/renderer/platform/wtf/BUILD.gn b/src/3rdparty/chromium/third_party/blink/renderer/platform/wtf/BUILD.gn
+index 8e25699..0d9a4c4 100644
+--- a/src/3rdparty/chromium/third_party/blink/renderer/platform/wtf/BUILD.gn
++++ b/src/3rdparty/chromium/third_party/blink/renderer/platform/wtf/BUILD.gn
+@@ -23,7 +23,7 @@ visibility = [
+ ]
+ 
+ config("wtf_config") {
+-  if (is_win) {
++  if (is_msvc) {
+     cflags = [
+       # Don't complain about calling specific versions of templatized
+       # functions (e.g. in RefPtrHashMap.h).
+@@ -37,6 +37,8 @@ config("wtf_config") {
+       # build.
+       cflags += [ "/wd4291" ]
+     }
++  } else {
++    cflags = [ "-Wno-template-id-cdtor" ]
+   }
+ }
+ 
+@@ -224,7 +226,7 @@ jumbo_component("wtf") {
+   # Rules changing the |sources| list are temporarily commented out, until
+   # those files are actually moved to here.
+ 
+-  if (is_win) {
++  if (is_msvc) {
+     sources -= [ "threading_pthreads.cc" ]
+ 
+     cflags = [ "/wd4068" ]  # Unknown pragma.
+@@ -331,7 +333,7 @@ jumbo_source_set("wtf_unittests_sources") {
+   # TODO(jschuh): crbug.com/167187 fix size_t to int truncations.
+   configs += [ "//build/config/compiler:no_size_t_to_int_warning" ]
+ 
+-  if (is_win) {
++  if (is_msvc) {
+     cflags = [ "/wd4068" ]  # Unknown pragma.
+   }
+ 
+diff --git a/src/3rdparty/chromium/third_party/blink/renderer/platform/wtf/hash_table.h b/src/3rdparty/chromium/third_party/blink/renderer/platform/wtf/hash_table.h
+index e222dca..e38fcfa 100644
+--- a/src/3rdparty/chromium/third_party/blink/renderer/platform/wtf/hash_table.h
++++ b/src/3rdparty/chromium/third_party/blink/renderer/platform/wtf/hash_table.h
+@@ -1294,7 +1294,7 @@ struct HashTableBucketInitializer<true> {
+     // makes it possible to use this with types that don't support copying.
+     // The memset to 0 looks like a slow operation but is optimized by the
+     // compilers.
+-    memset(&bucket, 0, sizeof(bucket));
++    memset(reinterpret_cast<void*>(&bucket), 0, sizeof(bucket));
+   }
+ };
+ 
+@@ -1774,7 +1774,7 @@ HashTable<Key, Value, Extractor, HashFunctions, Traits, KeyTraits, Allocator>::
+     if (IsEmptyOrDeletedBucket(table_[i])) {
+       DCHECK_NE(&table_[i], entry);
+       if (Traits::kEmptyValueIsZero) {
+-        memset(&temporary_table[i], 0, sizeof(ValueType));
++        memset(reinterpret_cast<void*>(&temporary_table[i]), 0, sizeof(ValueType));
+       } else {
+         InitializeBucket(temporary_table[i]);
+       }
+@@ -1786,10 +1786,10 @@ HashTable<Key, Value, Extractor, HashFunctions, Traits, KeyTraits, Allocator>::
+     }
+   }
+   table_ = temporary_table;
+-  Allocator::template BackingWriteBarrier(&table_);
++  Allocator::BackingWriteBarrier(&table_);
+ 
+   if (Traits::kEmptyValueIsZero) {
+-    memset(original_table, 0, new_table_size * sizeof(ValueType));
++    memset(reinterpret_cast<void*>(original_table), 0, new_table_size * sizeof(ValueType));
+   } else {
+     for (unsigned i = 0; i < new_table_size; i++)
+       InitializeBucket(original_table[i]);
+@@ -1844,7 +1844,7 @@ HashTable<Key, Value, Extractor, HashFunctions, Traits, KeyTraits, Allocator>::
+   // This swaps the newly allocated buffer with the current one. The store to
+   // the current table has to be atomic to prevent races with concurrent marker.
+   AsAtomicPtr(&table_)->store(new_hash_table.table_, std::memory_order_relaxed);
+-  Allocator::template BackingWriteBarrier(&table_);
++  Allocator::BackingWriteBarrier(&table_);
+   table_size_ = new_table_size;
+ 
+   new_hash_table.table_ = old_table;
+@@ -2012,8 +2012,8 @@ void HashTable<Key,
+   // on the mutator thread, which is also the only one that writes to them, so
+   // there is *no* risk of data races when reading.
+   AtomicWriteSwap(table_, other.table_);
+-  Allocator::template BackingWriteBarrier(&table_);
+-  Allocator::template BackingWriteBarrier(&other.table_);
++  Allocator::BackingWriteBarrier(&table_);
++  Allocator::BackingWriteBarrier(&other.table_);
+   if (IsWeak<ValueType>::value) {
+     // Weak processing is omitted when no backing store is present. In case such
+     // an empty table is later on used it needs to be strongified.
+diff --git a/src/3rdparty/chromium/third_party/blink/renderer/platform/wtf/stack_util.cc b/src/3rdparty/chromium/third_party/blink/renderer/platform/wtf/stack_util.cc
+index 71b901f..c449f7a 100644
+--- a/src/3rdparty/chromium/third_party/blink/renderer/platform/wtf/stack_util.cc
++++ b/src/3rdparty/chromium/third_party/blink/renderer/platform/wtf/stack_util.cc
+@@ -88,7 +88,7 @@ size_t GetUnderestimatedStackSize() {
+ #endif
+   }
+   return pthread_get_stacksize_np(pthread_self());
+-#elif defined(OS_WIN) && defined(COMPILER_MSVC)
++#elif defined(OS_WIN)
+ return Threading::ThreadStackSize();
+ #else
+ #error "Stack frame size estimation not supported on this platform."
+@@ -130,7 +130,7 @@ void* GetStackStart() {
+ #endif
+ #elif defined(OS_MAC)
+   return pthread_get_stackaddr_np(pthread_self());
+-#elif defined(OS_WIN) && defined(COMPILER_MSVC)
++#elif defined(OS_WIN)
+ // On Windows stack limits for the current thread are available in
+ // the thread information block (TIB).
+ // On Windows ARM64, stack limits could be retrieved by calling
+@@ -179,7 +179,7 @@ void InitializeMainThreadStackEstimate() {
+   g_main_thread_underestimated_stack_size = underestimated_stack_size;
+ }
+ 
+-#if defined(OS_WIN) && defined(COMPILER_MSVC)
++#if defined(OS_WIN)
+ size_t ThreadStackSize() {
+   // Notice that we cannot use the TIB's StackLimit for the stack end, as i
+   // tracks the end of the committed range. We're after the end of the reserved
+diff --git a/src/3rdparty/chromium/third_party/blink/renderer/platform/wtf/stack_util.h b/src/3rdparty/chromium/third_party/blink/renderer/platform/wtf/stack_util.h
+index c9c423c..92be7c0 100644
+--- a/src/3rdparty/chromium/third_party/blink/renderer/platform/wtf/stack_util.h
++++ b/src/3rdparty/chromium/third_party/blink/renderer/platform/wtf/stack_util.h
+@@ -29,7 +29,7 @@ WTF_EXPORT extern uintptr_t g_main_thread_underestimated_stack_size;
+ 
+ WTF_EXPORT void InitializeMainThreadStackEstimate();
+ 
+-#if defined(OS_WIN) && defined(COMPILER_MSVC)
++#if defined(OS_WIN)
+ size_t ThreadStackSize();
+ #endif
+ 
+diff --git a/src/3rdparty/chromium/third_party/blink/renderer/platform/wtf/threading.cc b/src/3rdparty/chromium/third_party/blink/renderer/platform/wtf/threading.cc
+index d6636df..1a1bf20 100644
+--- a/src/3rdparty/chromium/third_party/blink/renderer/platform/wtf/threading.cc
++++ b/src/3rdparty/chromium/third_party/blink/renderer/platform/wtf/threading.cc
+@@ -50,7 +50,7 @@ void Threading::Initialize() {
+   WtfThreading();
+ }
+ 
+-#if defined(OS_WIN) && defined(COMPILER_MSVC)
++#if defined(OS_WIN)
+ size_t Threading::ThreadStackSize() {
+   // Needed to bootstrap Threading on Windows, because this value is needed
+   // before the main thread data is fully initialized.
+diff --git a/src/3rdparty/chromium/third_party/blink/renderer/platform/wtf/threading.h b/src/3rdparty/chromium/third_party/blink/renderer/platform/wtf/threading.h
+index 0943e79..52c1d36 100644
+--- a/src/3rdparty/chromium/third_party/blink/renderer/platform/wtf/threading.h
++++ b/src/3rdparty/chromium/third_party/blink/renderer/platform/wtf/threading.h
+@@ -70,7 +70,7 @@ class WTF_EXPORT Threading {
+   // Must be called on the main thread before any callers to wtfThreadData().
+   static void Initialize();
+ 
+-#if defined(OS_WIN) && defined(COMPILER_MSVC)
++#if defined(OS_WIN)
+   static size_t ThreadStackSize();
+ #endif
+ 
+@@ -80,7 +80,7 @@ class WTF_EXPORT Threading {
+ 
+   base::PlatformThreadId thread_id_;
+ 
+-#if defined(OS_WIN) && defined(COMPILER_MSVC)
++#if defined(OS_WIN)
+   size_t thread_stack_size_ = 0u;
+ #endif
+ 
+diff --git a/src/3rdparty/chromium/third_party/blink/renderer/platform/wtf/vector.h b/src/3rdparty/chromium/third_party/blink/renderer/platform/wtf/vector.h
+index dfdd63e..6768ffd 100644
+--- a/src/3rdparty/chromium/third_party/blink/renderer/platform/wtf/vector.h
++++ b/src/3rdparty/chromium/third_party/blink/renderer/platform/wtf/vector.h
+@@ -159,7 +159,7 @@ template <typename T, typename Allocator>
+ struct VectorInitializer<true, T, Allocator> {
+   STATIC_ONLY(VectorInitializer);
+   static void Initialize(T* begin, T* end) {
+-    memset(begin, 0,
++    memset(reinterpret_cast<void*>(begin), 0,
+            reinterpret_cast<char*>(end) - reinterpret_cast<char*>(begin));
+   }
+ };
+@@ -217,7 +217,7 @@ struct VectorMover<true, T, Allocator> {
+     if (Allocator::kIsGarbageCollected) {
+       AtomicWriteMemcpy(dst, src, bytes);
+     } else {
+-      memcpy(dst, src, bytes);
++      memcpy(reinterpret_cast<void*>(dst), src, bytes);
+     }
+   }
+ 
+@@ -246,7 +246,7 @@ struct VectorMover<true, T, Allocator> {
+           AtomicWriteMemcpy<sizeof(T)>(dst_end, src_end);
+       }
+     } else {
+-      memmove(dst, src,
++      memmove(reinterpret_cast<void*>(dst), src,
+               reinterpret_cast<const char*>(src_end) -
+                   reinterpret_cast<const char*>(src));
+     }
+@@ -267,7 +267,7 @@ struct VectorMover<true, T, Allocator> {
+     if (Allocator::kIsGarbageCollected) {
+       alignas(constexpr_max(alignof(T), sizeof(size_t))) char buf[sizeof(T)];
+       for (; src < src_end; ++src, ++dst) {
+-        memcpy(buf, dst, sizeof(T));
++        memcpy(reinterpret_cast<void*>(buf), dst, sizeof(T));
+         AtomicWriteMemcpy<sizeof(T)>(dst, src);
+         AtomicWriteMemcpy<sizeof(T)>(src, buf);
+       }
+@@ -322,7 +322,7 @@ struct VectorCopier<true, T, Allocator> {
+                         reinterpret_cast<const char*>(src_end) -
+                             reinterpret_cast<const char*>(src));
+     } else {
+-      memcpy(dst, src,
++      memcpy(reinterpret_cast<void*>(dst), src,
+              reinterpret_cast<const char*>(src_end) -
+                  reinterpret_cast<const char*>(src));
+     }
+diff --git a/src/3rdparty/chromium/third_party/blink/tools/BUILD.gn b/src/3rdparty/chromium/third_party/blink/tools/BUILD.gn
+index b4541d7..6a891a0 100644
+--- a/src/3rdparty/chromium/third_party/blink/tools/BUILD.gn
++++ b/src/3rdparty/chromium/third_party/blink/tools/BUILD.gn
+@@ -38,7 +38,7 @@ group("wpt_tests_isolate") {
+     "//third_party/blink/web_tests/VirtualTestSuites",
+     "//third_party/blink/web_tests/WPTOverrideExpectations",
+   ]
+-  if (is_win) {
++  if (is_msvc) {
+     data_deps = [ "//build/win:copy_cdb_to_output" ]
+   }
+   if (!is_android) {
