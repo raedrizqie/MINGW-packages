@@ -1,0 +1,272 @@
+diff --git a/src/3rdparty/chromium/third_party/webrtc/api/fec_controller.h b/src/3rdparty/chromium/third_party/webrtc/api/fec_controller.h
+index 3e5f7bb..87777a5 100644
+--- a/src/3rdparty/chromium/third_party/webrtc/api/fec_controller.h
++++ b/src/3rdparty/chromium/third_party/webrtc/api/fec_controller.h
+@@ -11,6 +11,7 @@
+ #ifndef API_FEC_CONTROLLER_H_
+ #define API_FEC_CONTROLLER_H_
+ 
++#include <cstdint>
+ #include <memory>
+ #include <vector>
+ 
+diff --git a/src/3rdparty/chromium/third_party/webrtc/api/network_state_predictor.h b/src/3rdparty/chromium/third_party/webrtc/api/network_state_predictor.h
+index 9cf5ab6..2d165ba 100644
+--- a/src/3rdparty/chromium/third_party/webrtc/api/network_state_predictor.h
++++ b/src/3rdparty/chromium/third_party/webrtc/api/network_state_predictor.h
+@@ -11,6 +11,7 @@
+ #ifndef API_NETWORK_STATE_PREDICTOR_H_
+ #define API_NETWORK_STATE_PREDICTOR_H_
+ 
++#include <cstdint>
+ #include <memory>
+ #include <vector>
+ 
+diff --git a/src/3rdparty/chromium/third_party/webrtc/api/task_queue/task_queue_base.h b/src/3rdparty/chromium/third_party/webrtc/api/task_queue/task_queue_base.h
+index 90b1efd..63526a7 100644
+--- a/src/3rdparty/chromium/third_party/webrtc/api/task_queue/task_queue_base.h
++++ b/src/3rdparty/chromium/third_party/webrtc/api/task_queue/task_queue_base.h
+@@ -10,6 +10,7 @@
+ #ifndef API_TASK_QUEUE_TASK_QUEUE_BASE_H_
+ #define API_TASK_QUEUE_TASK_QUEUE_BASE_H_
+ 
++#include <cstdint>
+ #include <memory>
+ 
+ #include "api/task_queue/queued_task.h"
+diff --git a/src/3rdparty/chromium/third_party/webrtc/BUILD.gn b/src/3rdparty/chromium/third_party/webrtc/BUILD.gn
+index cec97c5..21fe3d0 100644
+--- a/src/3rdparty/chromium/third_party/webrtc/BUILD.gn
++++ b/src/3rdparty/chromium/third_party/webrtc/BUILD.gn
+@@ -347,7 +347,7 @@ config("common_config") {
+       }
+     }
+ 
+-    if (is_win && !is_clang) {
++    if (is_msvc && !is_clang) {
+       # MSVC warning suppressions (needed to use Abseil).
+       # TODO(bugs.webrtc.org/9274): Remove these warnings as soon as MSVC allows
+       # external headers warning suppression (or fix them upstream).
+@@ -411,8 +411,8 @@ config("common_config") {
+ 
+   if (!build_with_chromium && rtc_win_undef_unicode) {
+     cflags += [
+-      "/UUNICODE",
+-      "/U_UNICODE",
++      "-UUNICODE",
++      "-U_UNICODE",
+     ]
+   }
+ }
+diff --git a/src/3rdparty/chromium/third_party/webrtc/common_audio/BUILD.gn b/src/3rdparty/chromium/third_party/webrtc/common_audio/BUILD.gn
+index a03e9ab..545e62a 100644
+--- a/src/3rdparty/chromium/third_party/webrtc/common_audio/BUILD.gn
++++ b/src/3rdparty/chromium/third_party/webrtc/common_audio/BUILD.gn
+@@ -249,7 +249,7 @@ if (current_cpu == "x86" || current_cpu == "x64") {
+       "resampler/sinc_resampler_sse.cc",
+     ]
+ 
+-    if (is_posix || is_fuchsia) {
++    if (is_posix || is_fuchsia || is_mingw) {
+       cflags = [ "-msse2" ]
+     }
+ 
+@@ -269,7 +269,7 @@ if (current_cpu == "x86" || current_cpu == "x64") {
+       "resampler/sinc_resampler_avx2.cc",
+     ]
+ 
+-    if (is_win) {
++    if (is_msvc) {
+       cflags = [ "/arch:AVX2" ]
+     } else {
+       cflags = [
+diff --git a/src/3rdparty/chromium/third_party/webrtc/common_video/h264/pps_parser.h b/src/3rdparty/chromium/third_party/webrtc/common_video/h264/pps_parser.h
+index d6c31b0..2d6c9d2 100644
+--- a/src/3rdparty/chromium/third_party/webrtc/common_video/h264/pps_parser.h
++++ b/src/3rdparty/chromium/third_party/webrtc/common_video/h264/pps_parser.h
+@@ -13,6 +13,8 @@
+ 
+ #include "absl/types/optional.h"
+ 
++#include <cstdint>
++
+ namespace rtc {
+ class BitBuffer;
+ }
+diff --git a/src/3rdparty/chromium/third_party/webrtc/common_video/h264/sps_parser.h b/src/3rdparty/chromium/third_party/webrtc/common_video/h264/sps_parser.h
+index 76e627d..fe6f978 100644
+--- a/src/3rdparty/chromium/third_party/webrtc/common_video/h264/sps_parser.h
++++ b/src/3rdparty/chromium/third_party/webrtc/common_video/h264/sps_parser.h
+@@ -13,6 +13,8 @@
+ 
+ #include "absl/types/optional.h"
+ 
++#include <cstdint>
++
+ namespace rtc {
+ class BitBuffer;
+ }
+diff --git a/src/3rdparty/chromium/third_party/webrtc/modules/audio_processing/aec3/BUILD.gn b/src/3rdparty/chromium/third_party/webrtc/modules/audio_processing/aec3/BUILD.gn
+index c98fa4c..69d1764 100644
+--- a/src/3rdparty/chromium/third_party/webrtc/modules/audio_processing/aec3/BUILD.gn
++++ b/src/3rdparty/chromium/third_party/webrtc/modules/audio_processing/aec3/BUILD.gn
+@@ -252,7 +252,7 @@ if (current_cpu == "x86" || current_cpu == "x64") {
+       "vector_math_avx2.cc",
+     ]
+ 
+-    if (is_win) {
++    if (is_msvc) {
+       cflags = [ "/arch:AVX2" ]
+     } else {
+       cflags = [
+diff --git a/src/3rdparty/chromium/third_party/webrtc/modules/audio_processing/aec3/reverb_model_estimator.h b/src/3rdparty/chromium/third_party/webrtc/modules/audio_processing/aec3/reverb_model_estimator.h
+index 3b9971a..e4e9540 100644
+--- a/src/3rdparty/chromium/third_party/webrtc/modules/audio_processing/aec3/reverb_model_estimator.h
++++ b/src/3rdparty/chromium/third_party/webrtc/modules/audio_processing/aec3/reverb_model_estimator.h
+@@ -12,6 +12,7 @@
+ #define MODULES_AUDIO_PROCESSING_AEC3_REVERB_MODEL_ESTIMATOR_H_
+ 
+ #include <array>
++#include <memory>
+ #include <vector>
+ 
+ #include "absl/types/optional.h"
+diff --git a/src/3rdparty/chromium/third_party/webrtc/modules/desktop_capture/BUILD.gn b/src/3rdparty/chromium/third_party/webrtc/modules/desktop_capture/BUILD.gn
+index 5235512..54d98b0 100644
+--- a/src/3rdparty/chromium/third_party/webrtc/modules/desktop_capture/BUILD.gn
++++ b/src/3rdparty/chromium/third_party/webrtc/modules/desktop_capture/BUILD.gn
+@@ -497,8 +497,8 @@ rtc_library("desktop_capture_generic") {
+       "window_finder_win.h",
+     ]
+     libs = [
+-      "d3d11.lib",
+-      "dxgi.lib",
++      "d3d11",
++      "dxgi",
+     ]
+     deps += [ "../../rtc_base:win32" ]
+   }
+@@ -555,7 +555,7 @@ if (use_desktop_capture_differ_sse2) {
+       "differ_vector_sse2.h",
+     ]
+ 
+-    if (is_posix || is_fuchsia) {
++    if (is_posix || is_fuchsia || is_mingw) {
+       cflags = [ "-msse2" ]
+     }
+   }
+diff --git a/src/3rdparty/chromium/third_party/webrtc/modules/include/module_common_types_public.h b/src/3rdparty/chromium/third_party/webrtc/modules/include/module_common_types_public.h
+index 345e45c..8338a51 100644
+--- a/src/3rdparty/chromium/third_party/webrtc/modules/include/module_common_types_public.h
++++ b/src/3rdparty/chromium/third_party/webrtc/modules/include/module_common_types_public.h
+@@ -11,6 +11,7 @@
+ #ifndef MODULES_INCLUDE_MODULE_COMMON_TYPES_PUBLIC_H_
+ #define MODULES_INCLUDE_MODULE_COMMON_TYPES_PUBLIC_H_
+ 
++#include <cstdint>
+ #include <limits>
+ 
+ #include "absl/types/optional.h"
+diff --git a/src/3rdparty/chromium/third_party/webrtc/modules/video_coding/timestamp_map.h b/src/3rdparty/chromium/third_party/webrtc/modules/video_coding/timestamp_map.h
+index c85666c..dfb90e4 100644
+--- a/src/3rdparty/chromium/third_party/webrtc/modules/video_coding/timestamp_map.h
++++ b/src/3rdparty/chromium/third_party/webrtc/modules/video_coding/timestamp_map.h
+@@ -11,6 +11,7 @@
+ #ifndef MODULES_VIDEO_CODING_TIMESTAMP_MAP_H_
+ #define MODULES_VIDEO_CODING_TIMESTAMP_MAP_H_
+ 
++#include <cstdint>
+ #include <memory>
+ 
+ namespace webrtc {
+diff --git a/src/3rdparty/chromium/third_party/webrtc/rtc_base/BUILD.gn b/src/3rdparty/chromium/third_party/webrtc/rtc_base/BUILD.gn
+index 77bff8d..200b0de 100644
+--- a/src/3rdparty/chromium/third_party/webrtc/rtc_base/BUILD.gn
++++ b/src/3rdparty/chromium/third_party/webrtc/rtc_base/BUILD.gn
+@@ -404,7 +404,7 @@ rtc_library("timeutils") {
+   ]
+   libs = []
+   if (is_win) {
+-    libs += [ "winmm.lib" ]
++    libs += [ "winmm" ]
+   }
+ }
+ 
+@@ -801,9 +801,9 @@ if (is_win) {
+     ]
+ 
+     libs = [
+-      "crypt32.lib",
+-      "iphlpapi.lib",
+-      "secur32.lib",
++      "crypt32",
++      "iphlpapi",
++      "secur32",
+     ]
+ 
+     defines = [ "_CRT_NONSTDC_NO_DEPRECATE" ]
+diff --git a/src/3rdparty/chromium/third_party/webrtc/rtc_base/platform_thread_types.cc b/src/3rdparty/chromium/third_party/webrtc/rtc_base/platform_thread_types.cc
+index b0243b4..5c0a132 100644
+--- a/src/3rdparty/chromium/third_party/webrtc/rtc_base/platform_thread_types.cc
++++ b/src/3rdparty/chromium/third_party/webrtc/rtc_base/platform_thread_types.cc
+@@ -16,6 +16,7 @@
+ #endif
+ 
+ #if defined(WEBRTC_WIN)
++#include "build/build_config.h"
+ #include "rtc_base/arraysize.h"
+ 
+ // The SetThreadDescription API was brought in version 1607 of Windows 10.
+diff --git a/src/3rdparty/chromium/third_party/webrtc/rtc_base/system/rtc_export_template.h b/src/3rdparty/chromium/third_party/webrtc/rtc_base/system/rtc_export_template.h
+index 4ac7043..050dc23 100644
+--- a/src/3rdparty/chromium/third_party/webrtc/rtc_base/system/rtc_export_template.h
++++ b/src/3rdparty/chromium/third_party/webrtc/rtc_base/system/rtc_export_template.h
+@@ -185,8 +185,10 @@
+ 
+ RTC_EXPORT_TEMPLATE_TEST(DEFAULT, );  // NOLINT
+ RTC_EXPORT_TEMPLATE_TEST(DEFAULT, __attribute__((visibility("default"))));
++#ifdef _MSC_VER
+ RTC_EXPORT_TEMPLATE_TEST(MSVC_HACK, __declspec(dllexport));
+ RTC_EXPORT_TEMPLATE_TEST(DEFAULT, __declspec(dllimport));
++#endif
+ 
+ #undef RTC_EXPORT_TEMPLATE_TEST
+ #undef RTC_EXPORT_TEMPLATE_TEST_DEFAULT_DEFAULT
+diff --git a/src/3rdparty/chromium/third_party/webrtc/rtc_base/win/windows_version.cc b/src/3rdparty/chromium/third_party/webrtc/rtc_base/win/windows_version.cc
+index 2e6c157..dd04916 100644
+--- a/src/3rdparty/chromium/third_party/webrtc/rtc_base/win/windows_version.cc
++++ b/src/3rdparty/chromium/third_party/webrtc/rtc_base/win/windows_version.cc
+@@ -17,7 +17,7 @@
+ #include "rtc_base/checks.h"
+ #include "rtc_base/string_utils.h"
+ 
+-#if !defined(__clang__) && _MSC_FULL_VER < 191125507
++#if !defined(__clang__) && defined(_MSC_VER) && _MSC_FULL_VER < 191125507
+ #error VS 2017 Update 3.2 or higher is required
+ #endif
+ 
+diff --git a/src/3rdparty/chromium/third_party/webrtc/system_wrappers/BUILD.gn b/src/3rdparty/chromium/third_party/webrtc/system_wrappers/BUILD.gn
+index b446648..bce671b 100644
+--- a/src/3rdparty/chromium/third_party/webrtc/system_wrappers/BUILD.gn
++++ b/src/3rdparty/chromium/third_party/webrtc/system_wrappers/BUILD.gn
+@@ -67,7 +67,7 @@ rtc_library("system_wrappers") {
+   }
+ 
+   if (is_win) {
+-    libs += [ "winmm.lib" ]
++    libs += [ "winmm" ]
+ 
+     # Windows needs ../rtc_base due to include of
+     # webrtc/rtc_base/win32.h in source/clock.cc.
+diff --git a/src/3rdparty/chromium/third_party/webrtc/video/stats_counter.h b/src/3rdparty/chromium/third_party/webrtc/video/stats_counter.h
+index fb6017f..ed5530c 100644
+--- a/src/3rdparty/chromium/third_party/webrtc/video/stats_counter.h
++++ b/src/3rdparty/chromium/third_party/webrtc/video/stats_counter.h
+@@ -11,6 +11,7 @@
+ #ifndef VIDEO_STATS_COUNTER_H_
+ #define VIDEO_STATS_COUNTER_H_
+ 
++#include <cstdint>
+ #include <memory>
+ #include <string>
+ 
