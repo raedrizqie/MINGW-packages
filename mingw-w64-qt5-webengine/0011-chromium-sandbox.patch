@@ -1,0 +1,873 @@
+diff --git a/src/3rdparty/chromium/sandbox/win/BUILD.gn b/src/3rdparty/chromium/sandbox/win/BUILD.gn
+index e5db1a5..05dddf4 100644
+--- a/src/3rdparty/chromium/sandbox/win/BUILD.gn
++++ b/src/3rdparty/chromium/sandbox/win/BUILD.gn
+@@ -308,7 +308,7 @@ test("sbox_validation_tests") {
+     "//testing/gtest",
+   ]
+ 
+-  libs = [ "shlwapi.lib" ]
++  libs = [ "shlwapi" ]
+ }
+ 
+ test("sbox_unittests") {
+diff --git a/src/3rdparty/chromium/sandbox/win/src/handle_closer.cc b/src/3rdparty/chromium/sandbox/win/src/handle_closer.cc
+index 841a815..77f226f 100644
+--- a/src/3rdparty/chromium/sandbox/win/src/handle_closer.cc
++++ b/src/3rdparty/chromium/sandbox/win/src/handle_closer.cc
+@@ -157,29 +157,4 @@ bool HandleCloser::SetupHandleList(void* buffer, size_t buffer_bytes) {
+   return output <= end;
+ }
+ 
+-bool GetHandleName(HANDLE handle, std::wstring* handle_name) {
+-  static NtQueryObject QueryObject = nullptr;
+-  if (!QueryObject)
+-    ResolveNTFunctionPtr("NtQueryObject", &QueryObject);
+-
+-  ULONG size = MAX_PATH;
+-  std::unique_ptr<UNICODE_STRING, base::FreeDeleter> name;
+-  NTSTATUS result;
+-
+-  do {
+-    name.reset(static_cast<UNICODE_STRING*>(malloc(size)));
+-    DCHECK(name.get());
+-    result =
+-        QueryObject(handle, ObjectNameInformation, name.get(), size, &size);
+-  } while (result == STATUS_INFO_LENGTH_MISMATCH ||
+-           result == STATUS_BUFFER_OVERFLOW);
+-
+-  if (NT_SUCCESS(result) && name->Buffer && name->Length)
+-    handle_name->assign(name->Buffer, name->Length / sizeof(wchar_t));
+-  else
+-    handle_name->clear();
+-
+-  return NT_SUCCESS(result);
+-}
+-
+ }  // namespace sandbox
+diff --git a/src/3rdparty/chromium/sandbox/win/src/handle_closer_agent.cc b/src/3rdparty/chromium/sandbox/win/src/handle_closer_agent.cc
+index 045b17a..9d5d419 100644
+--- a/src/3rdparty/chromium/sandbox/win/src/handle_closer_agent.cc
++++ b/src/3rdparty/chromium/sandbox/win/src/handle_closer_agent.cc
+@@ -4,37 +4,15 @@
+ 
+ #include "sandbox/win/src/handle_closer_agent.h"
+ 
+-#include <limits.h>
+ #include <stddef.h>
+ 
++#include <optional>
+ #include "base/check.h"
++#include "base/logging.h"
+ #include "base/win/static_constants.h"
+-#include "sandbox/win/src/nt_internals.h"
++#include "base/win/win_util.h"
+ #include "sandbox/win/src/win_utils.h"
+ 
+-namespace {
+-
+-// Returns type infomation for an NT object. This routine is expected to be
+-// called for invalid handles so it catches STATUS_INVALID_HANDLE exceptions
+-// that can be generated when handle tracing is enabled.
+-NTSTATUS QueryObjectTypeInformation(HANDLE handle, void* buffer, ULONG* size) {
+-  static NtQueryObject QueryObject = nullptr;
+-  if (!QueryObject)
+-    ResolveNTFunctionPtr("NtQueryObject", &QueryObject);
+-
+-  NTSTATUS status = STATUS_UNSUCCESSFUL;
+-  __try {
+-    status = QueryObject(handle, ObjectTypeInformation, buffer, *size, size);
+-  } __except (GetExceptionCode() == STATUS_INVALID_HANDLE
+-                  ? EXCEPTION_EXECUTE_HANDLER
+-                  : EXCEPTION_CONTINUE_SEARCH) {
+-    status = STATUS_INVALID_HANDLE;
+-  }
+-  return status;
+-}
+-
+-}  // namespace
+-
+ namespace sandbox {
+ 
+ // Memory buffer mapped from the parent, with the list of handles.
+@@ -60,11 +38,12 @@ bool HandleCloserAgent::AttemptToStuffHandleSlot(HANDLE closed_handle,
+     return true;
+   }
+ 
+-  if (!dummy_handle_.IsValid())
++  if (!dummy_handle_.is_valid()) {
+     return false;
++  }
+ 
+   // This should never happen, as g_dummy is created before closing to_stuff.
+-  DCHECK(dummy_handle_.Get() != closed_handle);
++  DCHECK(dummy_handle_.get() != closed_handle);
+ 
+   std::vector<HANDLE> to_close;
+ 
+@@ -93,7 +72,7 @@ bool HandleCloserAgent::AttemptToStuffHandleSlot(HANDLE closed_handle,
+ 
+       do {
+         result =
+-            ::DuplicateHandle(::GetCurrentProcess(), dummy_handle_.Get(),
++            ::DuplicateHandle(::GetCurrentProcess(), dummy_handle_.get(),
+                               ::GetCurrentProcess(), &dup_dummy, 0, false, 0);
+         if (!result) {
+           break;
+@@ -165,69 +144,34 @@ void HandleCloserAgent::InitializeHandlesToClose(bool* is_csrss_connected) {
+ }
+ 
+ bool HandleCloserAgent::CloseHandles() {
+-  DWORD handle_count = UINT_MAX;
+-  const int kInvalidHandleThreshold = 100;
+-  const size_t kHandleOffset = 4;  // Handles are always a multiple of 4.
+-
+-  if (!::GetProcessHandleCount(::GetCurrentProcess(), &handle_count))
+-    return false;
+-
+   // Skip closing these handles when Application Verifier is in use in order to
+   // avoid invalid-handle exceptions.
+-  if (GetModuleHandleA(base::win::kApplicationVerifierDllName))
++  if (base::win::IsAppVerifierLoaded())
+     return true;
+ 
+-  // Set up buffers for the type info and the name.
+-  std::vector<BYTE> type_info_buffer(sizeof(OBJECT_TYPE_INFORMATION) +
+-                                     32 * sizeof(wchar_t));
+-  OBJECT_TYPE_INFORMATION* type_info =
+-      reinterpret_cast<OBJECT_TYPE_INFORMATION*>(&(type_info_buffer[0]));
+-  std::wstring handle_name;
+-  HANDLE handle = nullptr;
+-  int invalid_count = 0;
+-
+-  // Keep incrementing until we hit the number of handles reported by
+-  // GetProcessHandleCount(). If we hit a very long sequence of invalid
+-  // handles we assume that we've run past the end of the table.
+-  while (handle_count && invalid_count < kInvalidHandleThreshold) {
+-    reinterpret_cast<size_t&>(handle) += kHandleOffset;
+-    NTSTATUS rc;
+-
+-    // Get the type name, reusing the buffer.
+-    ULONG size = static_cast<ULONG>(type_info_buffer.size());
+-    rc = QueryObjectTypeInformation(handle, type_info, &size);
+-    while (rc == STATUS_INFO_LENGTH_MISMATCH || rc == STATUS_BUFFER_OVERFLOW) {
+-      type_info_buffer.resize(size + sizeof(wchar_t));
+-      type_info =
+-          reinterpret_cast<OBJECT_TYPE_INFORMATION*>(&(type_info_buffer[0]));
+-      rc = QueryObjectTypeInformation(handle, type_info, &size);
+-      // Leave padding for the nul terminator.
+-      if (NT_SUCCESS(rc) && size == type_info_buffer.size())
+-        rc = STATUS_INFO_LENGTH_MISMATCH;
+-    }
+-    if (!NT_SUCCESS(rc) || !type_info->Name.Buffer) {
+-      ++invalid_count;
+-      continue;
+-    }
+-
+-    --handle_count;
+-    type_info->Name.Buffer[type_info->Name.Length / sizeof(wchar_t)] = L'\0';
++  std::optional<ProcessHandleMap> handle_map = GetCurrentProcessHandles();
++  if (!handle_map)
++    return false;
+ 
+-    // Check if we're looking for this type of handle.
+-    HandleMap::iterator result = handles_to_close_.find(type_info->Name.Buffer);
+-    if (result != handles_to_close_.end()) {
+-      HandleMap::mapped_type& names = result->second;
++  for (const HandleMap::value_type& handle_to_close : handles_to_close_) {
++    ProcessHandleMap::iterator result = handle_map->find(handle_to_close.first);
++    if (result == handle_map->end())
++      continue;
++    const HandleMap::mapped_type& names = handle_to_close.second;
++    for (HANDLE handle : result->second) {
+       // Empty set means close all handles of this type; otherwise check name.
+       if (!names.empty()) {
++        auto handle_name = GetPathFromHandle(handle);
+         // Move on to the next handle if this name doesn't match.
+-        if (!GetHandleName(handle, &handle_name) || !names.count(handle_name))
++        if (!handle_name || !names.count(handle_name.value())) {
+           continue;
++        }
+       }
+ 
+       if (!::SetHandleInformation(handle, HANDLE_FLAG_PROTECT_FROM_CLOSE, 0))
+-        return false;
++        continue;
+       if (!::CloseHandle(handle))
+-        return false;
++        continue;
+       // Attempt to stuff this handle with a new dummy Event.
+       AttemptToStuffHandleSlot(handle, result->first);
+     }
+diff --git a/src/3rdparty/chromium/sandbox/win/src/interception_agent.cc b/src/3rdparty/chromium/sandbox/win/src/interception_agent.cc
+index 26e65df..8596965 100644
+--- a/src/3rdparty/chromium/sandbox/win/src/interception_agent.cc
++++ b/src/3rdparty/chromium/sandbox/win/src/interception_agent.cc
+@@ -45,7 +45,7 @@ InterceptionAgent* InterceptionAgent::GetInterceptionAgent() {
+ 
+     size_t array_bytes = g_interceptions->num_intercepted_dlls * sizeof(void*);
+     s_singleton = reinterpret_cast<InterceptionAgent*>(
+-        new (NT_ALLOC) char[array_bytes + sizeof(InterceptionAgent)]);
++        new char[array_bytes + sizeof(InterceptionAgent)]);
+ 
+     bool success = s_singleton->Init(g_interceptions);
+     if (!success) {
+@@ -112,7 +112,7 @@ bool InterceptionAgent::OnDllLoad(const UNICODE_STRING* full_path,
+   size_t buffer_bytes = offsetof(DllInterceptionData, thunks) +
+                         dll_info->num_functions * sizeof(ThunkData);
+   dlls_[i] = reinterpret_cast<DllInterceptionData*>(
+-      new (NT_PAGE, base_address) char[buffer_bytes]);
++      new char[buffer_bytes]);
+ 
+   DCHECK_NT(dlls_[i]);
+   if (!dlls_[i])
+diff --git a/src/3rdparty/chromium/sandbox/win/src/interceptors_64.cc b/src/3rdparty/chromium/sandbox/win/src/interceptors_64.cc
+index 0ac2671..760f117 100644
+--- a/src/3rdparty/chromium/sandbox/win/src/interceptors_64.cc
++++ b/src/3rdparty/chromium/sandbox/win/src/interceptors_64.cc
+@@ -52,7 +52,7 @@ NTSTATUS WINAPI TargetNtUnmapViewOfSection64(HANDLE process, PVOID base) {
+ 
+ NTSTATUS WINAPI
+ TargetNtSetInformationThread64(HANDLE thread,
+-                               NT_THREAD_INFORMATION_CLASS thread_info_class,
++                               THREADINFOCLASS thread_info_class,
+                                PVOID thread_information,
+                                ULONG thread_information_bytes) {
+   NtSetInformationThreadFunction orig_fn =
+diff --git a/src/3rdparty/chromium/sandbox/win/src/interceptors_64.h b/src/3rdparty/chromium/sandbox/win/src/interceptors_64.h
+index f34627d..802e892 100644
+--- a/src/3rdparty/chromium/sandbox/win/src/interceptors_64.h
++++ b/src/3rdparty/chromium/sandbox/win/src/interceptors_64.h
+@@ -39,7 +39,7 @@ SANDBOX_INTERCEPT NTSTATUS WINAPI TargetNtUnmapViewOfSection64(HANDLE process,
+ // Interception of NtSetInformationThread on the child process.
+ SANDBOX_INTERCEPT NTSTATUS WINAPI
+ TargetNtSetInformationThread64(HANDLE thread,
+-                               NT_THREAD_INFORMATION_CLASS thread_info_class,
++                               THREADINFOCLASS thread_info_class,
+                                PVOID thread_information,
+                                ULONG thread_information_bytes);
+ 
+diff --git a/src/3rdparty/chromium/sandbox/win/src/nt_internals.h b/src/3rdparty/chromium/sandbox/win/src/nt_internals.h
+index 6041566..a0cc52f 100644
+--- a/src/3rdparty/chromium/sandbox/win/src/nt_internals.h
++++ b/src/3rdparty/chromium/sandbox/win/src/nt_internals.h
+@@ -10,6 +10,7 @@
+ #include <windows.h>
+ 
+ #include <stddef.h>
++#include <winternl.h>
+ 
+ typedef LONG NTSTATUS;
+ #define NT_SUCCESS(st) (st >= 0)
+@@ -42,6 +43,7 @@ typedef LONG NTSTATUS;
+ #define CURRENT_THREAD ((HANDLE)-2)
+ #define NtCurrentProcess CURRENT_PROCESS
+ 
++#ifdef _MSC_VER
+ typedef struct _UNICODE_STRING {
+   USHORT Length;
+   USHORT MaximumLength;
+@@ -144,6 +146,7 @@ typedef struct _IO_STATUS_BLOCK {
+ #define FILE_OVERWRITTEN                        0x00000003
+ #define FILE_EXISTS                             0x00000004
+ #define FILE_DOES_NOT_EXIST                     0x00000005
++#endif // _MSC_VER
+ 
+ typedef NTSTATUS(WINAPI* NtCreateFileFunction)(
+     OUT PHANDLE FileHandle,
+@@ -168,18 +171,6 @@ typedef NTSTATUS(WINAPI* NtOpenFileFunction)(OUT PHANDLE FileHandle,
+ 
+ typedef NTSTATUS(WINAPI* NtCloseFunction)(IN HANDLE Handle);
+ 
+-typedef enum _FILE_INFORMATION_CLASS {
+-  FileRenameInformation = 10
+-} FILE_INFORMATION_CLASS,
+-    *PFILE_INFORMATION_CLASS;
+-
+-typedef struct _FILE_RENAME_INFORMATION {
+-  BOOLEAN ReplaceIfExists;
+-  HANDLE RootDirectory;
+-  ULONG FileNameLength;
+-  WCHAR FileName[1];
+-} FILE_RENAME_INFORMATION, *PFILE_RENAME_INFORMATION;
+-
+ typedef NTSTATUS(WINAPI* NtSetInformationFileFunction)(
+     IN HANDLE FileHandle,
+     OUT PIO_STATUS_BLOCK IoStatusBlock,
+@@ -187,28 +178,10 @@ typedef NTSTATUS(WINAPI* NtSetInformationFileFunction)(
+     IN ULONG Length,
+     IN FILE_INFORMATION_CLASS FileInformationClass);
+ 
+-typedef struct FILE_BASIC_INFORMATION {
+-  LARGE_INTEGER CreationTime;
+-  LARGE_INTEGER LastAccessTime;
+-  LARGE_INTEGER LastWriteTime;
+-  LARGE_INTEGER ChangeTime;
+-  ULONG FileAttributes;
+-} FILE_BASIC_INFORMATION, *PFILE_BASIC_INFORMATION;
+-
+ typedef NTSTATUS(WINAPI* NtQueryAttributesFileFunction)(
+     IN POBJECT_ATTRIBUTES ObjectAttributes,
+     OUT PFILE_BASIC_INFORMATION FileAttributes);
+ 
+-typedef struct _FILE_NETWORK_OPEN_INFORMATION {
+-  LARGE_INTEGER CreationTime;
+-  LARGE_INTEGER LastAccessTime;
+-  LARGE_INTEGER LastWriteTime;
+-  LARGE_INTEGER ChangeTime;
+-  LARGE_INTEGER AllocationSize;
+-  LARGE_INTEGER EndOfFile;
+-  ULONG FileAttributes;
+-} FILE_NETWORK_OPEN_INFORMATION, *PFILE_NETWORK_OPEN_INFORMATION;
+-
+ typedef NTSTATUS(WINAPI* NtQueryFullAttributesFileFunction)(
+     IN POBJECT_ATTRIBUTES ObjectAttributes,
+     OUT PFILE_NETWORK_OPEN_INFORMATION FileAttributes);
+@@ -265,11 +238,6 @@ typedef NTSTATUS(WINAPI* NtQuerySectionFunction)(
+ // -----------------------------------------------------------------------
+ // Process and Thread
+ 
+-typedef struct _CLIENT_ID {
+-  PVOID UniqueProcess;
+-  PVOID UniqueThread;
+-} CLIENT_ID, *PCLIENT_ID;
+-
+ typedef NTSTATUS(WINAPI* NtOpenThreadFunction)(OUT PHANDLE ThreadHandle,
+                                                IN ACCESS_MASK DesiredAccess,
+                                                IN POBJECT_ATTRIBUTES
+@@ -282,52 +250,21 @@ typedef NTSTATUS(WINAPI* NtOpenProcessFunction)(OUT PHANDLE ProcessHandle,
+                                                     ObjectAttributes,
+                                                 IN PCLIENT_ID ClientId);
+ 
+-typedef enum _NT_THREAD_INFORMATION_CLASS {
+-  ThreadBasicInformation,
+-  ThreadTimes,
+-  ThreadPriority,
+-  ThreadBasePriority,
+-  ThreadAffinityMask,
+-  ThreadImpersonationToken,
+-  ThreadDescriptorTableEntry,
+-  ThreadEnableAlignmentFaultFixup,
+-  ThreadEventPair,
+-  ThreadQuerySetWin32StartAddress,
+-  ThreadZeroTlsCell,
+-  ThreadPerformanceCount,
+-  ThreadAmILastThread,
+-  ThreadIdealProcessor,
+-  ThreadPriorityBoost,
+-  ThreadSetTlsArrayAddress,
+-  ThreadIsIoPending,
+-  ThreadHideFromDebugger
+-} NT_THREAD_INFORMATION_CLASS,
+-    *PNT_THREAD_INFORMATION_CLASS;
+-
+ typedef NTSTATUS(WINAPI* NtSetInformationThreadFunction)(
+     IN HANDLE ThreadHandle,
+-    IN NT_THREAD_INFORMATION_CLASS ThreadInformationClass,
++    IN THREADINFOCLASS ThreadInformationClass,
+     IN PVOID ThreadInformation,
+     IN ULONG ThreadInformationLength);
+ 
+-// Partial definition only:
+-typedef enum _PROCESSINFOCLASS {
+-  ProcessBasicInformation = 0,
+-  ProcessExecuteFlags = 0x22
+-} PROCESSINFOCLASS;
+-
+-// For the structure documentation, see
+-// https://msdn.microsoft.com/en-us/library/windows/desktop/aa813741(v=vs.85).aspx
+-typedef struct _RTL_USER_PROCESS_PARAMETERS {
+-  BYTE Reserved1[16];
+-  PVOID Reserved2[10];
+-  UNICODE_STRING ImagePathName;
+-  UNICODE_STRING CommandLine;
+-} RTL_USER_PROCESS_PARAMETERS, *PRTL_USER_PROCESS_PARAMETERS;
+-
+-// Partial definition only, from
++// Partial definition only for values not in PROCESS_INFO_CLASS.
++#pragma clang diagnostic push
++#pragma clang diagnostic ignored "-Wenum-constexpr-conversion"
++constexpr auto ProcessHandleTable = static_cast<PROCESSINFOCLASS>(58);
++#pragma clang diagnostic pop
++
++// Partial definition only adding fields not in winternl.h, from
+ // https://msdn.microsoft.com/en-us/library/windows/desktop/aa813706(v=vs.85).aspx
+-typedef struct _PEB {
++typedef struct _NT_PEB {
+   BYTE InheritedAddressSpace;
+   BYTE ReadImageFileExecOptions;
+   BYTE BeingDebugged;
+@@ -336,30 +273,12 @@ typedef struct _PEB {
+   PVOID ImageBaseAddress;
+   PVOID Ldr;
+   PRTL_USER_PROCESS_PARAMETERS ProcessParameters;
+-} PEB, *PPEB;
+-
+-typedef LONG KPRIORITY;
++} NT_PEB, *PNT_PEB;
+ 
+-typedef struct _PROCESS_BASIC_INFORMATION {
+-  union {
+-    NTSTATUS ExitStatus;
+-    PVOID padding_for_x64_0;
+-  };
+-  PPEB PebBaseAddress;
+-  KAFFINITY AffinityMask;
+-  union {
+-    KPRIORITY BasePriority;
+-    PVOID padding_for_x64_1;
+-  };
+-  union {
+-    DWORD UniqueProcessId;
+-    PVOID padding_for_x64_2;
+-  };
+-  union {
+-    DWORD InheritedFromUniqueProcessId;
+-    PVOID padding_for_x64_3;
+-  };
+-} PROCESS_BASIC_INFORMATION, *PPROCESS_BASIC_INFORMATION;
++// Validate shared fields for NT_PEB:
++static_assert(offsetof(NT_PEB, Ldr) == offsetof(PEB, Ldr));
++static_assert(offsetof(NT_PEB, ProcessParameters) ==
++              offsetof(PEB, ProcessParameters));
+ 
+ typedef NTSTATUS(WINAPI* NtQueryInformationProcessFunction)(
+     IN HANDLE ProcessHandle,
+@@ -368,12 +287,6 @@ typedef NTSTATUS(WINAPI* NtQueryInformationProcessFunction)(
+     IN ULONG ProcessInformationLength,
+     OUT PULONG ReturnLength OPTIONAL);
+ 
+-typedef NTSTATUS(WINAPI* NtSetInformationProcessFunction)(
+-    HANDLE ProcessHandle,
+-    IN PROCESSINFOCLASS ProcessInformationClass,
+-    IN PVOID ProcessInformation,
+-    IN ULONG ProcessInformationLength);
+-
+ typedef NTSTATUS(WINAPI* NtOpenThreadTokenFunction)(IN HANDLE ThreadHandle,
+                                                     IN ACCESS_MASK
+                                                         DesiredAccess,
+@@ -398,13 +311,6 @@ typedef NTSTATUS(WINAPI* NtOpenProcessTokenExFunction)(
+     IN ULONG HandleAttributes,
+     OUT PHANDLE TokenHandle);
+ 
+-typedef NTSTATUS(WINAPI* NtQueryInformationTokenFunction)(
+-    IN HANDLE TokenHandle,
+-    IN TOKEN_INFORMATION_CLASS TokenInformationClass,
+-    OUT PVOID TokenInformation,
+-    IN ULONG TokenInformationLength,
+-    OUT PULONG ReturnLength);
+-
+ typedef NTSTATUS(WINAPI* RtlCreateUserThreadFunction)(
+     IN HANDLE Process,
+     IN PSECURITY_DESCRIPTOR ThreadSecurityDescriptor,
+@@ -425,111 +331,9 @@ typedef NTSTATUS(WINAPI* RtlConvertSidToUnicodeStringFunction)(
+ typedef VOID(WINAPI* RtlFreeUnicodeStringFunction)(
+     IN OUT PUNICODE_STRING UnicodeString);
+ 
+-// -----------------------------------------------------------------------
+-// Registry
+-
+-typedef enum _KEY_INFORMATION_CLASS {
+-  KeyBasicInformation = 0,
+-  KeyFullInformation = 2
+-} KEY_INFORMATION_CLASS,
+-    *PKEY_INFORMATION_CLASS;
+-
+-typedef struct _KEY_BASIC_INFORMATION {
+-  LARGE_INTEGER LastWriteTime;
+-  ULONG TitleIndex;
+-  ULONG NameLength;
+-  WCHAR Name[1];
+-} KEY_BASIC_INFORMATION, *PKEY_BASIC_INFORMATION;
+-
+-typedef struct _KEY_FULL_INFORMATION {
+-  LARGE_INTEGER LastWriteTime;
+-  ULONG TitleIndex;
+-  ULONG ClassOffset;
+-  ULONG ClassLength;
+-  ULONG SubKeys;
+-  ULONG MaxNameLen;
+-  ULONG MaxClassLen;
+-  ULONG Values;
+-  ULONG MaxValueNameLen;
+-  ULONG MaxValueDataLen;
+-  WCHAR Class[1];
+-} KEY_FULL_INFORMATION, *PKEY_FULL_INFORMATION;
+-
+-typedef enum _KEY_VALUE_INFORMATION_CLASS {
+-  KeyValueFullInformation = 1
+-} KEY_VALUE_INFORMATION_CLASS,
+-    *PKEY_VALUE_INFORMATION_CLASS;
+-
+-typedef struct _KEY_VALUE_FULL_INFORMATION {
+-  ULONG TitleIndex;
+-  ULONG Type;
+-  ULONG DataOffset;
+-  ULONG DataLength;
+-  ULONG NameLength;
+-  WCHAR Name[1];
+-} KEY_VALUE_FULL_INFORMATION, *PKEY_VALUE_FULL_INFORMATION;
+-
+-typedef NTSTATUS(WINAPI* NtCreateKeyFunction)(OUT PHANDLE KeyHandle,
+-                                              IN ACCESS_MASK DesiredAccess,
+-                                              IN POBJECT_ATTRIBUTES
+-                                                  ObjectAttributes,
+-                                              IN ULONG TitleIndex,
+-                                              IN PUNICODE_STRING Class OPTIONAL,
+-                                              IN ULONG CreateOptions,
+-                                              OUT PULONG Disposition OPTIONAL);
+-
+-typedef NTSTATUS(WINAPI* NtOpenKeyFunction)(OUT PHANDLE KeyHandle,
+-                                            IN ACCESS_MASK DesiredAccess,
+-                                            IN POBJECT_ATTRIBUTES
+-                                                ObjectAttributes);
+-
+-typedef NTSTATUS(WINAPI* NtOpenKeyExFunction)(OUT PHANDLE KeyHandle,
+-                                              IN ACCESS_MASK DesiredAccess,
+-                                              IN POBJECT_ATTRIBUTES
+-                                                  ObjectAttributes,
+-                                              IN DWORD open_options);
+-
+-typedef NTSTATUS(WINAPI* NtDeleteKeyFunction)(IN HANDLE KeyHandle);
+-
+-typedef NTSTATUS(WINAPI* RtlFormatCurrentUserKeyPathFunction)(
+-    OUT PUNICODE_STRING RegistryPath);
+-
+-typedef NTSTATUS(WINAPI* NtQueryKeyFunction)(IN HANDLE KeyHandle,
+-                                             IN KEY_INFORMATION_CLASS
+-                                                 KeyInformationClass,
+-                                             OUT PVOID KeyInformation,
+-                                             IN ULONG Length,
+-                                             OUT PULONG ResultLength);
+-
+-typedef NTSTATUS(WINAPI* NtEnumerateKeyFunction)(IN HANDLE KeyHandle,
+-                                                 IN ULONG Index,
+-                                                 IN KEY_INFORMATION_CLASS
+-                                                     KeyInformationClass,
+-                                                 OUT PVOID KeyInformation,
+-                                                 IN ULONG Length,
+-                                                 OUT PULONG ResultLength);
+-
+-typedef NTSTATUS(WINAPI* NtQueryValueKeyFunction)(IN HANDLE KeyHandle,
+-                                                  IN PUNICODE_STRING ValueName,
+-                                                  IN KEY_VALUE_INFORMATION_CLASS
+-                                                      KeyValueInformationClass,
+-                                                  OUT PVOID KeyValueInformation,
+-                                                  IN ULONG Length,
+-                                                  OUT PULONG ResultLength);
+-
+-typedef NTSTATUS(WINAPI* NtSetValueKeyFunction)(IN HANDLE KeyHandle,
+-                                                IN PUNICODE_STRING ValueName,
+-                                                IN ULONG TitleIndex OPTIONAL,
+-                                                IN ULONG Type,
+-                                                IN PVOID Data,
+-                                                IN ULONG DataSize);
+-
+ // -----------------------------------------------------------------------
+ // Memory
+ 
+-// Don't really need this structure right now.
+-typedef PVOID PRTL_HEAP_PARAMETERS;
+-
+ typedef PVOID(WINAPI* RtlCreateHeapFunction)(IN ULONG Flags,
+                                              IN PVOID HeapBase OPTIONAL,
+                                              IN SIZE_T ReserveSize OPTIONAL,
+@@ -590,34 +394,6 @@ typedef NTSTATUS(WINAPI* NtProtectVirtualMemoryFunction)(
+ // -----------------------------------------------------------------------
+ // Objects
+ 
+-typedef enum _OBJECT_INFORMATION_CLASS {
+-  ObjectBasicInformation,
+-  ObjectNameInformation,
+-  ObjectTypeInformation,
+-  ObjectAllInformation,
+-  ObjectDataInformation
+-} OBJECT_INFORMATION_CLASS,
+-    *POBJECT_INFORMATION_CLASS;
+-
+-typedef struct _OBJDIR_INFORMATION {
+-  UNICODE_STRING ObjectName;
+-  UNICODE_STRING ObjectTypeName;
+-  BYTE Data[1];
+-} OBJDIR_INFORMATION;
+-
+-typedef struct _PUBLIC_OBJECT_BASIC_INFORMATION {
+-  ULONG Attributes;
+-  ACCESS_MASK GrantedAccess;
+-  ULONG HandleCount;
+-  ULONG PointerCount;
+-  ULONG Reserved[10];  // reserved for internal use
+-} PUBLIC_OBJECT_BASIC_INFORMATION, *PPUBLIC_OBJECT_BASIC_INFORMATION;
+-
+-typedef struct __PUBLIC_OBJECT_TYPE_INFORMATION {
+-  UNICODE_STRING TypeName;
+-  ULONG Reserved[22];  // reserved for internal use
+-} PUBLIC_OBJECT_TYPE_INFORMATION, *PPUBLIC_OBJECT_TYPE_INFORMATION;
+-
+ typedef enum _POOL_TYPE {
+   NonPagedPool,
+   PagedPool,
+@@ -628,68 +404,6 @@ typedef enum _POOL_TYPE {
+   NonPagedPoolCacheAlignedMustS
+ } POOL_TYPE;
+ 
+-typedef struct _OBJECT_BASIC_INFORMATION {
+-  ULONG Attributes;
+-  ACCESS_MASK GrantedAccess;
+-  ULONG HandleCount;
+-  ULONG PointerCount;
+-  ULONG PagedPoolUsage;
+-  ULONG NonPagedPoolUsage;
+-  ULONG Reserved[3];
+-  ULONG NameInformationLength;
+-  ULONG TypeInformationLength;
+-  ULONG SecurityDescriptorLength;
+-  LARGE_INTEGER CreateTime;
+-} OBJECT_BASIC_INFORMATION, *POBJECT_BASIC_INFORMATION;
+-
+-typedef struct _OBJECT_TYPE_INFORMATION {
+-  UNICODE_STRING Name;
+-  ULONG TotalNumberOfObjects;
+-  ULONG TotalNumberOfHandles;
+-  ULONG TotalPagedPoolUsage;
+-  ULONG TotalNonPagedPoolUsage;
+-  ULONG TotalNamePoolUsage;
+-  ULONG TotalHandleTableUsage;
+-  ULONG HighWaterNumberOfObjects;
+-  ULONG HighWaterNumberOfHandles;
+-  ULONG HighWaterPagedPoolUsage;
+-  ULONG HighWaterNonPagedPoolUsage;
+-  ULONG HighWaterNamePoolUsage;
+-  ULONG HighWaterHandleTableUsage;
+-  ULONG InvalidAttributes;
+-  GENERIC_MAPPING GenericMapping;
+-  ULONG ValidAccess;
+-  BOOLEAN SecurityRequired;
+-  BOOLEAN MaintainHandleCount;
+-  USHORT MaintainTypeList;
+-  POOL_TYPE PoolType;
+-  ULONG PagedPoolUsage;
+-  ULONG NonPagedPoolUsage;
+-} OBJECT_TYPE_INFORMATION, *POBJECT_TYPE_INFORMATION;
+-
+-typedef enum _SYSTEM_INFORMATION_CLASS {
+-  SystemHandleInformation = 16
+-} SYSTEM_INFORMATION_CLASS;
+-
+-typedef struct _SYSTEM_HANDLE_INFORMATION {
+-  USHORT ProcessId;
+-  USHORT CreatorBackTraceIndex;
+-  UCHAR ObjectTypeNumber;
+-  UCHAR Flags;
+-  USHORT Handle;
+-  PVOID Object;
+-  ACCESS_MASK GrantedAccess;
+-} SYSTEM_HANDLE_INFORMATION, *PSYSTEM_HANDLE_INFORMATION;
+-
+-typedef struct _SYSTEM_HANDLE_INFORMATION_EX {
+-  ULONG NumberOfHandles;
+-  SYSTEM_HANDLE_INFORMATION Information[1];
+-} SYSTEM_HANDLE_INFORMATION_EX, *PSYSTEM_HANDLE_INFORMATION_EX;
+-
+-typedef struct _OBJECT_NAME_INFORMATION {
+-  UNICODE_STRING ObjectName;
+-} OBJECT_NAME_INFORMATION, *POBJECT_NAME_INFORMATION;
+-
+ typedef NTSTATUS(WINAPI* NtQueryObjectFunction)(
+     IN HANDLE Handle,
+     IN OBJECT_INFORMATION_CLASS ObjectInformationClass,
+@@ -717,19 +431,6 @@ typedef NTSTATUS(WINAPI* NtWaitForSingleObjectFunction)(
+     IN BOOLEAN Alertable,
+     IN PLARGE_INTEGER TimeOut OPTIONAL);
+ 
+-typedef NTSTATUS(WINAPI* NtQuerySystemInformation)(
+-    IN SYSTEM_INFORMATION_CLASS SystemInformationClass,
+-    OUT PVOID SystemInformation,
+-    IN ULONG SystemInformationLength,
+-    OUT PULONG ReturnLength);
+-
+-typedef NTSTATUS(WINAPI* NtQueryObject)(IN HANDLE Handle,
+-                                        IN OBJECT_INFORMATION_CLASS
+-                                            ObjectInformationClass,
+-                                        OUT PVOID ObjectInformation,
+-                                        IN ULONG ObjectInformationLength,
+-                                        OUT PULONG ReturnLength);
+-
+ // -----------------------------------------------------------------------
+ // Strings
+ 
+@@ -755,10 +456,6 @@ typedef LONG(WINAPI* RtlCompareUnicodeStringFunction)(
+     IN PCUNICODE_STRING String2,
+     IN BOOLEAN CaseInSensitive);
+ 
+-typedef VOID(WINAPI* RtlInitUnicodeStringFunction)(IN OUT PUNICODE_STRING
+-                                                       DestinationString,
+-                                                   IN PCWSTR SourceString);
+-
+ typedef ULONG(WINAPI* RtlNtStatusToDosErrorFunction)(NTSTATUS status);
+ 
+ typedef enum _EVENT_TYPE {
+@@ -767,60 +464,6 @@ typedef enum _EVENT_TYPE {
+ } EVENT_TYPE,
+     *PEVENT_TYPE;
+ 
+-typedef NTSTATUS(WINAPI* NtCreateDirectoryObjectFunction)(
+-    PHANDLE DirectoryHandle,
+-    ACCESS_MASK DesiredAccess,
+-    POBJECT_ATTRIBUTES ObjectAttributes);
+-
+-typedef NTSTATUS(WINAPI* NtOpenDirectoryObjectFunction)(
+-    PHANDLE DirectoryHandle,
+-    ACCESS_MASK DesiredAccess,
+-    POBJECT_ATTRIBUTES ObjectAttributes);
+-
+-typedef NTSTATUS(WINAPI* NtQuerySymbolicLinkObjectFunction)(
+-    HANDLE LinkHandle,
+-    PUNICODE_STRING LinkTarget,
+-    PULONG ReturnedLength);
+-
+-typedef NTSTATUS(WINAPI* NtOpenSymbolicLinkObjectFunction)(
+-    PHANDLE LinkHandle,
+-    ACCESS_MASK DesiredAccess,
+-    POBJECT_ATTRIBUTES ObjectAttributes);
+-
+-#define DIRECTORY_QUERY 0x0001
+-#define DIRECTORY_TRAVERSE 0x0002
+-#define DIRECTORY_CREATE_OBJECT 0x0004
+-#define DIRECTORY_CREATE_SUBDIRECTORY 0x0008
+-#define DIRECTORY_ALL_ACCESS 0x000F
+-
+-typedef NTSTATUS(WINAPI* NtCreateLowBoxToken)(
+-    OUT PHANDLE token,
+-    IN HANDLE original_handle,
+-    IN ACCESS_MASK access,
+-    IN POBJECT_ATTRIBUTES object_attribute,
+-    IN PSID appcontainer_sid,
+-    IN DWORD capabilityCount,
+-    IN PSID_AND_ATTRIBUTES capabilities,
+-    IN DWORD handle_count,
+-    IN PHANDLE handles);
+-
+-typedef NTSTATUS(WINAPI* NtSetInformationProcess)(IN HANDLE process_handle,
+-                                                  IN ULONG info_class,
+-                                                  IN PVOID process_information,
+-                                                  IN ULONG information_length);
+-
+-struct PROCESS_ACCESS_TOKEN {
+-  HANDLE token;
+-  HANDLE thread;
+-};
+-
+-const unsigned int NtProcessInformationAccessToken = 9;
+-
+-typedef NTSTATUS(WINAPI* RtlDeriveCapabilitySidsFromNameFunction)(
+-    PCUNICODE_STRING SourceString,
+-    PSID CapabilityGroupSid,
+-    PSID CapabilitySid);
+-
+ // -----------------------------------------------------------------------
+ // GDI OPM API and Supported Calls
+ 
+diff --git a/src/3rdparty/chromium/sandbox/win/src/policy_target.cc b/src/3rdparty/chromium/sandbox/win/src/policy_target.cc
+index 5cf894a..70ef91d 100644
+--- a/src/3rdparty/chromium/sandbox/win/src/policy_target.cc
++++ b/src/3rdparty/chromium/sandbox/win/src/policy_target.cc
+@@ -77,7 +77,7 @@ bool QueryBroker(IpcTag ipc_id, CountedParameterSetBase* params) {
+ NTSTATUS WINAPI TargetNtSetInformationThread(
+     NtSetInformationThreadFunction orig_SetInformationThread,
+     HANDLE thread,
+-    NT_THREAD_INFORMATION_CLASS thread_info_class,
++    THREADINFOCLASS thread_info_class,
+     PVOID thread_information,
+     ULONG thread_information_bytes) {
+   do {
+diff --git a/src/3rdparty/chromium/sandbox/win/src/policy_target.h b/src/3rdparty/chromium/sandbox/win/src/policy_target.h
+index 62686aa..b2490b3 100644
+--- a/src/3rdparty/chromium/sandbox/win/src/policy_target.h
++++ b/src/3rdparty/chromium/sandbox/win/src/policy_target.h
+@@ -23,7 +23,7 @@ extern "C" {
+ // It should never be called directly.
+ SANDBOX_INTERCEPT NTSTATUS WINAPI TargetNtSetInformationThread(
+     NtSetInformationThreadFunction orig_SetInformationThread, HANDLE thread,
+-    NT_THREAD_INFORMATION_CLASS thread_info_class, PVOID thread_information,
++    THREADINFOCLASS thread_info_class, PVOID thread_information,
+     ULONG thread_information_bytes);
+ 
+ // Interception of NtOpenThreadToken on the child process.
+diff --git a/src/3rdparty/chromium/sandbox/win/src/sandbox_nt_util.cc b/src/3rdparty/chromium/sandbox/win/src/sandbox_nt_util.cc
+index d7f6f03..74d6c14 100644
+--- a/src/3rdparty/chromium/sandbox/win/src/sandbox_nt_util.cc
++++ b/src/3rdparty/chromium/sandbox/win/src/sandbox_nt_util.cc
+@@ -14,6 +14,13 @@
+ #include "sandbox/win/src/sandbox_factory.h"
+ #include "sandbox/win/src/target_services.h"
+ 
++#ifndef _MSC_VER
++#undef __try
++#define __try try
++#undef __except
++#define __except(x) catch(...)
++#endif
++
+ namespace sandbox {
+ 
+ // This is the list of all imported symbols from ntdll.dll.
+@@ -314,7 +321,7 @@ NTSTATUS AllocAndCopyName(const OBJECT_ATTRIBUTES* in_object,
+         break;
+ 
+       size_t size = in_object->ObjectName->Length + sizeof(wchar_t);
+-      out_name->reset(new (NT_ALLOC) wchar_t[size / sizeof(wchar_t)]);
++      out_name->reset(new wchar_t[size / sizeof(wchar_t)]);
+       if (!*out_name)
+         break;
+ 
+@@ -420,7 +427,7 @@ UNICODE_STRING* AnsiToUnicode(const char* string) {
+       ansi_string.MaximumLength * sizeof(wchar_t) + sizeof(UNICODE_STRING);
+ 
+   UNICODE_STRING* out_string =
+-      reinterpret_cast<UNICODE_STRING*>(new (NT_ALLOC) char[name_bytes]);
++      reinterpret_cast<UNICODE_STRING*>(new char[name_bytes]);
+   if (!out_string)
+     return nullptr;
+ 
+@@ -503,7 +510,7 @@ UNICODE_STRING* GetBackingFilePath(PVOID address) {
+ 
+   for (;;) {
+     MEMORY_SECTION_NAME* section_name = reinterpret_cast<MEMORY_SECTION_NAME*>(
+-        new (NT_ALLOC) char[buffer_bytes]);
++        new char[buffer_bytes]);
+ 
+     if (!section_name)
+       return nullptr;
+@@ -559,7 +566,7 @@ UNICODE_STRING* ExtractModuleName(const UNICODE_STRING* module_path) {
+   // Based on the code above, size_bytes should always be small enough
+   // to make the static_cast below safe.
+   DCHECK_NT(UINT16_MAX > size_bytes);
+-  char* str_buffer = new (NT_ALLOC) char[size_bytes + sizeof(UNICODE_STRING)];
++  char* str_buffer = new char[size_bytes + sizeof(UNICODE_STRING)];
+   if (!str_buffer)
+     return nullptr;
+ 
+@@ -663,7 +670,7 @@ bool NtGetPathFromHandle(HANDLE handle,
+   std::unique_ptr<BYTE[], NtAllocDeleter> name_ptr;
+   if (!size)
+     return false;
+-  name_ptr.reset(new (NT_ALLOC) BYTE[size]);
++  name_ptr.reset(new BYTE[size]);
+   name = reinterpret_cast<OBJECT_NAME_INFORMATION*>(name_ptr.get());
+ 
+   // Query the name information a second time to get the name of the
+@@ -672,10 +679,10 @@ bool NtGetPathFromHandle(HANDLE handle,
+ 
+   if (STATUS_SUCCESS != status)
+     return false;
+-  size_t num_path_wchars = (name->ObjectName.Length / sizeof(wchar_t)) + 1;
+-  path->reset(new (NT_ALLOC) wchar_t[num_path_wchars]);
++  size_t num_path_wchars = (name->Name.Length / sizeof(wchar_t)) + 1;
++  path->reset(new wchar_t[num_path_wchars]);
+   status =
+-      CopyData(path->get(), name->ObjectName.Buffer, name->ObjectName.Length);
++      CopyData(path->get(), name->Name.Buffer, name->Name.Length);
+   path->get()[num_path_wchars - 1] = L'\0';
+   if (STATUS_SUCCESS != status)
+     return false;
