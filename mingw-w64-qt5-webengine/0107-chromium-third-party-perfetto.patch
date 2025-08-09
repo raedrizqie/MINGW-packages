@@ -1,0 +1,502 @@
+diff --git a/src/3rdparty/chromium/third_party/perfetto/gn/BUILD.gn b/src/3rdparty/chromium/third_party/perfetto/gn/BUILD.gn
+index fc5dcd8..85058ed 100644
+--- a/src/3rdparty/chromium/third_party/perfetto/gn/BUILD.gn
++++ b/src/3rdparty/chromium/third_party/perfetto/gn/BUILD.gn
+@@ -271,7 +271,7 @@ config("protobuf_gen_config") {
+       # Using -isystem instead of include_dirs (-I), so we don't need to
+       # suppress warnings coming from libprotobuf headers. Doing so would mask
+       # warnings in our own code.
+-      "-isystem",
++      "-I",
+       rebase_path("../buildtools/protobuf/src", root_build_dir),
+     ]
+   }
+diff --git a/src/3rdparty/chromium/third_party/perfetto/gn/standalone/BUILD.gn b/src/3rdparty/chromium/third_party/perfetto/gn/standalone/BUILD.gn
+index 3938a89..ba20e85 100644
+--- a/src/3rdparty/chromium/third_party/perfetto/gn/standalone/BUILD.gn
++++ b/src/3rdparty/chromium/third_party/perfetto/gn/standalone/BUILD.gn
+@@ -95,11 +95,16 @@ config("default") {
+   cflags += [
+     "-fstrict-aliasing",
+     "-fstack-protector-strong",
+-    "-fPIC",
+-    "-g",
+-    "-Wformat",
+   ]
+ 
++  if (!is_mingw) {
++    cflags += [
++      "-fPIC",
++      "-g",
++      "-Wformat",
++    ]
++  }
++
+   if (!is_fuzzer) {
+     cflags += [ "-Werror" ]
+   }
+@@ -140,7 +145,7 @@ config("default") {
+       "-m32",
+       "-lgcc",
+     ]
+-  } else if (current_cpu == "arm64") {
++  } else if (current_cpu == "x64" || current_cpu == "arm64") {
+     cflags += [ "-fno-omit-frame-pointer" ]
+   }
+ 
+@@ -152,7 +157,11 @@ config("default") {
+   }
+ 
+   if (is_debug) {
+-    libs += [ "dl" ]
++    if (is_mingw) {
++      cflags += [ "-g" ]
++    } else {
++      libs += [ "dl" ]
++    }
+   }
+ 
+   if (is_android) {
+@@ -227,6 +236,8 @@ config("release") {
+   }
+   if (is_mac) {
+     ldflags = [ "-dead_strip" ]
++  } else if (is_mingw) {
++    ldflags = [ "-Wl,--gc-sections" ]
+   } else {
+     ldflags = [
+       "-Wl,--gc-sections",
+diff --git a/src/3rdparty/chromium/third_party/perfetto/gn/standalone/BUILDCONFIG.gn b/src/3rdparty/chromium/third_party/perfetto/gn/standalone/BUILDCONFIG.gn
+index df49ef7..d2f1c79 100644
+--- a/src/3rdparty/chromium/third_party/perfetto/gn/standalone/BUILDCONFIG.gn
++++ b/src/3rdparty/chromium/third_party/perfetto/gn/standalone/BUILDCONFIG.gn
+@@ -36,10 +36,10 @@ is_linux = current_os == "linux"
+ is_linux_host = host_os == "linux"
+ is_mac = current_os == "mac"
+ is_mac_host = host_os == "mac"
++is_win = current_os == "win"
+ 
+ # Building with Windows/Fuchsia/nacl is currently only supported in the Chromium
+ # tree so always set this to false.
+-is_win = false
+ is_fuchsia = false
+ is_nacl = false
+ 
+diff --git a/src/3rdparty/chromium/third_party/perfetto/gn/standalone/protoc.py b/src/3rdparty/chromium/third_party/perfetto/gn/standalone/protoc.py
+index 723c35e..5cfaf4d 100755
+--- a/src/3rdparty/chromium/third_party/perfetto/gn/standalone/protoc.py
++++ b/src/3rdparty/chromium/third_party/perfetto/gn/standalone/protoc.py
+@@ -23,6 +23,7 @@ import os
+ import sys
+ import subprocess
+ import tempfile
++import uuid
+ 
+ from codecs import open
+ 
+@@ -35,14 +36,19 @@ def main():
+   args, remaining = parser.parse_known_args()
+ 
+   if args.dependency_out and args.descriptor_set_out:
+-    with tempfile.NamedTemporaryFile() as t:
+-      custom = [
+-          '--descriptor_set_out', args.descriptor_set_out, '--dependency_out',
+-          t.name
+-      ]
+-      subprocess.check_call([args.protoc] + custom + remaining)
+-
+-      dependency_data = t.read().decode('utf-8')
++    tmp_path = os.path.join(tempfile.gettempdir(), str(uuid.uuid4()))
++    custom = [
++        '--descriptor_set_out', args.descriptor_set_out, '--dependency_out',
++        tmp_path
++    ]
++    try:
++      cmd = [args.protoc] + custom + remaining
++      subprocess.check_call(cmd)
++      with open(tmp_path, 'rb', encoding='utf-8') as tmp_rd:
++        dependency_data = tmp_rd.read()
++    finally:
++      if os.path.exists(tmp_path):
++        os.unlink(tmp_path)
+ 
+     with open(args.dependency_out, 'w', encoding='utf-8') as f:
+       f.write(args.descriptor_set_out + ":")
+diff --git a/src/3rdparty/chromium/third_party/perfetto/gn/standalone/toolchain/BUILD.gn b/src/3rdparty/chromium/third_party/perfetto/gn/standalone/toolchain/BUILD.gn
+index de74fbc..cc7ec67 100644
+--- a/src/3rdparty/chromium/third_party/perfetto/gn/standalone/toolchain/BUILD.gn
++++ b/src/3rdparty/chromium/third_party/perfetto/gn/standalone/toolchain/BUILD.gn
+@@ -111,6 +111,8 @@ declare_args() {
+     _target_triplet = "i686-linux-android"
+   } else if (target_os == "android" && target_cpu == "x64") {
+     _target_triplet = "x86_64-linux-android"
++#  } else if (target_os == "win" && target_cpu == "arm64") {
++#    _target_triplet = "aarch64-w64-mingw32"
+   } else {
+     assert(
+         false,
+diff --git a/src/3rdparty/chromium/third_party/perfetto/include/perfetto/base/build_config.h b/src/3rdparty/chromium/third_party/perfetto/include/perfetto/base/build_config.h
+index bd3623f..f574079 100644
+--- a/src/3rdparty/chromium/third_party/perfetto/include/perfetto/base/build_config.h
++++ b/src/3rdparty/chromium/third_party/perfetto/include/perfetto/base/build_config.h
+@@ -105,21 +105,20 @@
+ #error OS not supported (see build_config.h)
+ #endif
+ 
++// These are NOT exclusive!
++#if defined(__GNUC__)
++#define PERFETTO_BUILDFLAG_DEFINE_PERFETTO_COMPILER_GCC() 1
++#else
++#define PERFETTO_BUILDFLAG_DEFINE_PERFETTO_COMPILER_GCC() 0
++#endif
+ #if defined(__clang__)
+ #define PERFETTO_BUILDFLAG_DEFINE_PERFETTO_COMPILER_CLANG() 1
+-#define PERFETTO_BUILDFLAG_DEFINE_PERFETTO_COMPILER_GCC() 0
+-#define PERFETTO_BUILDFLAG_DEFINE_PERFETTO_COMPILER_MSVC() 0
+-#elif defined(__GNUC__) // Careful: Clang also defines this!
+-#define PERFETTO_BUILDFLAG_DEFINE_PERFETTO_COMPILER_CLANG() 0
+-#define PERFETTO_BUILDFLAG_DEFINE_PERFETTO_COMPILER_GCC() 1
+-#define PERFETTO_BUILDFLAG_DEFINE_PERFETTO_COMPILER_MSVC() 0
+-#elif defined(_MSC_VER)
++#else
+ #define PERFETTO_BUILDFLAG_DEFINE_PERFETTO_COMPILER_CLANG() 0
+-#define PERFETTO_BUILDFLAG_DEFINE_PERFETTO_COMPILER_GCC() 0
++#endif
++#if defined(_MSC_VER)
+ #define PERFETTO_BUILDFLAG_DEFINE_PERFETTO_COMPILER_MSVC() 1
+ #else
+-#define PERFETTO_BUILDFLAG_DEFINE_PERFETTO_COMPILER_CLANG() 0
+-#define PERFETTO_BUILDFLAG_DEFINE_PERFETTO_COMPILER_GCC() 0
+ #define PERFETTO_BUILDFLAG_DEFINE_PERFETTO_COMPILER_MSVC() 0
+ #endif
+ 
+@@ -129,6 +128,12 @@
+ #define PERFETTO_BUILDFLAG_DEFINE_PERFETTO_ANDROID_USERDEBUG_BUILD() 0
+ #endif
+ 
++#if defined(__aarch64__) || defined(_M_ARM64)
++#define PERFETTO_BUILDFLAG_DEFINE_PERFETTO_ARCH_CPU_ARM64() 1
++#else
++#define PERFETTO_BUILDFLAG_DEFINE_PERFETTO_ARCH_CPU_ARM64() 0
++#endif
++
+ // perfetto_build_flags.h contains the tweakable build flags defined via GN.
+ // - In GN builds (e.g., standalone, chromium, v8) this file is generated at
+ //   build time via the gen_rule //gn/gen_buildflags.
+diff --git a/src/3rdparty/chromium/third_party/perfetto/include/perfetto/ext/base/optional.h b/src/3rdparty/chromium/third_party/perfetto/include/perfetto/ext/base/optional.h
+index b093510..da5a9e2 100644
+--- a/src/3rdparty/chromium/third_party/perfetto/include/perfetto/ext/base/optional.h
++++ b/src/3rdparty/chromium/third_party/perfetto/include/perfetto/ext/base/optional.h
+@@ -381,7 +381,7 @@ using RemoveCvRefT =
+ // cf)
+ // https://blogs.msdn.microsoft.com/vcblog/2016/03/30/optimizing-the-layout-of-empty-base-classes-in-vs2015-update-2-3/
+ #if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN) && \
+-    !PERFETTO_BUILDFLAG(PERFETTO_COMPILER_GCC)
++    PERFETTO_BUILDFLAG(PERFETTO_COMPILER_MSVC)
+ #define OPTIONAL_DECLSPEC_EMPTY_BASES __declspec(empty_bases)
+ #else
+ #define OPTIONAL_DECLSPEC_EMPTY_BASES
+diff --git a/src/3rdparty/chromium/third_party/perfetto/include/perfetto/ext/base/scoped_file.h b/src/3rdparty/chromium/third_party/perfetto/include/perfetto/ext/base/scoped_file.h
+index 24c8970..3c14f03 100644
+--- a/src/3rdparty/chromium/third_party/perfetto/include/perfetto/ext/base/scoped_file.h
++++ b/src/3rdparty/chromium/third_party/perfetto/include/perfetto/ext/base/scoped_file.h
+@@ -23,7 +23,7 @@
+ #include <stdio.h>
+ 
+ #if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN) && \
+-    !PERFETTO_BUILDFLAG(PERFETTO_COMPILER_GCC)
++    PERFETTO_BUILDFLAG(PERFETTO_COMPILER_MSVC)
+ #include <corecrt_io.h>
+ typedef int mode_t;
+ #else
+diff --git a/src/3rdparty/chromium/third_party/perfetto/include/perfetto/ext/tracing/core/slice.h b/src/3rdparty/chromium/third_party/perfetto/include/perfetto/ext/tracing/core/slice.h
+index 4ce66fd..3f3932b 100644
+--- a/src/3rdparty/chromium/third_party/perfetto/include/perfetto/ext/tracing/core/slice.h
++++ b/src/3rdparty/chromium/third_party/perfetto/include/perfetto/ext/tracing/core/slice.h
+@@ -20,6 +20,7 @@
+ #include <stddef.h>
+ #include <string.h>
+ 
++#include <cstdint>
+ #include <memory>
+ #include <string>
+ #include <vector>
+diff --git a/src/3rdparty/chromium/third_party/perfetto/include/perfetto/tracing/internal/track_event_data_source.h b/src/3rdparty/chromium/third_party/perfetto/include/perfetto/tracing/internal/track_event_data_source.h
+index bbae795..5a6538f 100644
+--- a/src/3rdparty/chromium/third_party/perfetto/include/perfetto/tracing/internal/track_event_data_source.h
++++ b/src/3rdparty/chromium/third_party/perfetto/include/perfetto/tracing/internal/track_event_data_source.h
+@@ -107,7 +107,7 @@ class TrackEventDataSource
+   }
+ 
+   static void Flush() {
+-    Base::template Trace([](typename Base::TraceContext ctx) { ctx.Flush(); });
++    Base::Trace([](typename Base::TraceContext ctx) { ctx.Flush(); });
+   }
+ 
+   // Determine if tracing for the given static category is enabled.
+@@ -121,7 +121,7 @@ class TrackEventDataSource
+   static bool IsDynamicCategoryEnabled(
+       const DynamicCategory& dynamic_category) {
+     bool enabled = false;
+-    Base::template Trace([&](typename Base::TraceContext ctx) {
++    Base::Trace([&](typename Base::TraceContext ctx) {
+       enabled = IsDynamicCategoryEnabled(&ctx, dynamic_category);
+     });
+     return enabled;
+@@ -428,7 +428,7 @@ class TrackEventDataSource
+                                  const protos::gen::TrackDescriptor& desc) {
+     PERFETTO_DCHECK(track.uuid == desc.uuid());
+     TrackRegistry::Get()->UpdateTrack(track, desc.SerializeAsString());
+-    Base::template Trace([&](typename Base::TraceContext ctx) {
++    Base::Trace([&](typename Base::TraceContext ctx) {
+       TrackEventInternal::WriteTrackDescriptor(
+           track, ctx.tls_inst_->trace_writer.get());
+     });
+@@ -545,7 +545,7 @@ class TrackEventDataSource
+   static void TraceWithInstances(uint32_t instances,
+                                  Lambda lambda) PERFETTO_ALWAYS_INLINE {
+     if (CategoryIndex == TrackEventCategoryRegistry::kDynamicCategoryIndex) {
+-      Base::template TraceWithInstances(instances, std::move(lambda));
++      Base::TraceWithInstances(instances, std::move(lambda));
+     } else {
+       Base::template TraceWithInstances<
+           CategoryTracePointTraits<CategoryIndex>>(instances,
+@@ -560,7 +560,7 @@ class TrackEventDataSource
+       const TrackType& track,
+       std::function<void(protos::pbzero::TrackDescriptor*)> callback) {
+     TrackRegistry::Get()->UpdateTrack(track, std::move(callback));
+-    Base::template Trace([&](typename Base::TraceContext ctx) {
++    Base::Trace([&](typename Base::TraceContext ctx) {
+       TrackEventInternal::WriteTrackDescriptor(
+           track, ctx.tls_inst_->trace_writer.get());
+     });
+diff --git a/src/3rdparty/chromium/third_party/perfetto/include/perfetto/tracing/tracing_backend.h b/src/3rdparty/chromium/third_party/perfetto/include/perfetto/tracing/tracing_backend.h
+index 67b0d2e..3c2462d 100644
+--- a/src/3rdparty/chromium/third_party/perfetto/include/perfetto/tracing/tracing_backend.h
++++ b/src/3rdparty/chromium/third_party/perfetto/include/perfetto/tracing/tracing_backend.h
+@@ -17,6 +17,7 @@
+ #ifndef INCLUDE_PERFETTO_TRACING_TRACING_BACKEND_H_
+ #define INCLUDE_PERFETTO_TRACING_TRACING_BACKEND_H_
+ 
++#include <cstdint>
+ #include <memory>
+ #include <string>
+ 
+diff --git a/src/3rdparty/chromium/third_party/perfetto/src/base/file_utils.cc b/src/3rdparty/chromium/third_party/perfetto/src/base/file_utils.cc
+index b8020ad..fd544e5 100644
+--- a/src/3rdparty/chromium/third_party/perfetto/src/base/file_utils.cc
++++ b/src/3rdparty/chromium/third_party/perfetto/src/base/file_utils.cc
+@@ -22,7 +22,7 @@
+ #include "perfetto/ext/base/scoped_file.h"
+ #include "perfetto/ext/base/utils.h"
+ 
+-#if !PERFETTO_BUILDFLAG(PERFETTO_OS_WIN) || \
++#if !PERFETTO_BUILDFLAG(PERFETTO_COMPILER_MSVC) || \
+     PERFETTO_BUILDFLAG(PERFETTO_COMPILER_GCC)
+ #include <unistd.h>
+ #else
+diff --git a/src/3rdparty/chromium/third_party/perfetto/src/base/time.cc b/src/3rdparty/chromium/third_party/perfetto/src/base/time.cc
+index 01bf02d..d0d0a09 100644
+--- a/src/3rdparty/chromium/third_party/perfetto/src/base/time.cc
++++ b/src/3rdparty/chromium/third_party/perfetto/src/base/time.cc
+@@ -14,11 +14,16 @@
+  * limitations under the License.
+  */
+ 
++#include <atomic>
++#include <optional>
++
+ #include "perfetto/base/time.h"
+ #include "perfetto/base/build_config.h"
++#include "perfetto/base/logging.h"
++#include "perfetto/ext/base/string_utils.h"
+ 
+ #if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
+-#include <Windows.h>
++#include <windows.h>
+ #else
+ #include <unistd.h>
+ #endif
+@@ -27,17 +32,99 @@ namespace perfetto {
+ namespace base {
+ 
+ #if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
++#if !PERFETTO_BUILDFLAG(PERFETTO_ARCH_CPU_ARM64)
++namespace {
++
++// Returns the current value of the performance counter.
++int64_t QPCNowRaw() {
++  LARGE_INTEGER perf_counter_now = {};
++  // According to the MSDN documentation for QueryPerformanceCounter(), this
++  // will never fail on systems that run XP or later.
++  // https://msdn.microsoft.com/library/windows/desktop/ms644904.aspx
++  ::QueryPerformanceCounter(&perf_counter_now);
++  return perf_counter_now.QuadPart;
++}
++
++double TSCTicksPerSecond() {
++  // The value returned by QueryPerformanceFrequency() cannot be used as the TSC
++  // frequency, because there is no guarantee that the TSC frequency is equal to
++  // the performance counter frequency.
++  // The TSC frequency is cached in a static variable because it takes some time
++  // to compute it.
++  static std::atomic<double> tsc_ticks_per_second = 0;
++  double value = tsc_ticks_per_second.load(std::memory_order_relaxed);
++  if (value != 0)
++    return value;
++
++  // Increase the thread priority to reduces the chances of having a context
++  // switch during a reading of the TSC and the performance counter.
++  const int previous_priority = ::GetThreadPriority(::GetCurrentThread());
++  ::SetThreadPriority(::GetCurrentThread(), THREAD_PRIORITY_HIGHEST);
++
++  // The first time that this function is called, make an initial reading of the
++  // TSC and the performance counter. Initialization of static variable is
++  // thread-safe. Threads can race initializing tsc_initial vs
++  // perf_counter_initial, although they should be storing very similar values.
++
++  static const uint64_t tsc_initial = __rdtsc();
++  static const int64_t perf_counter_initial = QPCNowRaw();
++
++  // Make a another reading of the TSC and the performance counter every time
++  // that this function is called.
++  const uint64_t tsc_now = __rdtsc();
++  const int64_t perf_counter_now = QPCNowRaw();
++
++  // Reset the thread priority.
++  ::SetThreadPriority(::GetCurrentThread(), previous_priority);
++
++  // Make sure that at least 50 ms elapsed between the 2 readings. The first
++  // time that this function is called, we don't expect this to be the case.
++  // Note: The longer the elapsed time between the 2 readings is, the more
++  //   accurate the computed TSC frequency will be. The 50 ms value was
++  //   chosen because local benchmarks show that it allows us to get a
++  //   stddev of less than 1 tick/us between multiple runs.
++  // Note: According to the MSDN documentation for QueryPerformanceFrequency(),
++  //   this will never fail on systems that run XP or later.
++  //   https://msdn.microsoft.com/library/windows/desktop/ms644905.aspx
++  LARGE_INTEGER perf_counter_frequency = {};
++  ::QueryPerformanceFrequency(&perf_counter_frequency);
++  PERFETTO_CHECK(perf_counter_now >= perf_counter_initial);
++  const int64_t perf_counter_ticks = perf_counter_now - perf_counter_initial;
++  const double elapsed_time_seconds =
++      static_cast<double>(perf_counter_ticks) /
++      static_cast<double>(perf_counter_frequency.QuadPart);
++
++  constexpr double kMinimumEvaluationPeriodSeconds = 0.05;
++  if (elapsed_time_seconds < kMinimumEvaluationPeriodSeconds)
++    return 0;
++
++  // Compute the frequency of the TSC.
++  PERFETTO_CHECK(tsc_now >= tsc_initial);
++  const uint64_t tsc_ticks = tsc_now - tsc_initial;
++  // Racing with another thread to write |tsc_ticks_per_second| is benign
++  // because both threads will write a valid result.
++  tsc_ticks_per_second.store(
++      static_cast<double>(tsc_ticks) / elapsed_time_seconds,
++      std::memory_order_relaxed);
++
++  return tsc_ticks_per_second.load(std::memory_order_relaxed);
++}
++
++}  // namespace
++#endif  // !PERFETTO_BUILDFLAG(PERFETTO_ARCH_CPU_ARM64)
+ 
+ TimeNanos GetWallTimeNs() {
+   LARGE_INTEGER freq;
+   ::QueryPerformanceFrequency(&freq);
+   LARGE_INTEGER counter;
+   ::QueryPerformanceCounter(&counter);
+-  double elapsed_nanoseconds = (1e9 * counter.QuadPart) / freq.QuadPart;
++  double elapsed_nanoseconds = (1e9 * static_cast<double>(counter.QuadPart)) /
++                               static_cast<double>(freq.QuadPart);
+   return TimeNanos(static_cast<uint64_t>(elapsed_nanoseconds));
+ }
+ 
+ TimeNanos GetThreadCPUTimeNs() {
++#if PERFETTO_BUILDFLAG(PERFETTO_ARCH_CPU_ARM64)
+   FILETIME dummy, kernel_ftime, user_ftime;
+   ::GetThreadTimes(GetCurrentThread(), &dummy, &dummy, &kernel_ftime,
+                    &user_ftime);
+@@ -47,6 +134,23 @@ TimeNanos GetThreadCPUTimeNs() {
+                        user_ftime.dwLowDateTime;
+ 
+   return TimeNanos((kernel_time + user_time) * 100);
++#else   // !PERFETTO_BUILDFLAG(PERFETTO_ARCH_CPU_ARM64)
++  // Get the number of TSC ticks used by the current thread.
++  ULONG64 thread_cycle_time = 0;
++  ::QueryThreadCycleTime(GetCurrentThread(), &thread_cycle_time);
++
++  // Get the frequency of the TSC.
++  const double tsc_ticks_per_second = TSCTicksPerSecond();
++  if (tsc_ticks_per_second == 0)
++    return TimeNanos();
++
++  // Return the CPU time of the current thread.
++  const double thread_time_seconds =
++      static_cast<double>(thread_cycle_time) / tsc_ticks_per_second;
++  constexpr int64_t kNanosecondsPerSecond = 1000 * 1000 * 1000;
++  return TimeNanos(
++      static_cast<int64_t>(thread_time_seconds * kNanosecondsPerSecond));
++#endif  // !PERFETTO_BUILDFLAG(PERFETTO_ARCH_CPU_ARM64)
+ }
+ 
+ void SleepMicroseconds(unsigned interval_us) {
+@@ -57,13 +161,45 @@ void SleepMicroseconds(unsigned interval_us) {
+   ::Sleep(static_cast<DWORD>((interval_us + 999) / 1000));
+ }
+ 
++void InitializeTime() {
++#if !PERFETTO_BUILDFLAG(PERFETTO_ARCH_CPU_ARM64)
++  // Make an early first call to TSCTicksPerSecond() to start 50 ms elapsed time
++  // (see comment in TSCTicksPerSecond()).
++  TSCTicksPerSecond();
++#endif  // !PERFETTO_BUILDFLAG(PERFETTO_ARCH_CPU_ARM64)
++}
++
+ #else  // PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
+ 
+ void SleepMicroseconds(unsigned interval_us) {
+   ::usleep(static_cast<useconds_t>(interval_us));
+ }
+ 
++void InitializeTime() {}
++
+ #endif  // PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
+ 
++std::string GetTimeFmt(const std::string& fmt) {
++  time_t raw_time;
++  time(&raw_time);
++  struct tm* local_tm;
++  local_tm = localtime(&raw_time);
++  char buf[128];
++  PERFETTO_CHECK(strftime(buf, 80, fmt.c_str(), local_tm) > 0);
++  return buf;
++}
++
++std::optional<int32_t> GetTimezoneOffsetMins() {
++  std::string tz = GetTimeFmt("%z");
++  if (tz.size() != 5 || (tz[0] != '+' && tz[0] != '-'))
++    return std::nullopt;
++  char sign = '\0';
++  int32_t hh = 0;
++  int32_t mm = 0;
++  if (sscanf(tz.c_str(), "%c%2d%2d", &sign, &hh, &mm) != 3)
++    return std::nullopt;
++  return (hh * 60 + mm) * (sign == '-' ? -1 : 1);
++}
++
+ }  // namespace base
+ }  // namespace perfetto
+diff --git a/src/3rdparty/chromium/third_party/perfetto/src/trace_processor/importers/gzip/gzip_utils.h b/src/3rdparty/chromium/third_party/perfetto/src/trace_processor/importers/gzip/gzip_utils.h
+index 624363f..6d717fb 100644
+--- a/src/3rdparty/chromium/third_party/perfetto/src/trace_processor/importers/gzip/gzip_utils.h
++++ b/src/3rdparty/chromium/third_party/perfetto/src/trace_processor/importers/gzip/gzip_utils.h
+@@ -17,6 +17,7 @@
+ #ifndef SRC_TRACE_PROCESSOR_IMPORTERS_GZIP_GZIP_UTILS_H_
+ #define SRC_TRACE_PROCESSOR_IMPORTERS_GZIP_GZIP_UTILS_H_
+ 
++#include <cstdint>
+ #include <memory>
+ 
+ struct z_stream_s;

@@ -1,0 +1,521 @@
+diff --git a/src/3rdparty/chromium/media/audio/BUILD.gn b/src/3rdparty/chromium/media/audio/BUILD.gn
+index 63dce70..ab47b10 100644
+--- a/src/3rdparty/chromium/media/audio/BUILD.gn
++++ b/src/3rdparty/chromium/media/audio/BUILD.gn
+@@ -204,9 +204,9 @@ source_set("audio") {
+     ]
+ 
+     libs += [
+-      "dxguid.lib",
+-      "setupapi.lib",
+-      "winmm.lib",
++      "dxguid",
++      "setupapi",
++      "winmm",
+     ]
+   }
+ 
+diff --git a/src/3rdparty/chromium/media/audio/audio_manager.cc b/src/3rdparty/chromium/media/audio/audio_manager.cc
+index 01ccb57..805b50e 100644
+--- a/src/3rdparty/chromium/media/audio/audio_manager.cc
++++ b/src/3rdparty/chromium/media/audio/audio_manager.cc
+@@ -113,12 +113,16 @@ AudioManager::~AudioManager() {
+ std::unique_ptr<AudioManager> AudioManager::Create(
+     std::unique_ptr<AudioThread> audio_thread,
+     AudioLogFactory* audio_log_factory) {
++#if defined(OS_WIN) && defined(COMPILER_GCC) // FIXME: missing CreateAudioManager
++  return nullptr;
++#else
+   std::unique_ptr<AudioManager> manager =
+       CreateAudioManager(std::move(audio_thread), audio_log_factory);
+ #if BUILDFLAG(ENABLE_WEBRTC)
+   manager->InitializeDebugRecording();
+ #endif
+   return manager;
++#endif
+ }
+ 
+ // static
+diff --git a/src/3rdparty/chromium/media/audio/audio_thread_impl.cc b/src/3rdparty/chromium/media/audio/audio_thread_impl.cc
+index 957cd09..9e6c0d8 100644
+--- a/src/3rdparty/chromium/media/audio/audio_thread_impl.cc
++++ b/src/3rdparty/chromium/media/audio/audio_thread_impl.cc
+@@ -17,7 +17,7 @@ AudioThreadImpl::AudioThreadImpl()
+     : thread_("AudioThread"),
+       hang_monitor_(nullptr, base::OnTaskRunnerDeleter(nullptr)) {
+   base::Thread::Options thread_options;
+-#if defined(OS_WIN)
++#if defined(COMPILER_MSVC)
+   thread_.init_com_with_mta(true);
+ #elif defined(OS_FUCHSIA)
+   // FIDL-based APIs require async_t, which is initialized on IO thread.
+diff --git a/src/3rdparty/chromium/media/audio/simple_sources.cc b/src/3rdparty/chromium/media/audio/simple_sources.cc
+index 7d26562..f3542ec 100644
+--- a/src/3rdparty/chromium/media/audio/simple_sources.cc
++++ b/src/3rdparty/chromium/media/audio/simple_sources.cc
+@@ -7,6 +7,7 @@
+ #include <stddef.h>
+ 
+ #include <algorithm>
++#include <cstring>
+ 
+ #include "base/files/file.h"
+ #include "base/logging.h"
+diff --git a/src/3rdparty/chromium/media/audio/win/core_audio_util_win.cc b/src/3rdparty/chromium/media/audio/win/core_audio_util_win.cc
+index 4759784..64b7993 100644
+--- a/src/3rdparty/chromium/media/audio/win/core_audio_util_win.cc
++++ b/src/3rdparty/chromium/media/audio/win/core_audio_util_win.cc
+@@ -291,20 +291,32 @@ ChannelConfig GuessChannelConfig(WORD channels) {
+       DVLOG(2) << "KSAUDIO_SPEAKER_STEREO";
+       return KSAUDIO_SPEAKER_STEREO;
+     case 3:
++#if defined(COMPILER_GCC) // FIXME: missing KSAUDIO_SPEAKER_2POINT1
++      DVLOG(1) << "Unsupported channel count: " << channels;
++#else
+       DVLOG(2) << "KSAUDIO_SPEAKER_2POINT1";
+       return KSAUDIO_SPEAKER_2POINT1;
++#endif
+     case 4:
+       DVLOG(2) << "KSAUDIO_SPEAKER_QUAD";
+       return KSAUDIO_SPEAKER_QUAD;
+     case 5:
++#if defined(COMPILER_GCC) // FIXME: missing KSAUDIO_SPEAKER_5POINT0
++      DVLOG(1) << "Unsupported channel count: " << channels;
++#else
+       DVLOG(2) << "KSAUDIO_SPEAKER_5POINT0";
+       return KSAUDIO_SPEAKER_5POINT0;
++#endif
+     case 6:
+       DVLOG(2) << "KSAUDIO_SPEAKER_5POINT1";
+       return KSAUDIO_SPEAKER_5POINT1;
+     case 7:
++#if defined(COMPILER_GCC) // FIXME: missing KSAUDIO_SPEAKER_7POINT0
++      DVLOG(1) << "Unsupported channel count: " << channels;
++#else
+       DVLOG(2) << "KSAUDIO_SPEAKER_7POINT0";
+       return KSAUDIO_SPEAKER_7POINT0;
++#endif
+     case 8:
+       DVLOG(2) << "KSAUDIO_SPEAKER_7POINT1";
+       return KSAUDIO_SPEAKER_7POINT1;
+diff --git a/src/3rdparty/chromium/media/audio/win/device_enumeration_win.cc b/src/3rdparty/chromium/media/audio/win/device_enumeration_win.cc
+index df2ad51..43f6b72 100644
+--- a/src/3rdparty/chromium/media/audio/win/device_enumeration_win.cc
++++ b/src/3rdparty/chromium/media/audio/win/device_enumeration_win.cc
+@@ -74,6 +74,7 @@ static bool GetDeviceNamesWinImpl(EDataFlow data_flow,
+     device.unique_id =
+         base::WideToUTF8(static_cast<WCHAR*>(endpoint_device_id));
+ 
++#if !defined(COMPILER_GCC) // FIXME: missing Microsoft::WRL::ComPtr<IPropertyStore>
+     // Retrieve user-friendly name of endpoint device.
+     // Example: "Microphone (Realtek High Definition Audio)".
+     Microsoft::WRL::ComPtr<IPropertyStore> properties;
+@@ -96,6 +97,7 @@ static bool GetDeviceNamesWinImpl(EDataFlow data_flow,
+       if (!suffix.empty())
+         device.device_name += suffix;
+     }
++#endif
+ 
+     // Add combination of user-friendly and unique name to the output list.
+     device_names->push_back(device);
+diff --git a/src/3rdparty/chromium/media/base/win/BUILD.gn b/src/3rdparty/chromium/media/base/win/BUILD.gn
+index 93a5706..829aab7 100644
+--- a/src/3rdparty/chromium/media/base/win/BUILD.gn
++++ b/src/3rdparty/chromium/media/base/win/BUILD.gn
+@@ -14,11 +14,13 @@ import("//build/config/jumbo.gni")
+ assert(is_win)
+ 
+ config("delay_load_mf") {
+-  ldflags = [
+-    "/DELAYLOAD:mf.dll",
+-    "/DELAYLOAD:mfplat.dll",
+-    "/DELAYLOAD:mfreadwrite.dll",
+-  ]
++  if (is_msvc) {
++    ldflags = [
++      "/DELAYLOAD:mf.dll",
++      "/DELAYLOAD:mfplat.dll",
++      "/DELAYLOAD:mfreadwrite.dll",
++    ]
++  }
+ }
+ 
+ jumbo_component("media_foundation_util") {
+@@ -42,9 +44,9 @@ jumbo_component("media_foundation_util") {
+     "//media:shared_memory_support",
+   ]
+   libs = [
+-    "mf.lib",
+-    "mfplat.lib",
+-    "mfreadwrite.lib",
++    "mf",
++    "mfplat",
++    "mfreadwrite",
+   ]
+ 
+   # MediaFoundation is not available on Windows N, so must be delay loaded.
+diff --git a/src/3rdparty/chromium/media/capture/BUILD.gn b/src/3rdparty/chromium/media/capture/BUILD.gn
+index c9986f3..790f43c 100644
+--- a/src/3rdparty/chromium/media/capture/BUILD.gn
++++ b/src/3rdparty/chromium/media/capture/BUILD.gn
+@@ -228,20 +228,32 @@ jumbo_component("capture_lib") {
+       "video/win/video_capture_dxgi_device_manager.cc",
+       "video/win/video_capture_dxgi_device_manager.h",
+     ]
++    if (is_mingw) {
++      sources -= [
++        "video/win/sink_filter_win.cc",
++        "video/win/sink_filter_win.h",
++        "video/win/sink_input_pin_win.cc",
++        "video/win/sink_input_pin_win.h",
++        "video/win/video_capture_device_mf_win.cc",
++        "video/win/video_capture_device_mf_win.h",
++      ]
++    }
+     deps += [ "//media/base/win:media_foundation_util" ]
+     libs = [
+-      "d3d11.lib",
+-      "mf.lib",
+-      "mfplat.lib",
+-      "mfreadwrite.lib",
+-      "mfuuid.lib",
+-    ]
+-    ldflags = [
+-      "/DELAYLOAD:d3d11.dll",
+-      "/DELAYLOAD:mf.dll",
+-      "/DELAYLOAD:mfplat.dll",
+-      "/DELAYLOAD:mfreadwrite.dll",
++      "d3d11",
++      "mf",
++      "mfplat",
++      "mfreadwrite",
++      "mfuuid",
+     ]
++    if (is_msvc) {
++      ldflags = [
++        "/DELAYLOAD:d3d11.dll",
++        "/DELAYLOAD:mf.dll",
++        "/DELAYLOAD:mfplat.dll",
++        "/DELAYLOAD:mfreadwrite.dll",
++      ]
++    }
+ 
+     # TODO(jschuh): https://crbug.com/167187 fix size_t to int truncations.
+     configs += [ "//build/config/compiler:no_size_t_to_int_warning" ]
+@@ -474,16 +486,18 @@ test("capture_unittests") {
+       "video/win/video_capture_device_mf_win_unittest.cc",
+     ]
+     libs = [
+-      "mf.lib",
+-      "mfplat.lib",
+-      "mfreadwrite.lib",
+-      "mfuuid.lib",
+-    ]
+-    ldflags = [
+-      "/DELAYLOAD:mf.dll",
+-      "/DELAYLOAD:mfplat.dll",
+-      "/DELAYLOAD:mfreadwrite.dll",
++      "mf",
++      "mfplat",
++      "mfreadwrite",
++      "mfuuid",
+     ]
++    if (is_msvc) {
++      ldflags = [
++        "/DELAYLOAD:mf.dll",
++        "/DELAYLOAD:mfplat.dll",
++        "/DELAYLOAD:mfreadwrite.dll",
++      ]
++    }
+ 
+     # TODO(jschuh): https://crbug.com/167187 fix size_t to int truncations.
+     configs += [ "//build/config/compiler:no_size_t_to_int_warning" ]
+diff --git a/src/3rdparty/chromium/media/capture/video/win/video_capture_device_factory_win.cc b/src/3rdparty/chromium/media/capture/video/win/video_capture_device_factory_win.cc
+index 5f6c82c..871360c 100644
+--- a/src/3rdparty/chromium/media/capture/video/win/video_capture_device_factory_win.cc
++++ b/src/3rdparty/chromium/media/capture/video/win/video_capture_device_factory_win.cc
+@@ -144,7 +144,11 @@ GetMFAttributes() {
+                        {{MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE,
+                          MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE_VIDCAP_GUID},
+                         {MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE_VIDCAP_CATEGORY,
++#if defined(COMPILER_GCC) // FIXME: missing KSCATEGORY_SENSOR_CAMERA
++                         KSCATEGORY_VIDEO_CAMERA}}}}});
++#else
+                          KSCATEGORY_SENSOR_CAMERA}}}}});
++#endif
+   return *mf_attributes;
+ }
+ 
+@@ -535,7 +539,9 @@ void VideoCaptureDeviceFactoryWin::GetDevicesInfo(
+ 
+   if (IsEnclosureLocationSupported()) {
+     origin_task_runner_ = base::ThreadTaskRunnerHandle::Get();
++#if defined(COMPILER_MSVC)
+     com_thread_.init_com_with_mta(true);
++#endif
+     com_thread_.Start();
+     com_thread_.task_runner()->PostTask(
+         FROM_HERE,
+@@ -556,6 +562,7 @@ void VideoCaptureDeviceFactoryWin::EnumerateDevicesUWP(
+   scoped_refptr<base::SingleThreadTaskRunner> com_thread_runner =
+       com_thread_.task_runner();
+ 
++#if defined(COMPILER_MSVC)
+   // The |device_info_callback| created by base::BindRepeating() is copyable,
+   // which is necessary for the below lambda function of |callback| for the
+   // asynchronous operation. The reason is to permanently capture anything in a
+@@ -605,6 +612,9 @@ void VideoCaptureDeviceFactoryWin::EnumerateDevicesUWP(
+ 
+   // Keep a reference to incomplete |asyn_op| for releasing later.
+   async_ops_.insert(async_op);
++#else
++  return;
++#endif
+ }
+ 
+ void VideoCaptureDeviceFactoryWin::FoundAllDevicesUWP(
+diff --git a/src/3rdparty/chromium/media/cdm/BUILD.gn b/src/3rdparty/chromium/media/cdm/BUILD.gn
+index facbe3a..5f9196c 100644
+--- a/src/3rdparty/chromium/media/cdm/BUILD.gn
++++ b/src/3rdparty/chromium/media/cdm/BUILD.gn
+@@ -179,7 +179,7 @@ source_set("unit_tests") {
+     sources += [ "cenc_utils_unittest.cc" ]
+   }
+ 
+-  if (is_win) {
++  if (is_msvc) {
+     sources += [
+       "win/media_foundation_cdm_factory_unittest.cc",
+       "win/media_foundation_cdm_session_unittest.cc",
+diff --git a/src/3rdparty/chromium/media/cdm/api/content_decryption_module_export.h b/src/3rdparty/chromium/media/cdm/api/content_decryption_module_export.h
+index 932708d..daea1c8 100644
+--- a/src/3rdparty/chromium/media/cdm/api/content_decryption_module_export.h
++++ b/src/3rdparty/chromium/media/cdm/api/content_decryption_module_export.h
+@@ -7,7 +7,7 @@
+ 
+ // Define CDM_API so that functionality implemented by the CDM module
+ // can be exported to consumers.
+-#if defined(_WIN32)
++#if defined(_MSC_VER)
+ 
+ #if defined(CDM_IMPLEMENTATION)
+ #define CDM_API __declspec(dllexport)
+@@ -15,9 +15,9 @@
+ #define CDM_API __declspec(dllimport)
+ #endif  // defined(CDM_IMPLEMENTATION)
+ 
+-#else  // defined(_WIN32)
++#else  // defined(_MSC_VER)
+ #define CDM_API __attribute__((visibility("default")))
+-#endif  // defined(_WIN32)
++#endif  // defined(_MSC_VER)
+ 
+ // Define CDM_CLASS_API to export class types. We have to add visibility
+ // attributes to make sure virtual tables in CDM consumer and CDM implementation
+@@ -25,14 +25,14 @@
+ // about that for the internal symbols, but it has only become a practical issue
+ // after introduction of LTO devirtualization. See more details on
+ // https://crbug.com/609564#c35
+-#if defined(_WIN32)
++#if defined(_MSC_VER)
+ #if defined(__clang__)
+ #define CDM_CLASS_API [[clang::lto_visibility_public]]
+ #else
+ #define CDM_CLASS_API
+ #endif
+-#else  // defined(_WIN32)
++#else  // defined(_MSC_VER)
+ #define CDM_CLASS_API __attribute__((visibility("default")))
+-#endif  // defined(_WIN32)
++#endif  // defined(_MSC_VER)
+ 
+ #endif  // CDM_CONTENT_DECRYPTION_MODULE_EXPORT_H_
+diff --git a/src/3rdparty/chromium/media/cdm/win/media_foundation_cdm.h b/src/3rdparty/chromium/media/cdm/win/media_foundation_cdm.h
+index aa556cf..7255331 100644
+--- a/src/3rdparty/chromium/media/cdm/win/media_foundation_cdm.h
++++ b/src/3rdparty/chromium/media/cdm/win/media_foundation_cdm.h
+@@ -5,6 +5,8 @@
+ #ifndef MEDIA_CDM_WIN_MEDIA_FOUNDATION_CDM_H_
+ #define MEDIA_CDM_WIN_MEDIA_FOUNDATION_CDM_H_
+ 
++#if defined(COMPILER_MSVC)
++
+ #include <mfcontentdecryptionmodule.h>
+ #include <wrl.h>
+ 
+@@ -93,4 +95,6 @@ class MEDIA_EXPORT MediaFoundationCdm : public ContentDecryptionModule,
+ 
+ }  // namespace media
+ 
++#endif // COMPILER_MSVC
++
+ #endif  // MEDIA_CDM_WIN_MEDIA_FOUNDATION_CDM_H_
+diff --git a/src/3rdparty/chromium/media/filters/vp9_compressed_header_parser.cc b/src/3rdparty/chromium/media/filters/vp9_compressed_header_parser.cc
+index 4ce0843..a80a256 100644
+--- a/src/3rdparty/chromium/media/filters/vp9_compressed_header_parser.cc
++++ b/src/3rdparty/chromium/media/filters/vp9_compressed_header_parser.cc
+@@ -135,7 +135,7 @@ void Vp9CompressedHeaderParser::ReadCoefProbs(Vp9FrameHeader* fhdr) {
+     for (auto& ai : fhdr->frame_context.coef_probs[tx_size]) {
+       for (auto& aj : ai) {
+         for (auto& ak : aj) {
+-          int max_l = (ak == aj[0]) ? 3 : 6;
++          int max_l = (+ak == +aj[0]) ? 3 : 6;
+           for (int l = 0; l < max_l; l++) {
+             DiffUpdateProbArray(ak[l]);
+           }
+diff --git a/src/3rdparty/chromium/media/filters/vp9_parser.cc b/src/3rdparty/chromium/media/filters/vp9_parser.cc
+index 6c205c6..b2ef6e5 100644
+--- a/src/3rdparty/chromium/media/filters/vp9_parser.cc
++++ b/src/3rdparty/chromium/media/filters/vp9_parser.cc
+@@ -374,7 +374,7 @@ bool Vp9FrameContext::IsValid() const {
+     for (auto& ai : a) {
+       for (auto& aj : ai) {
+         for (auto& ak : aj) {
+-          int max_l = (ak == aj[0]) ? 3 : 6;
++          int max_l = (+ak == +aj[0]) ? 3 : 6;
+           for (int l = 0; l < max_l; l++) {
+             for (auto& x : ak[l]) {
+               if (x == 0) {
+diff --git a/src/3rdparty/chromium/media/gpu/BUILD.gn b/src/3rdparty/chromium/media/gpu/BUILD.gn
+index b1a84b1..e694494 100644
+--- a/src/3rdparty/chromium/media/gpu/BUILD.gn
++++ b/src/3rdparty/chromium/media/gpu/BUILD.gn
+@@ -227,21 +227,23 @@ component("gpu") {
+       "//ui/display",
+     ]
+     libs += [
+-      "d3d9.lib",
+-      "d3d11.lib",
+-      "dxva2.lib",
+-      "strmiids.lib",
+-      "mf.lib",
+-      "mfplat.lib",
+-      "mfuuid.lib",
+-    ]
+-    ldflags += [
+-      "/DELAYLOAD:d3d9.dll",
+-      "/DELAYLOAD:d3d11.dll",
+-      "/DELAYLOAD:dxva2.dll",
+-      "/DELAYLOAD:mf.dll",
+-      "/DELAYLOAD:mfplat.dll",
++      "d3d9",
++      "d3d11",
++      "dxva2",
++      "strmiids",
++      "mf",
++      "mfplat",
++      "mfuuid",
+     ]
++    if (is_msvc) {
++      ldflags += [
++        "/DELAYLOAD:d3d9.dll",
++        "/DELAYLOAD:d3d11.dll",
++        "/DELAYLOAD:dxva2.dll",
++        "/DELAYLOAD:mf.dll",
++        "/DELAYLOAD:mfplat.dll",
++      ]
++    }
+   }
+ 
+   if (use_ozone) {
+diff --git a/src/3rdparty/chromium/media/gpu/windows/dxva_video_decode_accelerator_win.cc b/src/3rdparty/chromium/media/gpu/windows/dxva_video_decode_accelerator_win.cc
+index 69c2a0d..e204c14 100644
+--- a/src/3rdparty/chromium/media/gpu/windows/dxva_video_decode_accelerator_win.cc
++++ b/src/3rdparty/chromium/media/gpu/windows/dxva_video_decode_accelerator_win.cc
+@@ -84,7 +84,7 @@ const CLSID MEDIASUBTYPE_VP90 = {
+ // texture color conversion in DX11.
+ // Defined in mfidl.h in the Windows 10 SDK. ntverp.h provides VER_PRODUCTBUILD
+ // to detect which SDK we are compiling with.
+-#if VER_PRODUCTBUILD < 10011  // VER_PRODUCTBUILD for 10.0.10158.0 SDK.
++#if defined(_MSC_VER) && VER_PRODUCTBUILD < 10011  // VER_PRODUCTBUILD for 10.0.10158.0 SDK.
+ DEFINE_GUID(CLSID_VideoProcessorMFT,
+             0x88753b26,
+             0x5b24,
+@@ -2402,7 +2402,9 @@ void DXVAVideoDecodeAccelerator::SetState(State new_state) {
+ }
+ 
+ bool DXVAVideoDecodeAccelerator::StartDecoderThread() {
++#if defined(COMPILER_MSVC)
+   decoder_thread_.init_com_with_mta(true);
++#endif
+   decoder_thread_.Start();
+   decoder_thread_task_runner_ = decoder_thread_.task_runner();
+   if (!decoder_thread_task_runner_) {
+diff --git a/src/3rdparty/chromium/media/gpu/windows/media_foundation_video_encode_accelerator_win.cc b/src/3rdparty/chromium/media/gpu/windows/media_foundation_video_encode_accelerator_win.cc
+index dca4b8a..517742d 100644
+--- a/src/3rdparty/chromium/media/gpu/windows/media_foundation_video_encode_accelerator_win.cc
++++ b/src/3rdparty/chromium/media/gpu/windows/media_foundation_video_encode_accelerator_win.cc
+@@ -193,7 +193,9 @@ bool MediaFoundationVideoEncodeAccelerator::Initialize(const Config& config,
+     return false;
+   }
+ 
++#if defined(COMPILER_MSVC)
+   encoder_thread_.init_com_with_mta(false);
++#endif
+   if (!encoder_thread_.Start()) {
+     DLOG(ERROR) << "Failed spawning encoder thread.";
+     return false;
+diff --git a/src/3rdparty/chromium/media/midi/BUILD.gn b/src/3rdparty/chromium/media/midi/BUILD.gn
+index 6c34560..c047221 100644
+--- a/src/3rdparty/chromium/media/midi/BUILD.gn
++++ b/src/3rdparty/chromium/media/midi/BUILD.gn
+@@ -152,12 +152,18 @@ component("midi") {
+       "midi_manager_winrt.cc",
+       "midi_manager_winrt.h",
+     ]
++    if (is_mingw) {
++      sources -= [
++        "midi_manager_winrt.cc",
++        "midi_manager_winrt.h",
++      ]
++    }
+ 
+-    libs += [ "setupapi.lib" ]
++    libs += [ "setupapi" ]
+ 
+     # This library is included in base in static builds.
+     if (is_component_build) {
+-      libs += [ "cfgmgr32.lib" ]
++      libs += [ "cfgmgr32" ]
+     }
+   }
+ 
+diff --git a/src/3rdparty/chromium/media/midi/midi_service.cc b/src/3rdparty/chromium/media/midi/midi_service.cc
+index 25b1ec3..f6b98c7 100644
+--- a/src/3rdparty/chromium/media/midi/midi_service.cc
++++ b/src/3rdparty/chromium/media/midi/midi_service.cc
+@@ -103,7 +103,7 @@ scoped_refptr<base::SingleThreadTaskRunner> MidiService::GetTaskRunner(
+   if (!threads_[runner_id]) {
+     threads_[runner_id] = std::make_unique<base::Thread>(
+         base::StringPrintf("MidiServiceThread(%zu)", runner_id));
+-#if defined(OS_WIN)
++#if defined(OS_WIN) && defined(COMPILER_MSVC)
+     threads_[runner_id]->init_com_with_mta(true);
+ #endif
+     threads_[runner_id]->Start();
+diff --git a/src/3rdparty/chromium/media/midi/task_service.cc b/src/3rdparty/chromium/media/midi/task_service.cc
+index fb19068..1769bc3 100644
+--- a/src/3rdparty/chromium/media/midi/task_service.cc
++++ b/src/3rdparty/chromium/media/midi/task_service.cc
+@@ -146,7 +146,7 @@ scoped_refptr<base::SingleThreadTaskRunner> TaskService::GetTaskRunner(
+     threads_[thread] = std::make_unique<base::Thread>(
+         base::StringPrintf("MidiService_TaskService_Thread(%zu)", runner_id));
+     base::Thread::Options options;
+-#if defined(OS_WIN)
++#if defined(OS_WIN) && defined(COMPILER_MSVC)
+     threads_[thread]->init_com_with_mta(true);
+ #elif defined(OS_MAC)
+     options.message_pump_type = base::MessagePumpType::UI;
+diff --git a/src/3rdparty/chromium/media/renderers/BUILD.gn b/src/3rdparty/chromium/media/renderers/BUILD.gn
+index bbbc19a..e55305d 100644
+--- a/src/3rdparty/chromium/media/renderers/BUILD.gn
++++ b/src/3rdparty/chromium/media/renderers/BUILD.gn
+@@ -62,7 +62,7 @@ source_set("renderers") {
+     deps += [ "//fuchsia/engine:switches" ]
+   }
+ 
+-  if (is_win) {
++  if (is_msvc) {
+     sources += [
+       "win/media_engine_extension.cc",
+       "win/media_engine_extension.h",
