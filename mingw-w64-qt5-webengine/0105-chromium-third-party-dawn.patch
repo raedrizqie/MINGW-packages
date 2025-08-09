@@ -1,0 +1,91 @@
+diff --git a/src/3rdparty/chromium/third_party/dawn/generator/generator_lib.py b/src/3rdparty/chromium/third_party/dawn/generator/generator_lib.py
+index e3d46bd..6bf7c9b 100755
+--- a/src/3rdparty/chromium/third_party/dawn/generator/generator_lib.py
++++ b/src/3rdparty/chromium/third_party/dawn/generator/generator_lib.py
+@@ -109,8 +109,8 @@ class _PreprocessingLoader(jinja2.BaseLoader):
+             source = self.preprocess(f.read())
+         return source, path, lambda: mtime == os.path.getmtime(path)
+ 
+-    blockstart = re.compile('{%-?\s*(if|elif|else|for|block|macro)[^}]*%}')
+-    blockend = re.compile('{%-?\s*(end(if|for|block|macro)|elif|else)[^}]*%}')
++    blockstart = re.compile(r'{%-?\s*(if|elif|else|for|block|macro)[^}]*%}')
++    blockend = re.compile(r'{%-?\s*(end(if|for|block|macro)|elif|else)[^}]*%}')
+ 
+     def preprocess(self, source):
+         lines = source.split('\n')
+@@ -219,6 +219,16 @@ def _compute_python_dependencies(root_dir=None):
+     return paths
+ 
+ 
++# Computes the string representing a cmake list of paths.
++def _cmake_path_list(paths):
++    if os.name == "nt":
++        # On Windows CMake still expects paths to be separated by forward
++        # slashes
++        return (";".join(paths)).replace("\\", "/")
++    else:
++        return ";".join(paths)
++
++
+ def run_generator(generator):
+     parser = argparse.ArgumentParser(
+         description=generator.get_description(),
+@@ -299,7 +309,7 @@ def run_generator(generator):
+                         " ".join(dependencies))
+ 
+         if args.print_cmake_dependencies:
+-            sys.stdout.write(";".join(dependencies))
++            sys.stdout.write(_cmake_path_list(dependencies))
+             return 0
+ 
+     # The caller wants to assert that the outputs are what it expects.
+@@ -318,9 +328,11 @@ def run_generator(generator):
+ 
+     # Print the list of all the outputs for cmake.
+     if args.print_cmake_outputs:
+-        sys.stdout.write(";".join([
+-            os.path.join(args.output_dir, render.output) for render in renders
+-        ]))
++        sys.stdout.write(
++            _cmake_path_list([
++                os.path.join(args.output_dir, render.output)
++                for render in renders
++            ]))
+         return 0
+ 
+     outputs = _do_renders(renders, args.template_dir)
+diff --git a/src/3rdparty/chromium/third_party/dawn/scripts/dawn_features.gni b/src/3rdparty/chromium/third_party/dawn/scripts/dawn_features.gni
+index 6f4f01e..8fd1ad0 100644
+--- a/src/3rdparty/chromium/third_party/dawn/scripts/dawn_features.gni
++++ b/src/3rdparty/chromium/third_party/dawn/scripts/dawn_features.gni
+@@ -38,7 +38,7 @@ declare_args() {
+   dawn_complete_static_libs = false
+ 
+   # Enables the compilation of Dawn's D3D12 backend
+-  dawn_enable_d3d12 = is_win
++  dawn_enable_d3d12 = is_msvc
+ 
+   # Enables the compilation of Dawn's Metal backend
+   dawn_enable_metal = is_mac
+diff --git a/src/3rdparty/chromium/third_party/dawn/src/common/BUILD.gn b/src/3rdparty/chromium/third_party/dawn/src/common/BUILD.gn
+index 0a2e36f..344fdf8 100644
+--- a/src/3rdparty/chromium/third_party/dawn/src/common/BUILD.gn
++++ b/src/3rdparty/chromium/third_party/dawn/src/common/BUILD.gn
+@@ -121,7 +121,7 @@ config("dawn_internal") {
+     #   if (myUint64 > std::numeric_limits<size_t>::max()) {...}
+     cflags += [ "-Wno-tautological-type-limit-compare" ]
+ 
+-    if (is_win) {
++    if (is_msvc) {
+       cflags += [
+         # clang-cl doesn't know -pedantic, pass it explicitly to the clang driver
+         "/clang:-pedantic",
+@@ -134,7 +134,7 @@ config("dawn_internal") {
+     }
+   }
+ 
+-  if (!is_clang && is_win) {
++  if (!is_clang && is_msvc) {
+     # Dawn extends wgpu enums with internal enums.
+     # MSVC considers these invalid switch values. crbug.com/dawn/397.
+     cflags += [ "/wd4063" ]

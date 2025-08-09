@@ -1,0 +1,276 @@
+diff --git a/src/3rdparty/chromium/BUILD.gn b/src/3rdparty/chromium/BUILD.gn
+index 8d9657d..fc6ca0a 100644
+--- a/src/3rdparty/chromium/BUILD.gn
++++ b/src/3rdparty/chromium/BUILD.gn
+@@ -67,6 +67,7 @@ if (is_official_build) {
+ group("gn_all") {
+   testonly = true
+ 
++  if (!is_mingw) {
+   deps = [
+     ":gn_visibility",
+     "//base:base_perftests",
+@@ -845,13 +846,14 @@ group("gn_all") {
+ 
+   # OpenCV
+   deps += [ "//third_party/opencv:opencv_emd_fuzzer" ]
++  }
+ }
+ 
+ # TODO(https://crbug.com/1112776): ensure remoting is functional on Linux builds with
+ # ozone. We also need to figure out what to do with remoting_host that is set for
+ # use_x11 && is_linux. See remoting/remoting_options.gni.  For now, just allow to
+ # enable remoting for is_linux && use_x11 && use_ozone.
+-if ((is_linux || is_chromeos || is_win) && enable_remoting &&
++if ((is_linux || is_chromeos || is_msvc) && enable_remoting &&
+     (use_x11 || !use_ozone)) {
+   # This group is used for network annotation check test.
+   group("shipped_binaries") {
+@@ -886,7 +888,7 @@ if (is_fuchsia) {
+ 
+ # TODO(GYP_GONE): Figure out if we really need this target or if there's
+ # some better way to specify things.
+-if (is_win && !use_qt) {
++if (is_msvc && !use_qt) {
+   group("chrome_official_builder_no_unittests") {
+     deps = [
+       "//chrome/common/win:eventlog_provider",
+@@ -1039,7 +1041,7 @@ if (!is_ios && !use_qt) {
+         "//chrome/test/chromedriver",
+         "//third_party/catapult/third_party/typ",
+       ]
+-      if (is_win) {
++      if (is_msvc) {
+         data_deps += [ "//build/win:copy_cdb_to_output" ]
+       }
+     }
+@@ -1143,7 +1145,9 @@ if (!is_ios && !use_qt) {
+         "//third_party/apache-win32/",
+         "//third_party/perl/perl/",
+       ]
+-      data_deps += [ "//build/win:copy_cdb_to_output" ]
++      if (is_msvc) {
++        data_deps += [ "//build/win:copy_cdb_to_output" ]
++      }
+     }
+ 
+     if (is_mac) {
+@@ -1321,7 +1325,7 @@ group("chromium_builder_perf") {
+   }
+ }
+ 
+-if (!is_ios && !is_android && !is_chromecast && !is_fuchsia) {
++if (!is_ios && !is_android && !is_chromecast && !is_fuchsia && !is_mingw) {
+   group("chromium_builder_asan") {
+     testonly = true
+ 
+diff --git a/src/3rdparty/chromium/mojo/core/BUILD.gn b/src/3rdparty/chromium/mojo/core/BUILD.gn
+index 5c5df36..e47e9cb 100644
+--- a/src/3rdparty/chromium/mojo/core/BUILD.gn
++++ b/src/3rdparty/chromium/mojo/core/BUILD.gn
+@@ -162,7 +162,7 @@ template("core_impl_source_set") {
+       deps += [ "//crypto" ]
+     }
+ 
+-    if (is_win) {
++    if (is_msvc) {
+       cflags = [ "/wd4324" ]  # Structure was padded due to __declspec(align()),
+                               # which is uninteresting.
+     }
+diff --git a/src/3rdparty/chromium/mojo/public/tools/mojom/mojom/fileutil.py b/src/3rdparty/chromium/mojo/public/tools/mojom/mojom/fileutil.py
+index bf626f5..e1c823d 100644
+--- a/src/3rdparty/chromium/mojo/public/tools/mojom/mojom/fileutil.py
++++ b/src/3rdparty/chromium/mojo/public/tools/mojom/mojom/fileutil.py
+@@ -3,7 +3,6 @@
+ # found in the LICENSE file.
+ 
+ import errno
+-import imp
+ import os.path
+ import sys
+ 
+diff --git a/src/3rdparty/chromium/mojo/public/tools/mojom/mojom/parse/lexer.py b/src/3rdparty/chromium/mojo/public/tools/mojom/mojom/parse/lexer.py
+index 3e084bb..1e8b49f 100644
+--- a/src/3rdparty/chromium/mojo/public/tools/mojom/mojom/parse/lexer.py
++++ b/src/3rdparty/chromium/mojo/public/tools/mojom/mojom/parse/lexer.py
+@@ -2,7 +2,6 @@
+ # Use of this source code is governed by a BSD-style license that can be
+ # found in the LICENSE file.
+ 
+-import imp
+ import os.path
+ import sys
+ 
+diff --git a/src/3rdparty/chromium/ppapi/shared_impl/ppb_view_shared.cc b/src/3rdparty/chromium/ppapi/shared_impl/ppb_view_shared.cc
+index 5c1ab97..50374b6 100644
+--- a/src/3rdparty/chromium/ppapi/shared_impl/ppb_view_shared.cc
++++ b/src/3rdparty/chromium/ppapi/shared_impl/ppb_view_shared.cc
+@@ -18,7 +18,7 @@ namespace ppapi {
+ 
+ ViewData::ViewData() {
+   // Assume POD.
+-  memset(this, 0, sizeof(ViewData));
++  memset(reinterpret_cast<void*>(this), 0, sizeof(ViewData));
+ 
+   device_scale = 1.0f;
+   css_scale = 1.0f;
+diff --git a/src/3rdparty/chromium/skia/BUILD.gn b/src/3rdparty/chromium/skia/BUILD.gn
+index 6a107a5..5f3bd80 100644
+--- a/src/3rdparty/chromium/skia/BUILD.gn
++++ b/src/3rdparty/chromium/skia/BUILD.gn
+@@ -90,7 +90,7 @@ config("skia_config") {
+ 
+   if (is_component_build) {
+     defines += [ "SKIA_DLL" ]
+-    if (is_win) {
++    if (is_msvc) {
+       defines += [ "SKCMS_API=__declspec(dllexport)" ]
+     } else {
+       defines += [ "SKCMS_API=__attribute__((visibility(\"default\")))" ]
+@@ -175,11 +175,13 @@ config("skia_library_config") {
+       # starts up, depending on the actual device memory).
+       "SK_DEFAULT_FONT_CACHE_LIMIT=1048576",  # 1024 * 1024
+     ]
++  } else if (is_mingw) {
++    defines += [ "SK_DEFAULT_FONT_CACHE_COUNT_LIMIT=256" ]
+   } else {
+     defines += [ "SK_DEFAULT_FONT_CACHE_LIMIT=20971520" ]  # 20 * 1024 * 1024
+   }
+ 
+-  if (is_win) {
++  if (is_msvc) {
+     defines += [
+       # On windows, GDI handles are a scarse system-wide resource so we have to
+       # keep the glyph cache, which holds up to 4 GDI handles per entry, to a
+@@ -209,9 +211,9 @@ config("skia_library_config") {
+ }
+ 
+ source_set("skcms") {
+-  cflags = []
+-  if (!is_win || is_clang) {
+-    cflags += [
++  cflags_c = []
++  if (!is_msvc || is_clang) {
++    cflags_c += [
+       "-w",
+       "-std=c11",
+     ]
+@@ -407,7 +409,7 @@ component("skia") {
+       # Keeping _win.cpp
+       "//third_party/skia/src/utils/SkThreadUtils_pthread.cpp",
+     ]
+-    libs = [ "fontsub.lib" ]
++    libs = [ "fontsub" ]
+   } else {
+     sources -= [
+       # Keeping _pthread.cpp
+@@ -660,14 +662,17 @@ template("skia_source_set") {
+     if (using_mismatched_sample_profile) {
+       configs -= [ "//build/config/compiler:afdo_optimize_size" ]
+     }
+-    if (is_win) {
++    if (is_msvc) {
+       cflags_cc = [
+         "/std:c++17",
+         "/wd5041",  # out-of-line definition for constexpr static data member is
+                     # not needed and is deprecated in C++17
+       ]
+     } else {
+-      cflags_cc = [ "-std=c++17" ]
++      cflags_cc = [
++        "-std=c++17",
++        "-Wno-missing-field-initializers",
++      ]
+     }
+   }
+ }
+@@ -699,47 +704,47 @@ if (current_cpu == "arm64") {
+ if (current_cpu == "x86" || current_cpu == "x64") {
+   skia_source_set("skia_opts_sse3") {
+     sources = skia_opts.ssse3_sources
+-    if (!is_win || is_clang) {
++    if (!is_msvc || is_clang) {
+       cflags = [ "-mssse3" ]
+     }
+-    if (is_win) {
++    if (is_msvc) {
+       defines = [ "SK_CPU_SSE_LEVEL=31" ]
+     }
+     visibility = [ ":skia_opts" ]
+   }
+   skia_source_set("skia_opts_sse41") {
+     sources = skia_opts.sse41_sources
+-    if (!is_win || is_clang) {
++    if (!is_msvc || is_clang) {
+       cflags = [ "-msse4.1" ]
+     }
+-    if (is_win) {
++    if (is_msvc) {
+       defines = [ "SK_CPU_SSE_LEVEL=41" ]
+     }
+     visibility = [ ":skia_opts" ]
+   }
+   skia_source_set("skia_opts_sse42") {
+     sources = skia_opts.sse42_sources
+-    if (!is_win || is_clang) {
++    if (!is_msvc || is_clang) {
+       cflags = [ "-msse4.2" ]
+     }
+-    if (is_win) {
++    if (is_msvc) {
+       defines = [ "SK_CPU_SSE_LEVEL=42" ]
+     }
+     visibility = [ ":skia_opts" ]
+   }
+   skia_source_set("skia_opts_avx") {
+     sources = skia_opts.avx_sources
+-    if (!is_win) {
++    if (!is_msvc) {
+       cflags = [ "-mavx" ]
+     }
+-    if (is_win) {
++    if (is_msvc) {
+       cflags = [ "/arch:AVX" ]
+     }
+     visibility = [ ":skia_opts" ]
+   }
+   skia_source_set("skia_opts_hsw") {
+     sources = skia_opts.hsw_sources
+-    if (!is_win) {
++    if (!is_msvc) {
+       cflags = [
+         "-mavx2",
+         "-mbmi",
+@@ -748,17 +753,17 @@ if (current_cpu == "x86" || current_cpu == "x64") {
+         "-mfma",
+       ]
+     }
+-    if (is_win) {
++    if (is_msvc) {
+       cflags = [ "/arch:AVX2" ]
+     }
+     visibility = [ ":skia_opts" ]
+   }
+   skia_source_set("skia_opts_skx") {
+     sources = skia_opts.skx_sources
+-    if (!is_win) {
++    if (!is_msvc) {
+       cflags = [ "-march=skylake-avx512" ]
+     }
+-    if (is_win) {
++    if (is_msvc) {
+       cflags = [ "/arch:AVX512" ]
+     }
+     visibility = [ ":skia_opts" ]
+diff --git a/src/3rdparty/chromium/sql/vfs_wrapper.cc b/src/3rdparty/chromium/sql/vfs_wrapper.cc
+index db1e20a..2d3a44c 100644
+--- a/src/3rdparty/chromium/sql/vfs_wrapper.cc
++++ b/src/3rdparty/chromium/sql/vfs_wrapper.cc
+@@ -5,6 +5,7 @@
+ #include "sql/vfs_wrapper.h"
+ 
+ #include <algorithm>
++#include <cstring>
+ #include <string>
+ #include <vector>
+ 
