@@ -6,7 +6,7 @@ _realname=qt5-static
 pkgbase="mingw-w64-${_realname}"
 pkgname="${MINGW_PACKAGE_PREFIX}-${_realname}"
 pkgver=5.15.17
-pkgrel=1
+pkgrel=2
 pkgdesc="A cross-platform application and UI framework (static) (mingw-w64)"
 arch=('any')
 mingw_arch=('mingw64' 'ucrt64' 'clang64' 'clangarm64')
@@ -25,7 +25,6 @@ makedepends=("${MINGW_PACKAGE_PREFIX}-cc"
              "${MINGW_PACKAGE_PREFIX}-pkgconf"
              "${MINGW_PACKAGE_PREFIX}-python"
              "${MINGW_PACKAGE_PREFIX}-ninja"
-             "${MINGW_PACKAGE_PREFIX}-dbus"
              "${MINGW_PACKAGE_PREFIX}-openssl"
              "${MINGW_PACKAGE_PREFIX}-vulkan-headers"
              "${MINGW_PACKAGE_PREFIX}-z3"
@@ -257,7 +256,8 @@ build() {
     -static \
     -static-runtime \
     -silent \
-    -dbus-linked \
+    -dbus \
+    -dbus-runtime \
     -opengl desktop \
     -openssl-linked \
     -sql-sqlite \
@@ -290,7 +290,7 @@ build() {
 
 check() {
   cd build-${MSYSTEM}
-  make check -j1 -k
+  make check
 }
 
 package() {
@@ -358,19 +358,19 @@ package() {
                  -e "s|${BUILDDIR_PREFIX}/qtserialport/lib/lib|-l|g" \
                  -e "s|${BUILDDIR_PREFIX}/qtgamepad/lib/lib|-l|g" \
                  -e "s|-L${BUILDDIR_PREFIX}/qtlocation/lib ||g" \
-                 -e "s|-l\:libz.a |-lz |g" \
-                 -e "s|-l\:libzstd.a |-lzstd |g" \
+                 -e "s| -l\:libz.a| -lz|g" \
+                 -e "s| -l\:libzstd.a| -lzstd|g" \
                  -e "s|.a | |g" {} \;
 
   find "${pkgdir}${MINGW_PREFIX}/${_realname}/share/qt5" -type f -name '*.prl' \
     -exec sed -i -e "s|-l\:libz.a\;|-lz\;|g" \
                  -e "s|-l\:libzstd.a\;|-lzstd\;|g" \
-                 -e "s|-l\:libz.a |-lz |g" \
-                 -e "s|-l\:libzstd.a |-lzstd |g" {} \;
+                 -e "s| -l\:libz.a| -lz|g" \
+                 -e "s| -l\:libzstd.a| -lzstd|g" {} \;
 
   find "${pkgdir}${MINGW_PREFIX}/${_realname}/lib" -type f -name '*.prl' \
     -exec sed -i -e "s|-l\:libz.a\;|-lz\;|g" \
                  -e "s|-l\:libzstd.a\;|-lzstd\;|g" \
-                 -e "s|-l\:libz.a |-lz |g" \
-                 -e "s|-l\:libzstd.a |-lzstd |g" {} \;
+                 -e "s| -l\:libz.a| -lz|g" \
+                 -e "s| -l\:libzstd.a| -lzstd|g" {} \;
 }
