@@ -1,0 +1,38 @@
+diff --git a/src/python/pathops/_pathops.pxd b/src/python/pathops/_pathops.pxd
+index 0b01fa9..6e12db0 100644
+--- a/src/python/pathops/_pathops.pxd
++++ b/src/python/pathops/_pathops.pxd
+@@ -211,9 +211,9 @@ cpdef enum PathVerb:
+ 
+ cdef uint8_t *POINTS_IN_VERB
+ 
+-cpdef dict VERB_METHODS
++cdef dict VERB_METHODS
+ 
+-cpdef dict PEN_METHODS
++cdef dict PEN_METHODS
+ 
+ 
+ cdef class RawPathIterator:
+diff --git a/src/python/pathops/_pathops.pyx b/src/python/pathops/_pathops.pyx
+index 7f1517f..7a3d557 100644
+--- a/src/python/pathops/_pathops.pyx
++++ b/src/python/pathops/_pathops.pyx
+@@ -688,7 +688,7 @@ cdef uint8_t *POINTS_IN_VERB = [
+     0   # DONE
+ ]
+ 
+-cpdef dict VERB_METHODS = {
++cdef dict VERB_METHODS = {
+     kMove_Verb: "moveTo",
+     kLine_Verb: "lineTo",
+     kQuad_Verb: "quadTo",
+@@ -697,7 +697,7 @@ cpdef dict VERB_METHODS = {
+     kClose_Verb: "close",
+ }
+ 
+-cpdef dict PEN_METHODS = {
++cdef dict PEN_METHODS = {
+     kMove_Verb: "moveTo",
+     kLine_Verb: "lineTo",
+     kQuad_Verb: "qCurveTo",

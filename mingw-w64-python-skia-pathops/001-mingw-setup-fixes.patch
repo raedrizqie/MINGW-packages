@@ -1,6 +1,59 @@
---- a/setup.py.orig	2022-11-11 23:48:30.000000000 +0800
-+++ b/setup.py	2022-11-13 17:38:40.683349300 +0800
-@@ -214,7 +214,7 @@
+diff --git a/pyproject.toml b/pyproject.toml
+index 84fe22f..3c6bd9a 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -5,3 +5,7 @@ requires = [
+     "setuptools_scm",
+     "cython >= 0.28.4",
+ ]
++
++[tool.setuptools_scm]
++write_to = "src/python/pathops/_version.py"
++normalize = false
+diff --git a/setup.py b/setup.py
+index 90c0179..c6f0082 100644
+--- a/setup.py
++++ b/setup.py
+@@ -2,13 +2,13 @@
+ from __future__ import print_function
+ from setuptools import setup, find_packages, Extension
+ from setuptools.command.build_ext import build_ext
++from setuptools.modified import newer_group
+ from distutils.errors import DistutilsSetupError
+ from distutils import log
+-from distutils.dep_util import newer_group
+ from distutils.dir_util import mkpath
+ from distutils.file_util import copy_file
+ from distutils.util import get_platform
+-import pkg_resources
++from importlib.metadata import version, PackageNotFoundError
+ import struct
+ import subprocess
+ import sys
+@@ -24,9 +24,10 @@ import shlex
+ BUILD_SKIA_FROM_SOURCE = bool(int(os.environ.get("BUILD_SKIA_FROM_SOURCE", "1")))
+ # Use this to specify the directory where your pre-built skia is located
+ SKIA_LIBRARY_DIR = os.environ.get("SKIA_LIBRARY_DIR")
++SKIA_LIBRARIES = os.environ.get("SKIA_LIBRARIES")
+ 
+ # check if minimum required Cython is available
+-cython_version_re = re.compile('\s*"cython\s*>=\s*([0-9][0-9\w\.]*)\s*"')
++cython_version_re = re.compile(r'\s*"cython\s*>=\s*([0-9][0-9\w\.]*)\s*"')
+ with open("pyproject.toml", "r", encoding="utf-8") as fp:
+     for line in fp:
+         m = cython_version_re.match(line)
+@@ -36,8 +37,8 @@ with open("pyproject.toml", "r", encoding="utf-8") as fp:
+     else:
+         sys.exit("error: could not parse cython version from pyproject.toml")
+ try:
+-    pkg_resources.require("cython >= %s" % cython_min_version)
+-except pkg_resources.ResolutionError:
++    version("cython") >= cython_min_version
++except PackageNotFoundError:
+     with_cython = False
+ else:
+     with_cython = True
+@@ -214,7 +215,7 @@ class custom_build_ext(build_ext):
  
      def run(self):
          build_ext.run(self)
@@ -9,7 +62,7 @@
              self._copy_windows_dlls()
  
      def _copy_windows_dlls(self):
-@@ -256,7 +256,7 @@
+@@ -256,7 +257,7 @@ def build_skia(build_base):
  
      env = os.environ
      target_cpu = None
@@ -18,7 +71,33 @@
          from distutils._msvccompiler import _get_vc_env
  
          # for Windows, we want to build a shared skia.dll. If we build a static lib
-@@ -323,7 +323,7 @@
+@@ -296,16 +297,18 @@ def get_skia_using_pkgconfig():
+     log.info("Finding skia using pkg-config")
+     try:
+         op = subprocess.run(
+-            [pkgconfig, "--cflags", "--libs", "skia"],
++            ["pkg-config", "--cflags", "--libs", "skia"],
+             text=True,
+             check=False,
++            shell=False,
+             stdout=subprocess.PIPE,
+             stderr=subprocess.PIPE,
+         )
+         stout = op.stdout
+     except FileNotFoundError:
+         stout = ""
+-    args, _ = _parser.parse_known_args(shlex.split(stout))
++    args, _ = _parser.parse_known_args(shlex.split(stout.replace('\"','')))
++    print(args)
+     return args
+ 
+ 
+@@ -319,11 +322,11 @@ skia_builder_dir = os.path.join("src", "cpp", "skia-builder")
+ skia_dir = os.path.join(skia_builder_dir, "skia")
+ skia_src_dir = os.path.join(skia_dir, "src")  # allow access to internals
+ 
+-include_dirs = [skia_dir, skia_src_dir, *pkg_config_op.include_dirs]
++include_dirs = [skia_dir, skia_src_dir] + pkg_config_op.include_dirs
  
  extra_compile_args = {
      "": [
@@ -27,3 +106,38 @@
      ]
      + (
          [
+@@ -343,6 +346,9 @@ extra_compile_args = {
+ library_dirs = [SKIA_LIBRARY_DIR] if SKIA_LIBRARY_DIR is not None else []
+ library_dirs += pkg_config_op.library_dirs
+ 
++libraries = [SKIA_LIBRARIES] if SKIA_LIBRARIES is not None else []
++libraries += pkg_config_op.libraries
++
+ extensions = [
+     Extension(
+         "pathops._pathops",
+@@ -351,7 +357,7 @@ extensions = [
+         ],
+         include_dirs=include_dirs,
+         extra_compile_args=extra_compile_args,
+-        libraries=["skia", *pkg_config_op.libraries],
++        libraries=libraries,
+         library_dirs=library_dirs,
+         language="c++",
+     ),
+@@ -364,7 +370,6 @@ version_file = os.path.join(pkg_dir, "pathops", "_version.py")
+ 
+ setup_params = dict(
+     name="skia-pathops",
+-    use_scm_version={"write_to": version_file},
+     description="Python access to operations on paths using the Skia library",
+     url="https://github.com/fonttools/skia-pathops",
+     long_description=long_description,
+@@ -396,7 +401,6 @@ setup_params = dict(
+         "Development Status :: 4 - Beta",
+         "Environment :: Console",
+         "Intended Audience :: Developers",
+-        "License :: OSI Approved :: BSD License",
+         "Operating System :: OS Independent",
+         "Programming Language :: Python",
+         "Programming Language :: Python :: 3",

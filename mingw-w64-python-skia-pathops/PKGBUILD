@@ -4,10 +4,10 @@ _realname=skia-pathops
 pkgbase=mingw-w64-python-${_realname}
 pkgname=("${MINGW_PACKAGE_PREFIX}-python-${_realname}")
 pkgver=0.7.4
-pkgrel=5
+pkgrel=6
 pkgdesc='Python access to operations on paths using the Skia library (mingw-w64)'
 arch=('any')
-mingw_arch=('mingw64' 'ucrt64' 'clang64')
+mingw_arch=('clang64')
 url="https://github.com/fonttools/skia-pathops"
 msys2_references=(
   'purl: pkg:pypi/skia-pathops'
@@ -29,32 +29,35 @@ makedepends=(
   "${MINGW_PACKAGE_PREFIX}-cc"
   "${MINGW_PACKAGE_PREFIX}-pkgconf"
 )
-options=(!strip)
+options=('!strip')
 source=("https://github.com/fonttools/skia-pathops/archive/v${pkgver}/${_realname}-${pkgver}.tar.gz"
-        "001-mingw-setup-fixes.patch")
-sha256sums=('ab4dcaa6821c040ece818da71bf37318c74b066904db1231ac89d094e90047fc'
-            'd8e85cac77e7b0c6b0230c73088429d6996a982862d7a6eaaacaf13419faad30')
+        "001-mingw-setup-fixes.patch"
+        "002-python312-use-cdef.patch")
+sha256sums=('SKIP'
+            'SKIP'
+            'SKIP')
 
-prepare() { 
-  rm -rf python-build-${MSYSTEM} | true
-  cp -r "${_realname}-${pkgver}" "python-build-${MSYSTEM}"
-  export SETUPTOOLS_SCM_PRETEND_VERSION=${pkgver}
+prepare() {
+  cp -r "${_realname}-${pkgver}" "python-build-${MSYSTEM}" && cd "python-build-${MSYSTEM}"
 
-  cd "${srcdir}/python-build-${MSYSTEM}"
-  patch -p1 -i "${srcdir}"/001-mingw-setup-fixes.patch
+  patch -p1 -i ../001-mingw-setup-fixes.patch
+  patch -p1 -i ../002-python312-use-cdef.patch
 }
 
 build() {
-  cd "${srcdir}/python-build-${MSYSTEM}"
+  cd "python-build-${MSYSTEM}"
 
-  BUILD_SKIA_FROM_SOURCE=0 \
-  ${MINGW_PREFIX}/bin/python -m build --wheel --skip-dependency-check --no-isolation
+  export SETUPTOOLS_SCM_PRETEND_VERSION=${pkgver}
+  export BUILD_SKIA_FROM_SOURCE=0
+
+  python -m build --wheel --skip-dependency-check --no-isolation
 }
 
 package() {
-  cd "${srcdir}/python-build-${MSYSTEM}"
+  cd "python-build-${MSYSTEM}"
+
   MSYS2_ARG_CONV_EXCL="--prefix=" \
-    "${MINGW_PREFIX}"/bin/python -m installer --prefix=${MINGW_PREFIX} \
+  python -m installer --prefix=${MINGW_PREFIX} \
     --destdir="${pkgdir}" dist/*.whl
 
   install -Dm644 LICENSE "${pkgdir}${MINGW_PREFIX}/share/licenses/python-${_realname}/LICENSE"
