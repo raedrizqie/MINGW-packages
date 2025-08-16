@@ -76,7 +76,7 @@ index 90c0179..c6f0082 100644
      try:
          op = subprocess.run(
 -            [pkgconfig, "--cflags", "--libs", "skia"],
-+            ["pkg-config", "--cflags", "--libs", "skia"],
++            ["sh", "pkg-config", "--cflags", "--libs", "skia"],
              text=True,
              check=False,
 +            shell=False,
