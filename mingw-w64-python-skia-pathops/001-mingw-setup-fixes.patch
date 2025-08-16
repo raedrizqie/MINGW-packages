@@ -76,7 +76,7 @@ index 90c0179..c6f0082 100644
      try:
          op = subprocess.run(
 -            [pkgconfig, "--cflags", "--libs", "skia"],
-+            ["sh", "pkg-config", "--cflags", "--libs", "skia"],
++            ["pkg-config", "--cflags", "--libs", "skia"],
              text=True,
              check=False,
 +            shell=False,
@@ -87,8 +87,8 @@ index 90c0179..c6f0082 100644
      except FileNotFoundError:
          stout = ""
 -    args, _ = _parser.parse_known_args(shlex.split(stout))
-+    args, _ = _parser.parse_known_args(shlex.split(stout.replace('\"','')))
-+    print(args)
++    args, _ = _parser.parse_known_args(shlex.split(stout)) 
++    args = args.replace('\"','')
      return args
  
  
