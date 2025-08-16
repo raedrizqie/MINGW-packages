@@ -87,8 +87,8 @@ index 90c0179..c6f0082 100644
      except FileNotFoundError:
          stout = ""
 -    args, _ = _parser.parse_known_args(shlex.split(stout))
-+    args, _ = _parser.parse_known_args(shlex.split(stout)) 
-+    args = args.replace('\"','')
++    args, _ = _parser.parse_known_args(shlex.split(stout, posix=False)) 
++    print(args)
      return args
  
  
