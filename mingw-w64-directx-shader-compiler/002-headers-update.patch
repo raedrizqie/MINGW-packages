@@ -1,0 +1,314 @@
+diff --git a/include/dxc/Support/Global.h b/include/dxc/Support/Global.h
+index 9d97467d..df22cefd 100644
+--- a/include/dxc/Support/Global.h
++++ b/include/dxc/Support/Global.h
+@@ -229,7 +229,7 @@ template <typename T> T *VerifyNullAndThrow(T *p) {
+ }
+ #define VNT(__p) VerifyNullAndThrow(__p)
+ 
+-#ifdef _MSC_VER
++#ifdef _WIN32
+ 
+ extern "C" __declspec(dllimport) void __stdcall OutputDebugStringA(
+     const char *msg);
+@@ -268,7 +268,7 @@ inline void OutputDebugFormatA(const char *pszFormat, ...) {
+ 
+   va_list argList;
+   va_start(argList, pszFormat);
+-  int count = vsnprintf_s(buffer, _countof(buffer), pszFormat, argList);
++  int count = vsprintf_s(buffer, _countof(buffer), pszFormat, argList);
+   va_end(argList);
+ 
+   OutputDebugStringA(buffer);
+@@ -277,7 +277,7 @@ inline void OutputDebugFormatA(const char *pszFormat, ...) {
+   }
+ }
+ 
+-#endif // _MSC_VER
++#endif // _WIN32
+ 
+ #ifndef NDEBUG
+ 
+@@ -300,7 +300,7 @@ inline void OutputDebugFormatA(const char *pszFormat, ...) {
+     if (!(exp)) {                                                              \
+       OutputDebugFormatA(                                                      \
+           "Error: \t%s\nFile:\n%s(%d)\nFunc:\t%s.\n\t" fmt "\n",               \
+-          "!(" #exp ")", __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__);       \
++          "!(" #exp ")", __FILE__, __LINE__, __FUNCTION__, ##__VA_ARGS__);     \
+       __debugbreak();                                                          \
+     }                                                                          \
+   } while (0)
+diff --git a/include/dxc/Support/Unicode.h b/include/dxc/Support/Unicode.h
+index 64e3abcc..0416205d 100644
+--- a/include/dxc/Support/Unicode.h
++++ b/include/dxc/Support/Unicode.h
+@@ -13,9 +13,13 @@
+ 
+ #include <string>
+ 
+-#ifdef _WIN32
++#ifdef _MSC_VER
+ #include <specstrings.h>
+ #else
++#undef MultiByteToWideChar
++#undef WideCharToMultiByte
++
++namespace Unicode {
+ // MultiByteToWideChar which is a Windows-specific method.
+ // This is a very simplistic implementation for non-Windows platforms. This
+ // implementation completely ignores CodePage and dwFlags.
+@@ -31,9 +35,9 @@ int WideCharToMultiByte(uint32_t CodePage, uint32_t dwFlags,
+                         char *lpMultiByteStr, int cbMultiByte,
+                         const char *lpDefaultChar = nullptr,
+                         bool *lpUsedDefaultChar = nullptr);
+-#endif // _WIN32
++#endif // _MSC_VER
+ 
+-namespace Unicode {
++//namespace Unicode {
+ 
+ // Based on
+ // http://msdn.microsoft.com/en-us/library/windows/desktop/dd374101(v=vs.85).aspx.
+diff --git a/include/dxc/WinAdapter.h b/include/dxc/WinAdapter.h
+index d02ad1ac..464a4cd7 100644
+--- a/include/dxc/WinAdapter.h
++++ b/include/dxc/WinAdapter.h
+@@ -15,7 +15,7 @@
+ #ifndef LLVM_SUPPORT_WIN_ADAPTER_H
+ #define LLVM_SUPPORT_WIN_ADAPTER_H
+ 
+-#ifndef _WIN32
++#ifndef _MSC_VER
+ 
+ #ifdef __cplusplus
+ #include <atomic>
+@@ -33,6 +33,128 @@
+ #include <vector>
+ #endif // __cplusplus
+ 
++#ifdef __MINGW32__
++
++#undef _WIN32_WINNT
++#undef _WIN32_IE
++
++// Require at least Windows 7 (Updated from XP)
++#define _WIN32_WINNT 0x0601
++#define _WIN32_IE 0x0800
++
++#define WIN32_LEAN_AND_MEAN 1
++#define STRSAFE_NO_DEPRECATE 1
++
++#include <intsafe.h>
++#include <objidl.h>
++#include <sal.h>
++#include <strsafe.h>
++#include <unknwn.h>
++#include <windows.h>
++
++#undef EN
++#undef IN
++#undef OUT
++
++#ifdef MemoryFence
++#undef MemoryFence
++#endif
++
++#define EventRegisterMicrosoft_Windows_DXCompiler_API()
++#define EventRegisterMicrosoft_Windows_DxcRuntime_API()
++#define EventUnregisterMicrosoft_Windows_DXCompiler_API()
++#define EventUnregisterMicrosoft_Windows_DxcRuntime_API()
++
++#define DxcEtw_DXCompilerCompile_Start()
++#define DxcEtw_DXCompilerCompile_Stop(hr)
++#define DxcEtw_DXCompilerCreateInstance_Start()
++#define DxcEtw_DXCompilerCreateInstance_Stop(hr)
++#define DxcEtw_DXCompilerDisassemble_Start()
++#define DxcEtw_DXCompilerDisassemble_Stop(hr)
++#define DxcEtw_DXCompilerInitialization_Start()
++#define DxcEtw_DXCompilerInitialization_Stop(hr)
++#define DxcEtw_DXCompilerPreprocess_Start()
++#define DxcEtw_DXCompilerPreprocess_Stop(hr)
++#define DxcEtw_DXCompilerShutdown_Start()
++#define DxcEtw_DXCompilerShutdown_Stop(hr)
++#define DxcEtw_DxcValidation_Start()
++#define DxcEtw_DxcValidation_Stop(hr)
++#define DxcRuntimeEtw_DxcRuntimeInitialization_Start()
++#define DxcRuntimeEtw_DxcRuntimeInitialization_Stop(HR)
++#define DxcRuntimeEtw_DxcRuntimeShutdown_Start()
++#define DxcRuntimeEtw_DxcRuntimeShutdown_Stop(S_OK)
++
++#define ATLASSERT assert
++
++// FIXME: missing from intsafe.h
++#define Int32ToUInt32 IntToUInt
++#define UInt32Add UIntAdd
++#define UInt32Mult UIntMult
++
++// FIXME: missing from sal.h
++#define _Maybenull_
++#define _Notnull_
++
++// FIXME: missing from d3d12shader.h
++#define D3D_SHADER_REQUIRES_EARLY_DEPTH_STENCIL 0x00000002
++#define D3D12_SHVER_GET_TYPE(_Version) (((_Version) >> 16) & 0xffff)
++#define D3D12_SHVER_GET_MAJOR(_Version) (((_Version) >> 4) & 0xf)
++#define D3D12_SHVER_GET_MINOR(_Version) (((_Version) >> 0) & 0xf)
++
++#ifdef __cplusplus
++
++constexpr uint8_t nybble_from_hex(char c) {
++  return ((c >= '0' && c <= '9')
++              ? (c - '0')
++              : ((c >= 'a' && c <= 'f')
++                     ? (c - 'a' + 10)
++                     : ((c >= 'A' && c <= 'F') ? (c - 'A' + 10)
++                                               : /* Should be an error */ -1)));
++}
++
++constexpr uint8_t byte_from_hex(char c1, char c2) {
++  return nybble_from_hex(c1) << 4 | nybble_from_hex(c2);
++}
++
++constexpr uint8_t byte_from_hexstr(const char str[2]) {
++  return nybble_from_hex(str[0]) << 4 | nybble_from_hex(str[1]);
++}
++
++constexpr GUID guid_from_string(const char str[37]) {
++  return GUID{static_cast<uint32_t>(byte_from_hexstr(str)) << 24 |
++                  static_cast<uint32_t>(byte_from_hexstr(str + 2)) << 16 |
++                  static_cast<uint32_t>(byte_from_hexstr(str + 4)) << 8 |
++                  byte_from_hexstr(str + 6),
++              static_cast<uint16_t>(
++                  static_cast<uint16_t>(byte_from_hexstr(str + 9)) << 8 |
++                  byte_from_hexstr(str + 11)),
++              static_cast<uint16_t>(
++                  static_cast<uint16_t>(byte_from_hexstr(str + 14)) << 8 |
++                  byte_from_hexstr(str + 16)),
++              {byte_from_hexstr(str + 19), byte_from_hexstr(str + 21),
++               byte_from_hexstr(str + 24), byte_from_hexstr(str + 26),
++               byte_from_hexstr(str + 28), byte_from_hexstr(str + 30),
++               byte_from_hexstr(str + 32), byte_from_hexstr(str + 34)}};
++}
++
++#define CROSS_PLATFORM_UUIDOF(name, spec)                                      \
++  struct __declspec(uuid(spec)) name;                                          \
++  extern "C++" {                                                               \
++  template <> struct __mingw_uuidof_s<name> {                                  \
++    static constexpr IID __uuid_inst = guid_from_string(spec);                 \
++  };                                                                           \
++  template <> constexpr const GUID &__mingw_uuidof<name>() {                   \
++    return __mingw_uuidof_s<name>::__uuid_inst;                                \
++  }                                                                            \
++  template <> constexpr const GUID &__mingw_uuidof<name *>() {                 \
++    return __mingw_uuidof_s<name>::__uuid_inst;                                \
++  }                                                                            \
++  }
++
++#endif // __cplusplus
++
++#else // __MINGW32__
++
+ #define COM_NO_WINDOWS_H // needed to inform d3d headers that this isn't windows
+ 
+ //===----------------------------------------------------------------------===//
+@@ -631,6 +753,12 @@ CROSS_PLATFORM_UUIDOF(ID3D12LibraryReflection,
+ CROSS_PLATFORM_UUIDOF(ID3D12ShaderReflection,
+                       "5A58797D-A72C-478D-8BA2-EFC6B0EFE88E")
+ 
++#endif // __cplusplus
++
++#endif // __MINGW32__
++
++#ifdef __cplusplus
++
+ //===--------------------- COM Pointer Types ------------------------------===//
+ 
+ class CAllocator {
+@@ -898,6 +1026,7 @@ public:
+ 
+ #define CComHeapPtr CHeapPtr
+ 
++#ifndef __MINGW32__
+ //===--------------------------- BSTR Allocation --------------------------===//
+ 
+ void SysFreeString(BSTR bstrString);
+@@ -906,6 +1035,7 @@ BSTR SysAllocStringLen(const OLECHAR *strIn, UINT ui);
+ 
+ //===--------------------------- BSTR Length ------------------------------===//
+ unsigned int SysStringLen(const BSTR bstrString);
++#endif // __MINGW32__
+ 
+ //===--------------------- UTF-8 Related Types ----------------------------===//
+ 
+@@ -1035,6 +1165,6 @@ public:
+ 
+ #endif // __cplusplus
+ 
+-#endif // _WIN32
++#endif // _MSC_VER
+ 
+ #endif // LLVM_SUPPORT_WIN_ADAPTER_H
+diff --git a/include/dxc/dxcapi.h b/include/dxc/dxcapi.h
+index 95cc56a0..928163da 100644
+--- a/include/dxc/dxcapi.h
++++ b/include/dxc/dxcapi.h
+@@ -13,7 +13,7 @@
+ #ifndef __DXC_API__
+ #define __DXC_API__
+ 
+-#ifdef _WIN32
++#ifdef _MSC_VER
+ #ifndef DXC_API_IMPORT
+ #define DXC_API_IMPORT __declspec(dllimport)
+ #endif
+@@ -25,11 +25,13 @@
+ 
+ #ifdef _WIN32
+ 
++#ifdef _MSC_VER
+ #ifndef CROSS_PLATFORM_UUIDOF
+ // Warning: This macro exists in WinAdapter.h as well
+ #define CROSS_PLATFORM_UUIDOF(interface, spec)                                 \
+   struct __declspec(uuid(spec)) interface;
+ #endif
++#endif
+ 
+ #else
+ 
+diff --git a/include/llvm/ADT/StringRef.h b/include/llvm/ADT/StringRef.h
+index c103fdbf..72918b5b 100644
+--- a/include/llvm/ADT/StringRef.h
++++ b/include/llvm/ADT/StringRef.h
+@@ -12,6 +12,7 @@
+ 
+ #include <algorithm>
+ #include <cassert>
++#include <cstdint>
+ #include <cstring>
+ #include <limits>
+ #include <string>
+@@ -570,24 +571,4 @@ namespace llvm {
+   template <> struct isPodLike<StringRef> { static const bool value = true; };
+ }
+ 
+-// HLSL Change Starts
+-// StringRef provides an operator string; that trips up the std::pair noexcept specification,
+-// which (a) enables the moves constructor (because conversion is allowed), but (b)
+-// misclassifies the the construction as nothrow.
+-namespace std {
+-  template<>
+-  struct is_nothrow_constructible <std::string, llvm::StringRef>
+-    : std::false_type {
+-  };
+-  template<>
+-  struct is_nothrow_constructible <std::string, llvm::StringRef &>
+-    : std::false_type {
+-  };
+-  template<>
+-  struct is_nothrow_constructible <std::string, const llvm::StringRef &>
+-    : std::false_type {
+-  };
+-}
+-// HLSL Change Ends
+-
+ #endif

@@ -1,0 +1,219 @@
+diff --git a/lib/DxcSupport/FileIOHelper.cpp b/lib/DxcSupport/FileIOHelper.cpp
+index ed2593df..de57555b 100644
+--- a/lib/DxcSupport/FileIOHelper.cpp
++++ b/lib/DxcSupport/FileIOHelper.cpp
+@@ -423,7 +423,7 @@ static HRESULT CodePageBufferToWide(UINT32 codePage, LPCVOID bufferPointer,
+ 
+   // Calculate the length of the buffer in wchar_t elements.
+   int numToConvertWide =
+-      MultiByteToWideChar(codePage, MB_ERR_INVALID_CHARS, (LPCSTR)bufferPointer,
++      Unicode::MultiByteToWideChar(codePage, MB_ERR_INVALID_CHARS, (LPCSTR)bufferPointer,
+                           bufferSize, nullptr, 0);
+   if (numToConvertWide == 0)
+     return HRESULT_FROM_WIN32(GetLastError());
+@@ -437,7 +437,7 @@ static HRESULT CodePageBufferToWide(UINT32 codePage, LPCVOID bufferPointer,
+   IFROOM(wideNewCopy.m_pData);
+ 
+   int numActuallyConvertedWide =
+-      MultiByteToWideChar(codePage, MB_ERR_INVALID_CHARS, (LPCSTR)bufferPointer,
++      Unicode::MultiByteToWideChar(codePage, MB_ERR_INVALID_CHARS, (LPCSTR)bufferPointer,
+                           bufferSize, wideNewCopy, buffSizeWide);
+ 
+   if (numActuallyConvertedWide == 0)
+@@ -490,7 +490,7 @@ static HRESULT CodePageBufferToUtf8(UINT32 codePage, LPCVOID bufferPointer,
+     return S_OK;
+   }
+ 
+-  int numToConvertUtf8 = WideCharToMultiByte(
++  int numToConvertUtf8 = Unicode::WideCharToMultiByte(
+       CP_UTF8, 0, wideChars, wideCharCount, NULL, 0, NULL, NULL);
+   if (numToConvertUtf8 == 0)
+     return HRESULT_FROM_WIN32(GetLastError());
+@@ -507,7 +507,7 @@ static HRESULT CodePageBufferToUtf8(UINT32 codePage, LPCVOID bufferPointer,
+   IFROOM(utf8NewCopy.m_pData);
+ 
+   int numActuallyConvertedUtf8 =
+-      WideCharToMultiByte(CP_UTF8, 0, wideChars, wideCharCount, utf8NewCopy,
++      Unicode::WideCharToMultiByte(CP_UTF8, 0, wideChars, wideCharCount, utf8NewCopy,
+                           buffSizeUtf8, NULL, NULL);
+   if (numActuallyConvertedUtf8 == 0)
+     return HRESULT_FROM_WIN32(GetLastError());
+diff --git a/lib/DxcSupport/Unicode.cpp b/lib/DxcSupport/Unicode.cpp
+index 1481ae27..80580307 100644
+--- a/lib/DxcSupport/Unicode.cpp
++++ b/lib/DxcSupport/Unicode.cpp
+@@ -9,7 +9,7 @@
+ //                                                                           //
+ ///////////////////////////////////////////////////////////////////////////////
+ 
+-#ifdef _WIN32
++#ifdef _MSC_VER
+ #include <specstrings.h>
+ #else
+ #include <clocale>
+@@ -17,14 +17,15 @@
+ #include "dxc/Support/Global.h"
+ #include "dxc/Support/Unicode.h"
+ #include "dxc/Support/WinIncludes.h"
+-#include <assert.h>
++#include <cassert>
++#include <new>
+ #include <string>
+ 
+-#ifndef _WIN32
++#ifndef _MSC_VER
+ // MultiByteToWideChar which is a Windows-specific method.
+ // This is a very simplistic implementation for non-Windows platforms. This
+ // implementation completely ignores CodePage and dwFlags.
+-int MultiByteToWideChar(uint32_t /*CodePage*/, uint32_t /*dwFlags*/,
++int Unicode::MultiByteToWideChar(uint32_t /*CodePage*/, uint32_t /*dwFlags*/,
+                         const char *lpMultiByteStr, int cbMultiByte,
+                         wchar_t *lpWideCharStr, int cchWideChar) {
+ 
+@@ -75,7 +76,7 @@ int MultiByteToWideChar(uint32_t /*CodePage*/, uint32_t /*dwFlags*/,
+ // WideCharToMultiByte is a Windows-specific method.
+ // This is a very simplistic implementation for non-Windows platforms. This
+ // implementation completely ignores CodePage and dwFlags.
+-int WideCharToMultiByte(uint32_t /*CodePage*/, uint32_t /*dwFlags*/,
++int Unicode::WideCharToMultiByte(uint32_t /*CodePage*/, uint32_t /*dwFlags*/,
+                         const wchar_t *lpWideCharStr, int cchWideChar,
+                         char *lpMultiByteStr, int cbMultiByte,
+                         const char * /*lpDefaultChar*/,
+@@ -127,7 +128,7 @@ int WideCharToMultiByte(uint32_t /*CodePage*/, uint32_t /*dwFlags*/,
+     return rv;
+   return rv + 1; // mbstowcs excludes the terminating character
+ }
+-#endif // _WIN32
++#endif // _MSC_VER
+ 
+ namespace Unicode {
+ 
+@@ -180,14 +181,14 @@ bool UTF8ToWideString(const char *pUTF8, size_t cbUTF8, std::wstring *pWide) {
+     return true;
+   }
+ 
+-  int cWide = ::MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, pUTF8,
++  int cWide = Unicode::MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, pUTF8,
+                                     cbUTF8, nullptr, 0);
+   if (cWide == 0)
+     return false;
+ 
+   pWide->resize(cWide);
+ 
+-  cWide = ::MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, pUTF8, cbUTF8,
++  cWide = Unicode::MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, pUTF8, cbUTF8,
+                                 &(*pWide)[0], pWide->size());
+   DXASSERT(cWide > 0, "otherwise contents changed");
+   DXASSERT((*pWide)[pWide->size()] == L'\0',
+@@ -255,14 +256,14 @@ std::string WideToUTF8StringOrThrow(const wchar_t *pWide) {
+ 
+ bool UTF8BufferToWideComHeap(const char *pUTF8, wchar_t **ppWide) throw() {
+   *ppWide = nullptr;
+-  int c = ::MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, pUTF8, -1,
++  int c = Unicode::MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, pUTF8, -1,
+                                 nullptr, 0);
+   if (c == 0)
+     return false;
+   CComHeapPtr<wchar_t> p;
+   if (!p.Allocate(c))
+     return false;
+-  DXVERIFY_NOMSG(0 < ::MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, pUTF8,
++  DXVERIFY_NOMSG(0 < Unicode::MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, pUTF8,
+                                            -1, p.m_pData, c));
+   *ppWide = p.Detach();
+   return true;
+@@ -282,7 +283,7 @@ bool UTF8BufferToWideBuffer(const char *pUTF8, int cbUTF8, wchar_t **ppWide,
+     return true;
+   }
+ 
+-  int c = ::MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, pUTF8, cbUTF8,
++  int c = Unicode::MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, pUTF8, cbUTF8,
+                                 nullptr, 0);
+   if (c == 0)
+     return false;
+@@ -297,7 +298,7 @@ bool UTF8BufferToWideBuffer(const char *pUTF8, int cbUTF8, wchar_t **ppWide,
+     return false;
+ 
+   int converted =
+-      ::MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, pUTF8, cbUTF8, p, c);
++      Unicode::MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, pUTF8, cbUTF8, p, c);
+   (void)converted;
+   DXASSERT(converted > 0, "otherwise contents have changed");
+   p[c - 1] = L'\0';
+@@ -322,7 +323,7 @@ bool WideBufferToUTF8Buffer(const wchar_t *pWide, int cWide, char **ppUTF8,
+     return true;
+   }
+ 
+-  int c1 = ::WideCharToMultiByte(CP_UTF8, // code page
++  int c1 = Unicode::WideCharToMultiByte(CP_UTF8, // code page
+                                  0,       // flags
+                                  pWide,   // string to convert
+                                  cWide, // size, in chars, of string to convert
+@@ -341,7 +342,7 @@ bool WideBufferToUTF8Buffer(const wchar_t *pWide, int cWide, char **ppUTF8,
+     return false;
+ 
+   int converted =
+-      ::WideCharToMultiByte(CP_UTF8, 0, pWide, cWide, p, c1, nullptr, nullptr);
++      Unicode::WideCharToMultiByte(CP_UTF8, 0, pWide, cWide, p, c1, nullptr, nullptr);
+   (void)converted;
+   DXASSERT(converted > 0, "otherwise contents have changed");
+   p[c1 - 1] = '\0';
+diff --git a/lib/DxcSupport/WinAdapter.cpp b/lib/DxcSupport/WinAdapter.cpp
+index c3aaab88..b0d815a9 100644
+--- a/lib/DxcSupport/WinAdapter.cpp
++++ b/lib/DxcSupport/WinAdapter.cpp
+@@ -10,7 +10,8 @@
+ #include "assert.h"
+ #include "dxc/Support/WinFunctions.h"
+ #include "dxc/Support/WinIncludes.h"
+-#ifndef _WIN32
++
++#ifndef _MSC_VER
+ 
+ #include "dxc/Support/Unicode.h"
+ 
+@@ -22,6 +23,7 @@ void *CAllocator::Reallocate(void *p, size_t nBytes) throw() {
+ void *CAllocator::Allocate(size_t nBytes) throw() { return malloc(nBytes); }
+ void CAllocator::Free(void *p) throw() { free(p); }
+ 
++#ifndef __MINGW32__
+ //===--------------------------- BSTR Allocation --------------------------===//
+ 
+ void SysFreeString(BSTR bstrString) {
+@@ -60,6 +62,7 @@ unsigned int SysStringLen(const BSTR bstrString) {
+ 
+   return blobIn[0] / sizeof(OLECHAR);
+ }
++#endif // __MINGW32__
+ 
+ //===--------------------------- CHandle -------------------------------===//
+ 
+@@ -92,12 +95,12 @@ WArgV::WArgV(int argc, const char **argv)
+     : WStringVector(argc), WCharPtrVector(argc) {
+   for (int i = 0; i < argc; ++i) {
+     std::string S(argv[i]);
+-    const int wideLength = ::MultiByteToWideChar(
++    const int wideLength = Unicode::MultiByteToWideChar(
+         CP_UTF8, MB_ERR_INVALID_CHARS, S.data(), S.size(), nullptr, 0);
+     assert(wideLength > 0 &&
+            "else it should have failed during size calculation");
+     WStringVector[i].resize(wideLength);
+-    ::MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, S.data(), S.size(),
++    Unicode::MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, S.data(), S.size(),
+                           &(WStringVector[i])[0], WStringVector[i].size());
+     WCharPtrVector[i] = WStringVector[i].data();
+   }
+diff --git a/lib/IR/PassRegistry.cpp b/lib/IR/PassRegistry.cpp
+index b77d2bf3..6b57363a 100644
+--- a/lib/IR/PassRegistry.cpp
++++ b/lib/IR/PassRegistry.cpp
+@@ -35,7 +35,9 @@ using namespace llvm;
+ // A simple global initialized at DllMain-time will do (still does more work
+ // than we should likely perform though).
+ static uint32_t g_PassRegistryTid;
++#ifdef _MSC_VER
+ extern "C" uint32_t __stdcall GetCurrentThreadId(void);
++#endif
+ static void CheckThreadId() {
+   if (g_PassRegistryTid == 0)
+     g_PassRegistryTid = GetCurrentThreadId();
