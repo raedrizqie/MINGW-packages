@@ -318,7 +318,7 @@ index cdaf2b2..d9f73b9 100644
      ]
    }
  
-+  if (!is_mingw) {
++  if (is_mingw) {
 +    sources -= [
 +      "dwrite_font_proxy/dwrite_font_proxy_win.cc",
 +      "dwrite_font_proxy/dwrite_font_proxy_win.h",
