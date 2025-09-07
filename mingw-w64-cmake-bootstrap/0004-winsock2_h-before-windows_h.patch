@@ -1,0 +1,67 @@
+diff --git a/Source/cmFileTimes.cxx b/Source/cmFileTimes.cxx
+index f8a94466..3524801a 100644
+--- a/Source/cmFileTimes.cxx
++++ b/Source/cmFileTimes.cxx
+@@ -11,8 +11,6 @@
+ #include "cm_sys_stat.h"
+ 
+ #if defined(_WIN32)
+-#  include <windows.h>
+-
+ #  include "cmSystemTools.h"
+ #else
+ #  include <cerrno>
+diff --git a/Source/cmStdIoTerminal.cxx b/Source/cmStdIoTerminal.cxx
+index 428f7c7f..2f4303b4 100644
+--- a/Source/cmStdIoTerminal.cxx
++++ b/Source/cmStdIoTerminal.cxx
+@@ -11,10 +11,6 @@
+ #include <cm/string_view>
+ #include <cmext/string_view>
+ 
+-#ifdef _WIN32
+-#  include <windows.h>
+-#endif
+-
+ #include <cm/optional>
+ 
+ #include "cmStdIoStream.h"
+diff --git a/Source/cmVSSetupHelper.h b/Source/cmVSSetupHelper.h
+index fd01202d..a2862f0d 100644
+--- a/Source/cmVSSetupHelper.h
++++ b/Source/cmVSSetupHelper.h
+@@ -11,8 +11,6 @@
+ #include <string>
+ #include <vector>
+ 
+-#include <windows.h>
+-
+ template <class T>
+ class SmartCOMPtr
+ {
+diff --git a/Source/cmWindowsRegistry.cxx b/Source/cmWindowsRegistry.cxx
+index 0a0add33..a03fe6be 100644
+--- a/Source/cmWindowsRegistry.cxx
++++ b/Source/cmWindowsRegistry.cxx
+@@ -23,8 +23,6 @@
+ 
+ #  include <cm/memory>
+ 
+-#  include <windows.h>
+-
+ #  include "cmMakefile.h"
+ #  include "cmStringAlgorithms.h"
+ #  include "cmValue.h"
+diff --git a/Utilities/cmlibuv/include/uv/win.h b/Utilities/cmlibuv/include/uv/win.h
+index 2662b0a2..38365a4f 100644
+--- a/Utilities/cmlibuv/include/uv/win.h
++++ b/Utilities/cmlibuv/include/uv/win.h
+@@ -53,6 +53,8 @@ typedef struct pollfd {
+ #undef _TCP_INITIAL_RTO_PARAMETERS
+ #undef TCP_INITIAL_RTO_PARAMETERS
+ #undef PTCP_INITIAL_RTO_PARAMETERS
++
++#define WIN32_LEAN_AND_MEAN
+ #include <windows.h>
+ 
+ #include <process.h>
