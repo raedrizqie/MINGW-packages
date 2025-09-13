@@ -1,20 +1,78 @@
+diff --git a/configure.cmake b/configure.cmake
+index 6b3b5f7..6d6ece1 100644
 --- a/configure.cmake
 +++ b/configure.cmake
-@@ -314,7 +314,7 @@
- qt_feature("webengine-system-re2" PRIVATE
-     LABEL "re2"
-     AUTODETECT FALSE
--    CONDITION UNIX AND TEST_re2
-+    CONDITION (UNIX OR MINGW) AND TEST_re2
+@@ -251,7 +251,7 @@ extern \"C\" {
+ #include \"libavformat/avformat.h\"
+ }
+ int main(void) {
+-#if LIBAVFORMAT_VERSION_MAJOR >= 59
++#if LIBAVFORMAT_VERSION_MAJOR < 61
+     AVStream stream;
+     auto first_dts = av_stream_get_first_dts(&stream);
+ #endif
+@@ -455,6 +455,8 @@ qt_webengine_configure_check("compiler"
+     CONDITION MSVC OR
+         (LINUX AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU") OR
+         (LINUX AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang") OR
++        (MINGW AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU") OR
++        (MINGW AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang") OR
+         (MACOS AND CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
+     MESSAGE
+         "${CMAKE_CXX_COMPILER_ID} compiler is not supported."
+@@ -473,21 +475,21 @@ qt_webengine_configure_check("compiler"
  )
+ qt_webengine_configure_check("visual-studio"
+     MODULES QtWebEngine QtPdf
+-    CONDITION NOT WIN32 OR NOT MSVC OR MSVC_TOOLSET_VERSION EQUAL 142 OR MSVC_TOOLSET_VERSION EQUAL 143
++    CONDITION NOT WIN32 OR NOT MSVC OR (NOT MINGW AND (MSVC_TOOLSET_VERSION EQUAL 142 OR MSVC_TOOLSET_VERSION EQUAL 143))
+     MESSAGE "Build requires Visual Studio 2019 or higher."
+     DOCUMENTATION "Visual Studio 2019 or higher."
+     TAGS WINDOWS_PLATFORM
+ )
+ qt_webengine_configure_check("msvc-2019"
+     MODULES QtWebEngine QtPdf
+-    CONDITION NOT WIN32 OR NOT MSVC OR NOT MSVC_TOOLSET_VERSION EQUAL 142 OR NOT MSVC_VERSION LESS 1929
++    CONDITION NOT WIN32 OR NOT MSVC OR (NOT MINGW AND (NOT MSVC_TOOLSET_VERSION EQUAL 142 OR NOT MSVC_VERSION LESS 1929))
+     MESSAGE "VS compiler version must be at least 14.29"
+     DOCUMENTATION "Visual Studio compiler version at least 14.29 if compiled with Visual Studio 2019"
+     TAGS WINDOWS_PLATFORM
+ )
+ qt_webengine_configure_check("msvc-2022"
+     MODULES QtWebEngine QtPdf
+-    CONDITION NOT WIN32 OR NOT MSVC OR NOT MSVC_TOOLSET_VERSION EQUAL 143 OR NOT MSVC_VERSION LESS 1936
++    CONDITION NOT WIN32 OR NOT MSVC OR (NOT MINGW AND (NOT MSVC_TOOLSET_VERSION EQUAL 143 OR NOT MSVC_VERSION LESS 1936))
+     MESSAGE "VS compiler version must be at least 14.36"
+     DOCUMENTATION "Visual Studio compiler version at least 14.36 if compiled with Visual Studio 2022"
+     TAGS WINDOWS_PLATFORM
+@@ -511,7 +513,7 @@ qt_webengine_configure_check("gcc-pdf"
+     TAGS LINUX_PLATFORM
+ )
+ 
+-if(WIN32)
++if(MSVC)
+     qt_webengine_get_windows_sdk_version(windows_sdk_version sdk_minor)
+     message("-- Windows 10 SDK version: ${windows_sdk_version}")
+     unset(windows_sdk_version)
+@@ -519,7 +521,7 @@ endif()
+ 
+ qt_webengine_configure_check("windows-sdk"
+     MODULES QtWebEngine
+-    CONDITION NOT WIN32 OR sdk_minor GREATER_EQUAL ${QT_CONFIGURE_CHECK_windows_sdk_version}
++    CONDITION NOT WIN32 OR (NOT MINGW AND sdk_minor GREATER_EQUAL ${QT_CONFIGURE_CHECK_windows_sdk_version})
+     MESSAGE "Build requires Windows 11 SDK at least version 10.0.${QT_CONFIGURE_CHECK_windows_sdk_version}.0"
+     DOCUMENTATION "Windows 11 SDK at least version 10.0.${QT_CONFIGURE_CHECK_windows_sdk_version}.0"
+     TAGS WINDOWS_PLATFORM
+@@ -607,7 +609,7 @@ qt_feature("webengine-system-re2" PRIVATE
  qt_feature("webengine-system-icu" PRIVATE
      LABEL "icu"
-@@ -330,15 +330,15 @@
+     AUTODETECT FALSE
+-    CONDITION UNIX AND NOT APPLE AND ICU_FOUND
++    CONDITION (UNIX OR MINGW) AND NOT APPLE AND ICU_FOUND
  )
  qt_feature("webengine-system-libwebp" PRIVATE
      LABEL "libwebp, libwebpmux and libwebpdemux"
--    CONDITION UNIX AND WEBP_FOUND
-+    CONDITION (UNIX OR MINGW) AND WEBP_FOUND
+@@ -615,11 +617,11 @@ qt_feature("webengine-system-libwebp" PRIVATE
  )
  qt_feature("webengine-system-libopenjpeg2" PRIVATE
      LABEL "libopenjpeg2"
@@ -28,7 +86,7 @@
  )
  qt_feature("webengine-system-ffmpeg" PRIVATE
      LABEL "ffmpeg"
-@@ -612,19 +612,19 @@
+@@ -629,11 +631,11 @@ qt_feature("webengine-system-ffmpeg" PRIVATE
  qt_feature("webengine-system-libvpx" PRIVATE
      LABEL "libvpx"
      AUTODETECT FALSE
@@ -42,8 +100,7 @@
  )
  qt_feature("webengine-system-glib" PRIVATE
      LABEL "glib"
--    CONDITION UNIX AND GLIB_FOUND
-+    CONDITION (UNIX OR MINGW) AND GLIB_FOUND
+@@ -641,7 +643,7 @@ qt_feature("webengine-system-glib" PRIVATE
  )
  qt_feature("webengine-system-zlib" PRIVATE
      LABEL "zlib"
@@ -52,7 +109,7 @@
  )
  qt_feature("webengine-qt-zlib" PRIVATE
      LABEL "qtzlib"
-@@ -634,27 +634,27 @@
+@@ -651,7 +653,7 @@ qt_feature("webengine-qt-zlib" PRIVATE
  )
  qt_feature("webengine-system-minizip" PRIVATE
      LABEL "minizip"
@@ -61,8 +118,7 @@
  )
  qt_feature("webengine-system-libevent" PRIVATE
      LABEL "libevent"
--    CONDITION UNIX AND LIBEVENT_FOUND
-+    CONDITION (UNIX OR MINGW) AND LIBEVENT_FOUND
+@@ -659,19 +661,19 @@ qt_feature("webengine-system-libevent" PRIVATE
  )
  qt_feature("webengine-system-libxml" PRIVATE
      LABEL "libxml2 and libxslt"
@@ -86,7 +142,7 @@
  )
  qt_feature("webengine-qt-libpng" PRIVATE
      LABEL "qtpng"
-@@ -401,7 +401,7 @@
+@@ -682,7 +684,7 @@ qt_feature("webengine-qt-libpng" PRIVATE
  )
  qt_feature("webengine-system-libjpeg" PRIVATE
      LABEL "jpeg"
@@ -95,7 +151,7 @@
  )
  qt_feature("webengine-qt-libjpeg" PRIVATE
      LABEL "qtjpeg"
-@@ -412,7 +412,7 @@
+@@ -693,7 +695,7 @@ qt_feature("webengine-qt-libjpeg" PRIVATE
  )
  qt_feature("webengine-system-harfbuzz" PRIVATE
      LABEL "harfbuzz"
@@ -104,7 +160,7 @@
  )
  qt_feature("webengine-qt-harfbuzz" PRIVATE
      LABEL "qtharfbuzz"
-@@ -423,7 +423,7 @@
+@@ -704,7 +706,7 @@ qt_feature("webengine-qt-harfbuzz" PRIVATE
  )
  qt_feature("webengine-system-freetype" PRIVATE
      LABEL "freetype"
