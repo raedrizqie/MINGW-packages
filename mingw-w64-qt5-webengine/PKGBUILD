@@ -153,9 +153,9 @@ build() {
   mv ${_pkgfn/-opensource/} qt5web
   mkdir -p build-${MSYSTEM} && cd build-${MSYSTEM}
 
-  #mv ${MINGW_PREFIX}/../bin/sh.exe ${MINGW_PREFIX}/../bin/sh_exe
+  export QMAKE_SH=''
 
-  qmake ../qt5web -unix \
+  qmake ../qt5web \
     CONFIG+=silent -- \
     -no-build-qtpdf \
     -no-ffmpeg \
