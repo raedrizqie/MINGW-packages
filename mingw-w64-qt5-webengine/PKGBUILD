@@ -8,7 +8,7 @@ pkgver=5.15.17
 pkgrel=1
 pkgdesc='Qt5 support for web applications using the Chromium browser project'
 arch=(any)
-mingw_arch=('clang64')
+mingw_arch=('clangarm64' 'ucrt64')
 msys2_references=(
   'archlinux: qt5-webengine'
 )
