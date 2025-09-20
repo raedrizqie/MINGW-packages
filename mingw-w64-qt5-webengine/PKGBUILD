@@ -8,7 +8,7 @@ pkgver=5.15.17
 pkgrel=1
 pkgdesc='Qt5 support for web applications using the Chromium browser project'
 arch=(any)
-mingw_arch=('clangarm64' 'ucrt64')
+mingw_arch=('clang64')
 msys2_references=(
   'archlinux: qt5-webengine'
 )
@@ -153,11 +153,11 @@ build() {
   mv ${_pkgfn/-opensource/} qt5web
   mkdir -p build-${MSYSTEM} && cd build-${MSYSTEM}
 
-  export QMAKE_SH=
-  export AUTOMOC_EXECUTABLE=moc.exe
+  export QMAKE_SH=""
+  export AUTOMOC_EXECUTABLE="moc.exe"
 
   qmake ../qt5web \
-    CONFIG+=silent -- \
+    "CONFIG+=silent" -- \
     -no-build-qtpdf \
     -no-ffmpeg \
     -webengine-icu
