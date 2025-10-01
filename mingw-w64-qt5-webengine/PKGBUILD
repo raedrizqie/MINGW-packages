@@ -155,13 +155,13 @@ build() {
   #export SHELL=sh.exe
   #export EXECSHELL=sh.exe
 
-  qmake SHELL=sh.exe ../${_pkgfn/-opensource/} \
+  qmake SHELL=cmd.exe ../${_pkgfn/-opensource/} \
     "CONFIG+=silent" -- \
     -no-build-qtpdf \
     -no-ffmpeg \
     -webengine-icu
 
-  make SHELL=sh.exe
+  make SHELL=cmd.exe
 }
 
 package_qt5-webengine() {
