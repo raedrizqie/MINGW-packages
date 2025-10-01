@@ -132,6 +132,18 @@ index dd63573..25be1e5 100644
    } else {
      sources += [ "machine_id_provider_nonwin.cc" ]
    }
+diff --git a/src/3rdparty/chromium/components/metrics/environment_recorder.h b/src/3rdparty/chromium/components/metrics/environment_recorder.h
+index 0042d2e..e3eb227 100644
+--- a/src/3rdparty/chromium/components/metrics/environment_recorder.h
++++ b/src/3rdparty/chromium/components/metrics/environment_recorder.h
+@@ -5,6 +5,7 @@
+ #ifndef COMPONENTS_METRICS_ENVIRONMENT_RECORDER_H_
+ #define COMPONENTS_METRICS_ENVIRONMENT_RECORDER_H_
+ 
++#include <cstdint>
+ #include <string>
+ 
+ #include "base/macros.h"
 diff --git a/src/3rdparty/chromium/components/os_crypt/BUILD.gn b/src/3rdparty/chromium/components/os_crypt/BUILD.gn
 index 380c8a7..6571df9 100644
 --- a/src/3rdparty/chromium/components/os_crypt/BUILD.gn

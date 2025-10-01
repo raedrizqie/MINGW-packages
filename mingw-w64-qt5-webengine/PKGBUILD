@@ -4,11 +4,11 @@ _realname=qt5-webengine
 pkgbase=mingw-w64-${_realname}
 pkgname=("${MINGW_PACKAGE_PREFIX}-${_realname}"
          "${MINGW_PACKAGE_PREFIX}-${_realname}-debug")
-pkgver=5.15.17
+pkgver=5.15.18
 pkgrel=1
 pkgdesc='Qt5 support for web applications using the Chromium browser project'
 arch=(any)
-mingw_arch=('ucrt64')
+mingw_arch=('ucrt64' 'clangarm64')
 msys2_references=(
   'archlinux: qt5-webengine'
 )
@@ -44,7 +44,7 @@ makedepends=("${MINGW_PACKAGE_PREFIX}-cc"
              "${MINGW_PACKAGE_PREFIX}-qt5-webchannel"
              "rsync")
 _pkgfn="${_realname/5-/}-everywhere-opensource-src-${pkgver}"
-source=("https://download.qt.io/official_releases/qt/${pkgver%.*}/${pkgver}/submodules/${_pkgfn}.tar.xz"
+source=("https://download.qt.io/archive/qt/${pkgver%.*}/${pkgver}/submodules/${_pkgfn}.tar.xz"
         0001-qmake-configure-fixes.patch
         0002-chromium-add-mingw-toolchain.patch
         0003-chromium-base.patch
@@ -68,8 +68,8 @@ source=("https://download.qt.io/official_releases/qt/${pkgver%.*}/${pkgver}/subm
         0105-chromium-third-party-ffmpeg.patch
         0106-chromium-third-party-pdfium.patch
         0107-chromium-third-party-perfetto.patch
-        0108-chromium-third-party-skia.patch
-        0109-chromium-third-party-vulkan.patch
+        0108-chromium-third-party-protobuf.patch
+        0109-chromium-third-party-skia.patch
         0110-chromium-third-party-webrtc.patch
         0111-chromium-third-party-others.patch
         0201-gn-mingw-fixes.patch)
@@ -140,8 +140,8 @@ prepare() {
     0105-chromium-third-party-ffmpeg.patch \
     0106-chromium-third-party-pdfium.patch \
     0107-chromium-third-party-perfetto.patch \
-    0108-chromium-third-party-skia.patch \
-    0109-chromium-third-party-vulkan.patch \
+    0108-chromium-third-party-protobuf.patch \
+    0109-chromium-third-party-skia.patch \
     0110-chromium-third-party-webrtc.patch \
     0111-chromium-third-party-others.patch
 
@@ -152,11 +152,18 @@ prepare() {
 build() {
   mkdir -p build-${MSYSTEM} && cd build-${MSYSTEM}
 
-  export SHELL=cmd.exe
-  export EXECSHELL=cmd.exe
+  local _arch=x86_64
+  if [[ ${CARCH} == aarch64 ]]; then
+    _arch=arm64
+  fi
 
-  qmake ../${_pkgfn/-opensource/} \
-    "CONFIG+=silent" -- \
+  export MSYS2_ENV_CONV_EXCL="QMAKE_MOC;QMAKE_UIC"
+
+  qmake-qt5 ../${_pkgfn/-opensource/} \
+    QMAKE_MOC=${MINGW_PREFIX/bin/moc \
+    QMAKE_UIC=${MINGW_PREFIX/bin/uic \
+    QT_ARCH=${_arch} \
+    CONFIG+=silent -- \
     -no-build-qtpdf \
     -no-ffmpeg \
     -webengine-icu

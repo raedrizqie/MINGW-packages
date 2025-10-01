@@ -11,6 +11,20 @@ index 5c5df36..474aaf3 100644
        cflags = [ "/wd4324" ]  # Structure was padded due to __declspec(align()),
                                # which is uninteresting.
      }
+
+diff --git a/src/3rdparty/chromium/mojo/public/tools/mojom/mojom_parser.py b/src/3rdparty/chromium/mojo/public/tools/mojom/mojom_parser.py
+index 12adbfb..c32c0d4 100755
+--- a/src/3rdparty/chromium/mojo/public/tools/mojom/mojom_parser.py
++++ b/src/3rdparty/chromium/mojo/public/tools/mojom/mojom_parser.py
+@@ -194,7 +194,7 @@ def _ParseMojoms(mojom_files,
+   abs_paths = dict(
+       (path, abs_path) for abs_path, path in mojom_files_to_parse.items())
+   for mojom_abspath, _ in mojom_files_to_parse.items():
+-    with codecs.open(mojom_abspath, encoding='utf-8') as f:
++    with open(mojom_abspath, encoding='utf-8') as f:
+       ast = parser.Parse(''.join(f.readlines()), mojom_abspath)
+       conditional_features.RemoveDisabledDefinitions(ast, enabled_features)
+       loaded_mojom_asts[mojom_abspath] = ast
 diff --git a/src/3rdparty/chromium/mojo/public/tools/mojom/mojom/fileutil.py b/src/3rdparty/chromium/mojo/public/tools/mojom/mojom/fileutil.py
 index bf626f5..e1c823d 100644
 --- a/src/3rdparty/chromium/mojo/public/tools/mojom/mojom/fileutil.py

@@ -1,3 +1,16 @@
+diff --git a/src/3rdparty/chromium/third_party/perfetto/BUILD.gn b/src/3rdparty/chromium/third_party/perfetto/BUILD.gn
+index ecae546..35736f2 100644
+--- a/src/3rdparty/chromium/third_party/perfetto/BUILD.gn
++++ b/src/3rdparty/chromium/third_party/perfetto/BUILD.gn
+@@ -223,7 +223,7 @@ if (!build_with_chromium) {
+       "src/tracing:platform_posix",
+     ]
+     sources = [ "include/perfetto/tracing.h" ]
+-    assert_no_deps = [ "//gn:protobuf_lite" ]
++    assert_no_deps = [ "gn:protobuf_lite" ]
+   }
+ }
+ 
 diff --git a/src/3rdparty/chromium/third_party/perfetto/gn/BUILD.gn b/src/3rdparty/chromium/third_party/perfetto/gn/BUILD.gn
 index fc5dcd8..85058ed 100644
 --- a/src/3rdparty/chromium/third_party/perfetto/gn/BUILD.gn
@@ -11,8 +24,21 @@ index fc5dcd8..85058ed 100644
        rebase_path("../buildtools/protobuf/src", root_build_dir),
      ]
    }
+diff --git a/src/3rdparty/chromium/third_party/perfetto/gn/perfetto.gni b/src/3rdparty/chromium/third_party/perfetto/gn/perfetto.gni
+index dd79c2a..ce6d890 100644
+--- a/src/3rdparty/chromium/third_party/perfetto/gn/perfetto.gni
++++ b/src/3rdparty/chromium/third_party/perfetto/gn/perfetto.gni
+@@ -197,7 +197,7 @@ declare_args() {
+   # Only for local development. When true the binaries (perfetto, traced, ...)
+   # are monolithic and don't use a common shared library. This is mainly to
+   # avoid LD_LIBRARY_PATH dances when testing locally.
+-  monolithic_binaries = false
++  monolithic_binaries = is_win
+ 
+   # Whether DLOG should be enabled on debug builds (""), all builds ("on"), or
+   # none ("off"). We disable it by default for embedders to avoid spamming their
 diff --git a/src/3rdparty/chromium/third_party/perfetto/gn/standalone/BUILD.gn b/src/3rdparty/chromium/third_party/perfetto/gn/standalone/BUILD.gn
-index 3938a89..5ea10ac 100644
+index 3938a89..2db7de7 100644
 --- a/src/3rdparty/chromium/third_party/perfetto/gn/standalone/BUILD.gn
 +++ b/src/3rdparty/chromium/third_party/perfetto/gn/standalone/BUILD.gn
 @@ -76,7 +76,9 @@ config("c++17") {
@@ -20,7 +46,7 @@ index 3938a89..5ea10ac 100644
  
  config("visibility_hidden") {
 -  cflags = [ "-fvisibility=hidden" ]
-+  if (!is_mingw) {
++  if (!is_win) {
 +    cflags = [ "-fvisibility=hidden" ]
 +  }
  }
@@ -46,16 +72,18 @@ index 3938a89..5ea10ac 100644
    if (!is_fuzzer) {
      cflags += [ "-Werror" ]
    }
-@@ -140,7 +147,7 @@ config("default") {
+@@ -140,8 +147,9 @@ config("default") {
        "-m32",
        "-lgcc",
      ]
 -  } else if (current_cpu == "arm64") {
 +  } else if (current_cpu == "x64" || current_cpu == "arm64") {
      cflags += [ "-fno-omit-frame-pointer" ]
++    ldflags += [ "-m64" ]
    }
  
-@@ -152,7 +159,11 @@ config("default") {
+   if (is_linux) {
+@@ -152,7 +160,11 @@ config("default") {
    }
  
    if (is_debug) {
@@ -68,7 +96,7 @@ index 3938a89..5ea10ac 100644
    }
  
    if (is_android) {
-@@ -227,6 +238,8 @@ config("release") {
+@@ -227,6 +239,8 @@ config("release") {
    }
    if (is_mac) {
      ldflags = [ "-dead_strip" ]
@@ -431,7 +459,7 @@ index 01bf02d..d0d0a09 100644
 +  constexpr int64_t kNanosecondsPerSecond = 1000 * 1000 * 1000;
 +  return TimeNanos(
 +      static_cast<int64_t>(thread_time_seconds * kNanosecondsPerSecond));
-+#endif  // !PERFETTO_BUILDFLAG(PERFETTO_ARCH_CPU_ARM64)
++#endif  // PERFETTO_BUILDFLAG(PERFETTO_ARCH_CPU_ARM64)
  }
  
  void SleepMicroseconds(unsigned interval_us) {

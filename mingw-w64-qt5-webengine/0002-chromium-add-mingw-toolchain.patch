@@ -45,10 +45,45 @@ index 8d9657d..78b57fb 100644
      testonly = true
  
 diff --git a/src/3rdparty/chromium/build/android/gyp/util/build_utils.py b/src/3rdparty/chromium/build/android/gyp/util/build_utils.py
-index 0229805..b43cb55 100644
+index 0229805..e076609 100644
 --- a/src/3rdparty/chromium/build/android/gyp/util/build_utils.py
 +++ b/src/3rdparty/chromium/build/android/gyp/util/build_utils.py
-@@ -625,7 +625,7 @@ def ExpandFileArgs(args):
+@@ -12,8 +12,8 @@ import fnmatch
+ import json
+ import logging
+ import os
+-import pipes
+ import re
++import shlex
+ import shutil
+ import stat
+ import subprocess
+@@ -189,16 +189,21 @@ class CalledProcessError(Exception):
+   exits with a non-zero exit code."""
+ 
+   def __init__(self, cwd, args, output):
+-    super(CalledProcessError, self).__init__()
++    super().__init__()
+     self.cwd = cwd
+     self.args = args
+     self.output = output
+ 
+   def __str__(self):
+     # A user should be able to simply copy and paste the command that failed
+-    # into their shell.
++    # into their shell (unless it is more than 200 chars).
++    # User can set PRINT_FULL_COMMAND=1 to always print the full command.
++    print_full = os.environ.get('PRINT_FULL_COMMAND', '0') != '0'
++    full_cmd = shlex.join(self.args)
++    short_cmd = textwrap.shorten(full_cmd, width=200)
++    printed_cmd = full_cmd if print_full else short_cmd
+     copyable_command = '( cd {}; {} )'.format(os.path.abspath(self.cwd),
+-        ' '.join(map(pipes.quote, self.args)))
++                                              printed_cmd)
+     return 'Command failed: {}\n{}'.format(copyable_command, self.output)
+ 
+ 
+@@ -625,7 +630,7 @@ def ExpandFileArgs(args):
    """
    new_args = list(args)
    file_jsons = dict()
@@ -221,7 +256,7 @@ index 3815dd6..281fdc1 100644
        [ "//build/config/win:default_cygprofile_instrumentation" ]
  }
 diff --git a/src/3rdparty/chromium/build/config/compiler/BUILD.gn b/src/3rdparty/chromium/build/config/compiler/BUILD.gn
-index b511a58..685dc83 100644
+index b511a58..a057541 100644
 --- a/src/3rdparty/chromium/build/config/compiler/BUILD.gn
 +++ b/src/3rdparty/chromium/build/config/compiler/BUILD.gn
 @@ -121,7 +121,7 @@ declare_args() {
@@ -233,6 +268,15 @@ index b511a58..685dc83 100644
  
    # Initialize all local variables with a pattern. This flag will fill
    # uninitialized floating-point types (and 32-bit pointers) with 0xFF and the
+@@ -193,7 +193,7 @@ if (is_win || is_android || (is_chromeos && is_chromeos_device)) {
+       # Allow downstream tools to set orderfile path with
+       # another variable.
+       chrome_orderfile_path = default_chrome_orderfile
+-    } else if (is_win && is_clang && is_official_build) {
++    } else if (is_msvc && is_clang && is_official_build) {
+       chrome_orderfile_path = "//chrome/build/chrome.$target_cpu.orderfile"
+     } else if (is_chromeos && is_chromeos_device) {
+       chrome_orderfile_path = "//chromeos/profiles/chromeos.orderfile.txt"
 @@ -268,7 +268,7 @@ config("compiler") {
  
    # In general, Windows is totally different, but all the other builds share
@@ -242,44 +286,40 @@ index b511a58..685dc83 100644
      # Common POSIX compiler flags setup.
      # --------------------------------
      cflags += [ "-fno-strict-aliasing" ]  # See http://crbug.com/32204
-@@ -371,7 +371,7 @@ config("compiler") {
-       ]
-     }
+@@ -480,7 +480,7 @@ config("compiler") {
+     cflags += [ "-fmerge-all-constants" ]
+   }
  
--    if (!is_nacl) {
-+    if (!is_nacl && !is_mingw) {
-       if (exclude_unwind_tables) {
-         cflags += [
-           "-fno-unwind-tables",
-@@ -484,11 +484,11 @@ config("compiler") {
+-  if (use_lld) {
++  if (!is_mingw && use_lld) {
      # TODO(thakis): Make the driver pass --color-diagnostics to the linker
      # if -fcolor-diagnostics is passed to it, and pass -fcolor-diagnostics
      # in ldflags instead.
--    if (is_win) {
-+    if (is_msvc) {
-       # On Windows, we call the linker directly, instead of calling it through
-       # the driver.
-       ldflags += [ "--color-diagnostics" ]
--    } else {
-+    } else if (!is_mingw) {
-       ldflags += [ "-Wl,--color-diagnostics" ]
-     }
-   }
 @@ -499,7 +499,7 @@ config("compiler") {
      ldflags += [ "-Wl,-z,keep-text-section-prefix" ]
    }
  
 -  if (is_clang && !is_nacl && !use_xcode_clang && !use_qt) {
-+  if (is_clang && !is_nacl && !use_xcode_clang && !use_qt && !is_mingw) {
++  if (is_clang && !is_nacl && !is_mingw && !use_xcode_clang && !use_qt) {
      cflags += [ "-fcrash-diagnostics-dir=" + clang_diagnostic_dir ]
  
      cflags += [
-@@ -539,7 +539,7 @@ config("compiler") {
+@@ -531,15 +531,15 @@ config("compiler") {
+ 
+   # C11/C++11 compiler flags setup.
+   # ---------------------------
+-  if (is_linux || is_chromeos || is_android || (is_nacl && is_clang) ||
++  if (is_linux || is_mingw || is_chromeos || is_android || (is_nacl && is_clang) ||
+       current_os == "aix") {
+     if (target_os == "android") {
+       cxx11_override = use_cxx11_on_android
+-    } else {
++    } else if (!is_mingw) {
        cxx11_override = use_cxx11
      }
  
 -    if (is_clang) {
-+    if (is_clang || is_mingw) {
++    if (is_clang && !is_mingw) {
        standard_prefix = "c"
  
        # Since we build with -std=c* and not -std=gnu*, _GNU_SOURCE will not be
@@ -292,12 +332,13 @@ index b511a58..685dc83 100644
        # This is a straight translation of the non-Windows flags below,
        # except we do not use the ThinLTO cache, which leaks temporary
        # files on Windows (https://crbug.com/871962).
-@@ -700,12 +700,12 @@ config("compiler") {
+@@ -699,13 +699,13 @@ config("compiler") {
+   }
  
    if (compiler_timing) {
-     if (is_clang && !is_nacl) {
--      if (is_win) {
-+      if (is_msvc) {
+-    if (is_clang && !is_nacl) {
++    if (is_clang && !is_nacl && !is_mingw) {
+       if (is_win) {
          cflags += [ "/clang:-ftime-trace" ]
        } else {
          cflags += [ "-ftime-trace" ]
@@ -505,35 +546,17 @@ index b511a58..685dc83 100644
      arflags = [ "/llvmlibthin" ]
    }
  }
-@@ -1816,7 +1878,7 @@ config("thin_archive") {
- # Note: exceptions are disallowed in Google code.
- 
- config("exceptions") {
--  if (is_win) {
-+  if (is_msvc) {
-     # Enables exceptions in the STL.
+@@ -1821,7 +1883,9 @@ config("exceptions") {
      if (!use_custom_libcxx) {
        defines = [ "_HAS_EXCEPTIONS=1" ]
-@@ -1829,7 +1891,7 @@ config("exceptions") {
- }
- 
- config("no_exceptions") {
--  if (is_win) {
-+  if (is_msvc) {
-     # Disables exceptions in the STL.
-     # libc++ uses the __has_feature macro to control whether to use exceptions,
-     # so defining this macro is unnecessary. Defining _HAS_EXCEPTIONS to 0 also
-@@ -1839,7 +1901,9 @@ config("no_exceptions") {
-     if (!use_custom_libcxx) {
-       defines = [ "_HAS_EXCEPTIONS=0" ]
      }
--  } else {
-+  } else if (!is_mingw) {
-+    # Do not explicitly set no-exceptions on MinGW, else we have to
-+    # unset it in many other places.
-     cflags_cc = [ "-fno-exceptions" ]
+-    cflags_cc = [ "/EHsc" ]
++    if (is_msvc) {
++      cflags_cc = [ "/EHsc" ]
++    }
+   } else {
+     cflags_cc = [ "-fexceptions" ]
      cflags_objcc = cflags_cc
-   }
 @@ -1890,7 +1954,7 @@ config("no_shorten_64_warnings") {
      if (is_clang) {
        cflags = [ "-Wno-shorten-64-to-32" ]
@@ -615,6 +638,15 @@ index b511a58..685dc83 100644
      if (is_clang) {
        cflags = [ "/Z7" ]  # Debug information in the .obj files.
      } else {
+@@ -2348,7 +2412,7 @@ config("symbols") {
+     }
+ 
+     # TODO(https://crbug.com/1050118): Investigate missing debug info on mac.
+-    if (is_clang && !is_nacl && !use_xcode_clang && !is_apple && !use_qt) {
++    if (is_clang && !is_nacl && !is_mingw && !use_xcode_clang && !is_apple && !use_qt) {
+       cflags += [
+         "-Xclang",
+         "-debug-info-kind=constructor",
 @@ -2403,7 +2467,7 @@ config("symbols") {
  # This config guarantees to hold symbol for stack trace which are shown to user
  # when crash happens in unittests running on buildbot.
@@ -642,8 +674,21 @@ index b511a58..685dc83 100644
    # Use orderfile for linking Chrome on win, android, and Chrome OS.
    # This config enables using an orderfile for linking in LLD.
    config("chrome_orderfile_config") {
+diff --git a/src/3rdparty/chromium/build/config/compiler/compiler.gni b/src/3rdparty/chromium/build/config/compiler/compiler.gni
+index cf8ddb7..1792f38 100644
+--- a/src/3rdparty/chromium/build/config/compiler/compiler.gni
++++ b/src/3rdparty/chromium/build/config/compiler/compiler.gni
+@@ -134,7 +134,7 @@ if (is_chromeos) {
+   enable_frame_pointers = true
+ } else if (is_win) {
+   # 64-bit Windows ABI doesn't support frame pointers.
+-  if (current_cpu == "x64") {
++  if (current_cpu == "x64" || current_cpu == "arm64") {
+     enable_frame_pointers = false
+   } else {
+     enable_frame_pointers = true
 diff --git a/src/3rdparty/chromium/build/config/gcc/BUILD.gn b/src/3rdparty/chromium/build/config/gcc/BUILD.gn
-index 154b259..02e448b 100644
+index 154b259..827e28c 100644
 --- a/src/3rdparty/chromium/build/config/gcc/BUILD.gn
 +++ b/src/3rdparty/chromium/build/config/gcc/BUILD.gn
 @@ -31,7 +31,9 @@ declare_args() {
@@ -651,12 +696,32 @@ index 154b259..02e448b 100644
  # See http://gcc.gnu.org/wiki/Visibility
  config("symbol_visibility_hidden") {
 -  cflags = [ "-fvisibility=hidden" ]
-+  if (current_os != "win") {
++  if (!is_win) {
 +    cflags = [ "-fvisibility=hidden" ]
 +  }
  
    # Visibility attribute is not supported on AIX.
    if (current_os != "aix") {
+@@ -63,7 +65,7 @@ config("symbol_visibility_default") {
+ #    configs += [ "//build/config/gcc:rpath_for_built_shared_libraries" ]
+ #  }
+ config("rpath_for_built_shared_libraries") {
+-  if (!is_android) {
++  if (!is_android && !is_win) {
+     # Note: Android doesn't support rpath.
+     if (current_toolchain != default_toolchain || gcc_target_rpath == "") {
+       ldflags = [
+@@ -91,7 +93,9 @@ if (is_component_build && !is_android) {
+ # Settings for executables.
+ config("executable_config") {
+   configs = executable_and_shared_library_configs_
+-  ldflags = [ "-pie" ]
++  if (!is_win) {
++    ldflags = [ "-pie" ]
++  }
+   if (is_android) {
+     ldflags += [
+       "-Bdynamic",
 diff --git a/src/3rdparty/chromium/build/config/linux/pkg-config.py b/src/3rdparty/chromium/build/config/linux/pkg-config.py
 index 5adf70c..4b8f95c 100755
 --- a/src/3rdparty/chromium/build/config/linux/pkg-config.py
@@ -1031,7 +1096,7 @@ index c699562..161dd7d 100644
  
  #define BUILD_PRECOMPILE_H_
 diff --git a/src/3rdparty/chromium/build/toolchain/gcc_solink_wrapper.py b/src/3rdparty/chromium/build/toolchain/gcc_solink_wrapper.py
-index 7c2722d..cb3bf1b 100755
+index 7c2722d..4b8f504 100755
 --- a/src/3rdparty/chromium/build/toolchain/gcc_solink_wrapper.py
 +++ b/src/3rdparty/chromium/build/toolchain/gcc_solink_wrapper.py
 @@ -22,6 +22,9 @@ import wrapper_utils
@@ -1039,7 +1104,7 @@ index 7c2722d..cb3bf1b 100755
    """Replaces: readelf -d $sofile | grep SONAME"""
    toc = ''
 +  # MinGW's readelf doesn't work on PE files
-+  if sys.platform == 'win32' and 'GCC' in sys.version:
++  if sys.platform == 'win32' and 'MINGW' in sys.version:
 +    return 0, toc
    readelf = subprocess.Popen(wrapper_utils.CommandToRun(
        [args.readelf, '-d', args.sofile]),
@@ -1049,7 +1114,7 @@ index 7c2722d..cb3bf1b 100755
    """Replaces: nm --format=posix -g -D -p $sofile | cut -f1-2 -d' '"""
    toc = ''
 +  # MinGW's nm doesn't work on PE/COFF files
-+  if sys.platform == 'win32' and 'GCC' in sys.version:
++  if sys.platform == 'win32' and 'MINGW' in sys.version:
 +    return 0, toc
    nm = subprocess.Popen(wrapper_utils.CommandToRun(
        [args.nm, '--format=posix', '-g', '-D', '-p', args.sofile]),
@@ -1401,7 +1466,7 @@ index 7485ae6..6a4a472 100644
  
  if __name__ == '__main__':
 diff --git a/src/3rdparty/chromium/build/util/lastchange.py b/src/3rdparty/chromium/build/util/lastchange.py
-index 874870a..c58d4a8 100755
+index 874870a..8938ebf 100755
 --- a/src/3rdparty/chromium/build/util/lastchange.py
 +++ b/src/3rdparty/chromium/build/util/lastchange.py
 @@ -191,7 +191,10 @@ def GetGitTopDirectory(source_dir):
@@ -1410,7 +1475,7 @@ index 874870a..c58d4a8 100755
    """
 -  return _RunGitCommand(source_dir, ['rev-parse', '--show-toplevel'])
 +  directory = _RunGitCommand(source_dir, ['rev-parse', '--show-toplevel'])
-+  if sys.platform == 'win32' and 'GCC' in sys.version:
++  if sys.platform == 'win32' and 'MINGW' in sys.version:
 +    return subprocess.check_output(["cygpath", "-w", directory]).strip(b"\n").decode()
 +  return directory
  
