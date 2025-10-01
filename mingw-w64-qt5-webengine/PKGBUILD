@@ -161,7 +161,7 @@ build() {
     -no-ffmpeg \
     -webengine-icu
 
-  ninja -C build
+  ninja
 }
 
 package_qt5-webengine() {
