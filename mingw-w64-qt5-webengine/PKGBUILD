@@ -152,16 +152,16 @@ prepare() {
 build() {
   mkdir -p build-${MSYSTEM} && cd build-${MSYSTEM}
 
-  export SHELL=sh.exe
-  export EXECSHELL=sh.exe
+  #export SHELL=sh.exe
+  #export EXECSHELL=sh.exe
 
-  qmake ../${_pkgfn/-opensource/} \
+  qmake SHELL=cmd.exe ../${_pkgfn/-opensource/} \
     "CONFIG+=silent" -- \
     -no-build-qtpdf \
     -no-ffmpeg \
     -webengine-icu
 
-  make
+  make SHELL=cmd.exe
 }
 
 package_qt5-webengine() {
