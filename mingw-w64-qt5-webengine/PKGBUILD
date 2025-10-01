@@ -152,8 +152,8 @@ prepare() {
 build() {
   mkdir -p build-${MSYSTEM} && cd build-${MSYSTEM}
 
-  export SHELL=cmd.exe
-  export EXECSHELL=cmd.exe
+  export SHELL=sh.exe
+  export EXECSHELL=sh.exe
 
   qmake ../${_pkgfn/-opensource/} \
     "CONFIG+=silent" -- \
