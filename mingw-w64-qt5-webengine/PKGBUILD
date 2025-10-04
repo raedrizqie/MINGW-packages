@@ -158,8 +158,8 @@ build() {
     -no-ffmpeg \
     -webengine-icu
 
-  undef SHELL
-  undef EXECSHELL
+  export SHELL=
+  export EXECSHELL=
 
   make SHELL="/bin/sh" EXECSHELL="/bin/sh"
 }
