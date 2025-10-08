@@ -4,11 +4,11 @@ _realname=qt6-webengine
 pkgbase=mingw-w64-${_realname}
 pkgname=("${MINGW_PACKAGE_PREFIX}-${_realname}"
          "${MINGW_PACKAGE_PREFIX}-${_realname}-debug")
-pkgver=6.9.2
+pkgver=6.10.2
 pkgrel=1
 pkgdesc='Provides support for web applications using the Chromium browser project'
 arch=(any)
-mingw_arch=('clang64' 'clangarm64')
+mingw_arch=('clang64')
 url='https://www.qt.io'
 msys2_references=(
   'archlinux: qt6-webengine'

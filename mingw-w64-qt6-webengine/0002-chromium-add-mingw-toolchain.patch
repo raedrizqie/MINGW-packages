@@ -322,19 +322,6 @@ index e3e582d..e0cebba 100755
      print("[[],[],[],[],[]]")
      return 0
  
-diff --git a/src/3rdparty/chromium/build/config/linux/pkg_config.gni b/src/3rdparty/chromium/build/config/linux/pkg_config.gni
-index 591afd7..9867714 100644
---- a/src/3rdparty/chromium/build/config/linux/pkg_config.gni
-+++ b/src/3rdparty/chromium/build/config/linux/pkg_config.gni
-@@ -111,7 +111,7 @@ template("pkg_config") {
-         include_relativized = rebase_path(include, root_build_dir)
-         cflags += [ "-isystem$include_relativized" ]
-       } else {
--        cflags += [ "-isystem$include" ]
-+        cflags += [ "-I$include" ]
-       }
-     }
- 
 diff --git a/src/3rdparty/chromium/build/config/sanitizers/BUILD.gn b/src/3rdparty/chromium/build/config/sanitizers/BUILD.gn
 index 77aad5e..ad54937 100644
 --- a/src/3rdparty/chromium/build/config/sanitizers/BUILD.gn
