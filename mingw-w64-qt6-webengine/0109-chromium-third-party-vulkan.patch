@@ -1,5 +1,5 @@
 diff --git a/src/3rdparty/chromium/third_party/vulkan-loader/src/BUILD.gn b/src/3rdparty/chromium/third_party/vulkan-loader/src/BUILD.gn
-index a5d768c..732cae0 100644
+index 40135e7..f9b0799 100644
 --- a/src/3rdparty/chromium/third_party/vulkan-loader/src/BUILD.gn
 +++ b/src/3rdparty/chromium/third_party/vulkan-loader/src/BUILD.gn
 @@ -37,7 +37,7 @@ if (is_win) {
@@ -30,8 +30,8 @@ index a5d768c..732cae0 100644
  }
  
  if (!is_android) {
-@@ -208,7 +211,13 @@ if (!is_android) {
-         "loader/loader.rc",
+@@ -228,7 +231,13 @@ if (!is_android) {
+         "$target_gen_dir/loader.rc",
          "loader/vulkan-1.def",
        ]
 -      if (!is_clang) {
@@ -45,21 +45,23 @@ index a5d768c..732cae0 100644
          cflags = [
            "/wd4054",  # Type cast from function pointer
            "/wd4055",  # Type cast from data pointer
-@@ -227,7 +236,11 @@ if (!is_android) {
+@@ -247,8 +256,12 @@ if (!is_android) {
        if (is_clang) {
          cflags = [ "-Wno-incompatible-pointer-types" ]
        }
 -      libs = [ "Cfgmgr32.lib" ]
+-      deps += [ ":gen_loader_rc" ]
 +      if (is_mingw) {
 +        libs = [ "cfgmgr32" ]
 +      } else {
 +        libs = [ "Cfgmgr32.lib" ]
++        deps += [ ":gen_loader_rc" ]
 +      }
      }
      if (is_linux || is_chromeos) {
        sources += [
 diff --git a/src/3rdparty/chromium/third_party/vulkan-loader/src/loader/loader_windows.c b/src/3rdparty/chromium/third_party/vulkan-loader/src/loader/loader_windows.c
-index db493c5..c417ab2 100644
+index f73659c..b8f701f 100644
 --- a/src/3rdparty/chromium/third_party/vulkan-loader/src/loader/loader_windows.c
 +++ b/src/3rdparty/chromium/third_party/vulkan-loader/src/loader/loader_windows.c
 @@ -95,6 +95,7 @@ void windows_initialization(void) {
@@ -70,7 +72,7 @@ index db493c5..c417ab2 100644
  BOOL WINAPI DllMain(HINSTANCE hinst, DWORD reason, LPVOID reserved) {
      (void)hinst;
      switch (reason) {
-@@ -112,6 +113,7 @@ BOOL WINAPI DllMain(HINSTANCE hinst, DWORD reason, LPVOID reserved) {
+@@ -116,6 +117,7 @@ BOOL WINAPI DllMain(HINSTANCE hinst, DWORD reason, LPVOID reserved) {
      }
      return TRUE;
  }

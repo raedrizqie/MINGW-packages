@@ -1,8 +1,8 @@
 diff --git a/src/3rdparty/chromium/content/app/content_main.cc b/src/3rdparty/chromium/content/app/content_main.cc
-index a18a470..59f7c44 100644
+index c18a42c..685fc92 100644
 --- a/src/3rdparty/chromium/content/app/content_main.cc
 +++ b/src/3rdparty/chromium/content/app/content_main.cc
-@@ -55,7 +55,9 @@
+@@ -59,7 +59,9 @@
  #include "base/win/process_startup_helper.h"
  #include "base/win/win_util.h"
  #include "base/win/windows_version.h"
@@ -12,7 +12,7 @@ index a18a470..59f7c44 100644
  #include "ui/gfx/switches.h"
  #endif
  
-@@ -245,7 +247,9 @@ NO_STACK_PROTECTOR int RunContentProcess(
+@@ -244,7 +246,9 @@ NO_STACK_PROTECTOR int RunContentProcess(
  
  #if BUILDFLAG(IS_WIN)
      base::win::RegisterInvalidParamHandler();
@@ -23,10 +23,10 @@ index a18a470..59f7c44 100644
  
  #if !BUILDFLAG(IS_ANDROID)
 diff --git a/src/3rdparty/chromium/content/browser/BUILD.gn b/src/3rdparty/chromium/content/browser/BUILD.gn
-index ce2c7bc..c040278 100644
+index 549fb4b..124da79 100644
 --- a/src/3rdparty/chromium/content/browser/BUILD.gn
 +++ b/src/3rdparty/chromium/content/browser/BUILD.gn
-@@ -2952,6 +2952,15 @@ jumbo_source_set("browser") {
+@@ -3027,6 +3027,15 @@ jumbo_source_set("browser") {
        "speech/tts_win_utils.h",
        "utility_sandbox_delegate_win.cc",
      ]
@@ -42,7 +42,7 @@ index ce2c7bc..c040278 100644
      deps += [
        "//components/app_launch_prefetch",
        "//content/utility:delegate_data",
-@@ -2961,17 +2970,31 @@ jumbo_source_set("browser") {
+@@ -3035,17 +3044,31 @@ jumbo_source_set("browser") {
        "//third_party/isimpledom",
        "//third_party/wtl",
      ]
@@ -86,10 +86,10 @@ index ce2c7bc..c040278 100644
      if (is_qtwebengine) {
         sources -= [ "accessibility/browser_accessibility_state_impl_win.cc" ]
 diff --git a/src/3rdparty/chromium/content/browser/browser_main_loop.cc b/src/3rdparty/chromium/content/browser/browser_main_loop.cc
-index 5b3d75a..a8d25e6 100644
+index 91a48be..583a864 100644
 --- a/src/3rdparty/chromium/content/browser/browser_main_loop.cc
 +++ b/src/3rdparty/chromium/content/browser/browser_main_loop.cc
-@@ -1229,7 +1229,7 @@ void BrowserMainLoop::ShutdownThreadsAndCleanUp() {
+@@ -1213,7 +1213,7 @@ void BrowserMainLoop::ShutdownThreadsAndCleanUp() {
  // On windows, the monitor needs to be destroyed on the same thread
  // as they were created. On Linux, the monitor will be deleted when IO thread
  // goes away.
@@ -98,7 +98,7 @@ index 5b3d75a..a8d25e6 100644
    system_message_window_.reset();
  #endif
  
-@@ -1407,7 +1407,7 @@ void BrowserMainLoop::PostCreateThreadsImpl() {
+@@ -1388,7 +1388,7 @@ void BrowserMainLoop::PostCreateThreadsImpl() {
  #endif
    }
  
@@ -170,10 +170,10 @@ index 5b1a74b..fc47fb7 100644
      write_handle_ = INVALID_HANDLE_VALUE;
  #else
 diff --git a/src/3rdparty/chromium/content/browser/media/capture/desktop_capture_device.cc b/src/3rdparty/chromium/content/browser/media/capture/desktop_capture_device.cc
-index 9d53cea..5370f0c 100644
+index 60eabf1..44191cb 100644
 --- a/src/3rdparty/chromium/content/browser/media/capture/desktop_capture_device.cc
 +++ b/src/3rdparty/chromium/content/browser/media/capture/desktop_capture_device.cc
-@@ -758,7 +758,7 @@ std::unique_ptr<media::VideoCaptureDevice> DesktopCaptureDevice::Create(
+@@ -754,7 +754,7 @@ std::unique_ptr<media::VideoCaptureDevice> DesktopCaptureDevice::Create(
    std::unique_ptr<webrtc::DesktopCapturer> capturer;
    std::unique_ptr<media::VideoCaptureDevice> result;
  
@@ -183,24 +183,26 @@ index 9d53cea..5370f0c 100644
  
    // We prefer to allow the WGC and DXGI capturers to embed the cursor when
 diff --git a/src/3rdparty/chromium/content/browser/media/key_system_support_win.cc b/src/3rdparty/chromium/content/browser/media/key_system_support_win.cc
-index 21496aa..52ede6b 100644
+index 40dc117..74e0b6b 100644
 --- a/src/3rdparty/chromium/content/browser/media/key_system_support_win.cc
 +++ b/src/3rdparty/chromium/content/browser/media/key_system_support_win.cc
-@@ -54,6 +54,7 @@ void GetMediaFoundationServiceCdmCapability(
-     const base::FilePath& cdm_path,
-     bool is_hw_secure,
+@@ -66,6 +66,7 @@ void GetMediaFoundationServiceCdmCapability(
      media::CdmCapabilityCB cdm_capability_cb) {
+   DVLOG(3) << __func__ << ": key_system=" << key_system
+            << ", is_hw_secure=" << is_hw_secure;
 +#if defined(COMPILER_MSVC)
    if (!media::MediaFoundationCdm::IsAvailable()) {
      DVLOG(1) << "MediaFoundationCdm not available!";
-     std::move(cdm_capability_cb).Run(std::nullopt);
-@@ -67,6 +68,11 @@ void GetMediaFoundationServiceCdmCapability(
-                       base::BindOnce(&OnKeySystemCapability, is_hw_secure,
-                                      std::move(cdm_capability_cb)),
-                       false, std::nullopt));
+     std::move(cdm_capability_cb)
+@@ -87,6 +88,13 @@ void GetMediaFoundationServiceCdmCapability(
+                   media::CdmCapabilityQueryStatus::kDisconnectionError),
+               base::unexpected(
+                   media::CdmCapabilityQueryStatus::kDisconnectionError))));
 +#else
 +  DVLOG(1) << "MediaFoundationCdm not available!";
-+  std::move(cdm_capability_cb).Run(absl::nullopt);
++  std::move(cdm_capability_cb)
++      .Run(base::unexpected(
++          media::CdmCapabilityQueryStatus::kMediaFoundationCdmNotSupported));
 +  return;
 +#endif
  }
@@ -265,10 +267,10 @@ index b76c20f..201427a 100644
  
    if (!collection_) {
 diff --git a/src/3rdparty/chromium/content/browser/renderer_host/media/media_stream_manager.cc b/src/3rdparty/chromium/content/browser/renderer_host/media/media_stream_manager.cc
-index 009bd02..5dcfe86 100644
+index 76af8e6..855394c 100644
 --- a/src/3rdparty/chromium/content/browser/renderer_host/media/media_stream_manager.cc
 +++ b/src/3rdparty/chromium/content/browser/renderer_host/media/media_stream_manager.cc
-@@ -1593,6 +1593,7 @@ MediaStreamManager::MediaStreamManager(
+@@ -1560,6 +1560,7 @@ MediaStreamManager::MediaStreamManager(
  
    DCHECK(audio_system_);
  
@@ -276,19 +278,19 @@ index 009bd02..5dcfe86 100644
    if (!video_capture_provider) {
      scoped_refptr<base::SingleThreadTaskRunner> device_task_runner;
  
-@@ -1639,6 +1640,7 @@ MediaStreamManager::MediaStreamManager(
+@@ -1606,6 +1607,7 @@ MediaStreamManager::MediaStreamManager(
  #endif
    }
    InitializeMaybeAsync(std::move(video_capture_provider));
 +#endif
  
    audio_service_listener_ = std::make_unique<AudioServiceListener>();
- }
+ 
 diff --git a/src/3rdparty/chromium/content/browser/speech/tts_platform_impl.cc b/src/3rdparty/chromium/content/browser/speech/tts_platform_impl.cc
-index 309c941..5b214d8 100644
+index 2a2c892..c024903 100644
 --- a/src/3rdparty/chromium/content/browser/speech/tts_platform_impl.cc
 +++ b/src/3rdparty/chromium/content/browser/speech/tts_platform_impl.cc
-@@ -22,7 +22,7 @@ TtsPlatform* TtsPlatform::GetInstance() {
+@@ -21,7 +21,7 @@ TtsPlatform* TtsPlatform::GetInstance() {
      return result;
  #endif
  
@@ -298,10 +300,10 @@ index 309c941..5b214d8 100644
    // client.
    //
 diff --git a/src/3rdparty/chromium/content/child/BUILD.gn b/src/3rdparty/chromium/content/child/BUILD.gn
-index 75bce1d..1d3736e 100644
+index bd706e8..740c856 100644
 --- a/src/3rdparty/chromium/content/child/BUILD.gn
 +++ b/src/3rdparty/chromium/content/child/BUILD.gn
-@@ -139,7 +139,15 @@ target(link_target_type, "child") {
+@@ -143,7 +143,15 @@ target(link_target_type, "child") {
      ]
    }
  
@@ -316,13 +318,13 @@ index 75bce1d..1d3736e 100644
 +
 +  if (is_msvc) {
      sources += [
-       "dwrite_font_proxy/dwrite_font_proxy_init_impl_win.cc",
-       "dwrite_font_proxy/dwrite_font_proxy_init_impl_win.h",
+       "child_process_sandbox_support_impl_win.cc",
+       "child_process_sandbox_support_impl_win.h",
 diff --git a/src/3rdparty/chromium/content/gpu/gpu_main.cc b/src/3rdparty/chromium/content/gpu/gpu_main.cc
-index d2be94d..d39dc74 100644
+index 5480d56..262b618 100644
 --- a/src/3rdparty/chromium/content/gpu/gpu_main.cc
 +++ b/src/3rdparty/chromium/content/gpu/gpu_main.cc
-@@ -235,7 +235,7 @@ int GpuMain(MainFunctionParams parameters) {
+@@ -240,7 +240,7 @@ int GpuMain(MainFunctionParams parameters) {
  
    base::TimeTicks start_time = base::TimeTicks::Now();
  
@@ -332,10 +334,10 @@ index d2be94d..d39dc74 100644
  
    // Prevent Windows from displaying a modal dialog on failures like not being
 diff --git a/src/3rdparty/chromium/content/ppapi_plugin/ppapi_plugin_main.cc b/src/3rdparty/chromium/content/ppapi_plugin/ppapi_plugin_main.cc
-index bd37f0d..86145dc 100644
+index b784a12..2c4704e 100644
 --- a/src/3rdparty/chromium/content/ppapi_plugin/ppapi_plugin_main.cc
 +++ b/src/3rdparty/chromium/content/ppapi_plugin/ppapi_plugin_main.cc
-@@ -160,7 +160,7 @@ int PpapiPluginMain(MainFunctionParams parameters) {
+@@ -158,7 +158,7 @@ int PpapiPluginMain(MainFunctionParams parameters) {
      tracing::EnableStartupTracingIfNeeded();
    }
  
@@ -344,7 +346,7 @@ index bd37f0d..86145dc 100644
    if (!base::win::IsUser32AndGdi32Available())
      gfx::win::InitializeDirectWrite();
    InitializeDWriteFontProxy();
-@@ -182,7 +182,7 @@ int PpapiPluginMain(MainFunctionParams parameters) {
+@@ -180,7 +180,7 @@ int PpapiPluginMain(MainFunctionParams parameters) {
  
    run_loop.Run();
  
@@ -354,7 +356,7 @@ index bd37f0d..86145dc 100644
  #endif
    return 0;
 diff --git a/src/3rdparty/chromium/content/renderer/renderer_main_platform_delegate_win.cc b/src/3rdparty/chromium/content/renderer/renderer_main_platform_delegate_win.cc
-index 2fa80da..c69adf2 100644
+index e54dcaa..9ba66c5 100644
 --- a/src/3rdparty/chromium/content/renderer/renderer_main_platform_delegate_win.cc
 +++ b/src/3rdparty/chromium/content/renderer/renderer_main_platform_delegate_win.cc
 @@ -54,16 +54,20 @@ void RendererMainPlatformDelegate::PlatformInitialize() {
@@ -362,10 +364,10 @@ index 2fa80da..c69adf2 100644
    }
  
 +#if defined(COMPILER_MSVC)
-   // Do not initialize DWriteFactory if the SkiaFontService feature is enabled
+   // Do not initialize DWriteFactory if the feature flag is enabled
    // since this will conflict with the experimental font manager.
    if (!base::CommandLine::ForCurrentProcess()->HasSwitch(
-           switches::kUseSkiaFontManager)) {
+           switches::kUseFontDataManager)) {
      InitializeDWriteFontProxy();
    }
 +#endif
@@ -379,10 +381,10 @@ index 2fa80da..c69adf2 100644
  
  bool RendererMainPlatformDelegate::EnableSandbox() {
 diff --git a/src/3rdparty/chromium/content/shell/BUILD.gn b/src/3rdparty/chromium/content/shell/BUILD.gn
-index fe4a3de..aa8e3dc 100644
+index 72300bf..3deb882 100644
 --- a/src/3rdparty/chromium/content/shell/BUILD.gn
 +++ b/src/3rdparty/chromium/content/shell/BUILD.gn
-@@ -1086,7 +1086,7 @@ group("content_shell_crash_test") {
+@@ -1085,7 +1085,7 @@ group("content_shell_crash_test") {
        "//components/crash/content/tools/dmp2minidump.py",
      ]
    }
@@ -392,10 +394,10 @@ index fe4a3de..aa8e3dc 100644
    }
    if (is_posix) {
 diff --git a/src/3rdparty/chromium/content/utility/services.cc b/src/3rdparty/chromium/content/utility/services.cc
-index ec15b74..4388bca 100644
+index 8624628..0f87d29 100644
 --- a/src/3rdparty/chromium/content/utility/services.cc
 +++ b/src/3rdparty/chromium/content/utility/services.cc
-@@ -303,7 +303,7 @@ auto RunAccessibilityService(
+@@ -299,7 +299,7 @@ auto RunAccessibilityService(
  }
  #endif  // BUILDFLAG(ENABLE_ACCESSIBILITY_SERVICE)
  
@@ -404,7 +406,7 @@ index ec15b74..4388bca 100644
  std::unique_ptr<media::MediaFoundationServiceBroker>
  RunMediaFoundationServiceBroker(
      mojo::PendingReceiver<media::mojom::MediaFoundationServiceBroker>
-@@ -311,7 +311,7 @@ RunMediaFoundationServiceBroker(
+@@ -307,7 +307,7 @@ RunMediaFoundationServiceBroker(
    return std::make_unique<media::MediaFoundationServiceBroker>(
        std::move(receiver), base::BindOnce(&EnsureSandboxedWin));
  }
@@ -413,7 +415,7 @@ index ec15b74..4388bca 100644
  
  #if BUILDFLAG(IS_ANDROID)
  auto RunMediaDrmSupportService(
-@@ -473,9 +473,9 @@ void RegisterMainThreadServices(mojo::ServiceFactory& services) {
+@@ -459,9 +459,9 @@ void RegisterMainThreadServices(mojo::ServiceFactory& services) {
    services.Add(RunCdmServiceBroker);
  #endif
  

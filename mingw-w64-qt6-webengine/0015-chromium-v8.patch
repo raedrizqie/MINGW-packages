@@ -1,21 +1,17 @@
 diff --git a/src/3rdparty/chromium/v8/BUILD.gn b/src/3rdparty/chromium/v8/BUILD.gn
-index dcc3acb..8271aca 100644
+index 2a36740..d9c64ae 100644
 --- a/src/3rdparty/chromium/v8/BUILD.gn
 +++ b/src/3rdparty/chromium/v8/BUILD.gn
-@@ -37,10 +37,10 @@ declare_args() {
+@@ -37,7 +37,7 @@ declare_args() {
    v8_enable_future = false
  
    # Sets -DENABLE_SYSTEM_INSTRUMENTATION. Enables OS-dependent event tracing
 -  v8_enable_system_instrumentation = (is_win || is_mac) && !v8_use_perfetto
 +  v8_enable_system_instrumentation = (is_msvc || is_mac) && !v8_use_perfetto
  
-   # Sets -DV8_ENABLE_ETW_STACK_WALKING. Enables ETW Stack Walking
--  v8_enable_etw_stack_walking = is_win
-+  v8_enable_etw_stack_walking = is_msvc
- 
    # Sets the GUID for the ETW provider
    v8_etw_guid = ""
-@@ -1469,18 +1469,22 @@ config("toolchain") {
+@@ -1559,18 +1559,22 @@ config("toolchain") {
  
    if (v8_current_cpu == "x86") {
      defines += [ "V8_TARGET_ARCH_IA32" ]
@@ -40,7 +36,7 @@ index dcc3acb..8271aca 100644
      }
    }
    if (is_android && v8_android_log_stdout) {
-@@ -1508,7 +1512,7 @@ config("toolchain") {
+@@ -1598,7 +1602,7 @@ config("toolchain") {
    }
  
    if (v8_no_inline) {
@@ -49,25 +45,7 @@ index dcc3acb..8271aca 100644
        cflags += [ "/Ob0" ]
      } else {
        cflags += [
-@@ -1546,7 +1550,7 @@ config("toolchain") {
-     ]
-   }
- 
--  if (is_win) {
-+  if (is_msvc) {
-     cflags += [
-       "/wd4245",  # Conversion with signed/unsigned mismatch.
-       "/wd4267",  # Conversion with possible loss of data.
-@@ -1570,7 +1574,7 @@ config("toolchain") {
-     ]
-   }
- 
--  if (!is_clang && is_win) {
-+  if (!is_clang && is_msvc) {
-     cflags += [
-       "/wd4506",  # Benign "no definition for inline function"
- 
-@@ -1711,7 +1715,7 @@ config("toolchain") {
+@@ -1643,7 +1647,7 @@ config("toolchain") {
      ]
    }
  
@@ -76,7 +54,16 @@ index dcc3acb..8271aca 100644
      cflags += [
        # Disable gcc warnings for optimizations based on the assumption that
        # signed overflow does not occur. Generates false positives (see
-@@ -6351,7 +6355,7 @@ v8_source_set("v8_base_without_compiler") {
+@@ -6223,7 +6227,7 @@ v8_source_set("v8_base_without_compiler") {
+   }
+ 
+   # Architecture independent but platform-specific sources
+-  if (is_win) {
++  if (is_msvc) {
+     if (v8_enable_etw_stack_walking) {
+       sources += [
+         "src/diagnostics/etw-debug-win.cc",
+@@ -6284,7 +6288,7 @@ v8_source_set("v8_base_without_compiler") {
    if (v8_enable_i18n_support) {
      deps += [ ":run_gen-regexp-special-case" ]
      sources += [ "$target_gen_dir/src/regexp/special-case.cc" ]
@@ -85,7 +72,7 @@ index dcc3acb..8271aca 100644
        deps += [ "$v8_icu_path:icudata" ]
      }
    } else {
-@@ -6776,11 +6780,19 @@ v8_component("v8_libbase") {
+@@ -6710,11 +6714,19 @@ v8_component("v8_libbase") {
  
      defines += [ "_CRT_RAND_S" ]  # for rand_s()
  
@@ -110,42 +97,21 @@ index dcc3acb..8271aca 100644
  
      if (v8_enable_etw_stack_walking) {
        libs += [ "advapi32.lib" ]  # Needed for TraceLoggingProvider.h
-@@ -7001,9 +7013,9 @@ v8_source_set("v8_heap_base") {
-     "src/heap/base/worklist.cc",
-   ]
+diff --git a/src/3rdparty/chromium/v8/gni/v8.gni b/src/3rdparty/chromium/v8/gni/v8.gni
+index 6428021..2256286 100644
+--- a/src/3rdparty/chromium/v8/gni/v8.gni
++++ b/src/3rdparty/chromium/v8/gni/v8.gni
+@@ -184,7 +184,7 @@ declare_args() {
+   v8_enable_memory_sealing = false
  
--  if (is_clang || !is_win) {
-+  if (is_clang || !is_msvc) {
-     if (current_cpu == "x64") {
--      if (is_win) {
-+      if (is_msvc) {
-         # Prefer a masm version with unwind directives.
-         sources += [ "src/heap/base/asm/x64/push_registers_masm.asm" ]
-       } else {
-@@ -7028,7 +7040,7 @@ v8_source_set("v8_heap_base") {
-     } else if (current_cpu == "riscv64" || current_cpu == "riscv32") {
-       sources += [ "src/heap/base/asm/riscv/push_registers_asm.cc" ]
-     }
--  } else if (is_win) {
-+  } else if (is_msvc) {
-     if (current_cpu == "x64") {
-       sources += [ "src/heap/base/asm/x64/push_registers_masm.asm" ]
-     } else if (current_cpu == "x86") {
-diff --git a/src/3rdparty/chromium/v8/include/v8-fast-api-calls.h b/src/3rdparty/chromium/v8/include/v8-fast-api-calls.h
-index 1846668..052ac9c 100644
---- a/src/3rdparty/chromium/v8/include/v8-fast-api-calls.h
-+++ b/src/3rdparty/chromium/v8/include/v8-fast-api-calls.h
-@@ -328,7 +328,7 @@ class CTypeInfo {
- struct FastApiTypedArrayBase {
-  public:
-   // Returns the length in number of elements.
--  size_t V8_EXPORT length() const { return length_; }
-+  size_t length() const { return length_; }
-   // Checks whether the given index is within the bounds of the collection.
-   void V8_EXPORT ValidateIndex(size_t index) const;
+   # Sets -DV8_ENABLE_ETW_STACK_WALKING. Enables ETW Stack Walking
+-  v8_enable_etw_stack_walking = is_win
++  v8_enable_etw_stack_walking = is_msvc
+ }
  
+ if (v8_use_external_startup_data == "") {
 diff --git a/src/3rdparty/chromium/v8/include/v8config.h b/src/3rdparty/chromium/v8/include/v8config.h
-index 68d8065..cf92682 100644
+index e8bb19d..bdabd40 100644
 --- a/src/3rdparty/chromium/v8/include/v8config.h
 +++ b/src/3rdparty/chromium/v8/include/v8config.h
 @@ -360,6 +360,13 @@ path. Add it with -I<path> to the command line
@@ -162,7 +128,7 @@ index 68d8065..cf92682 100644
  #endif
  
  # define V8_HAS_ATTRIBUTE_ALWAYS_INLINE (__has_attribute(always_inline))
-@@ -814,7 +821,7 @@ V8 shared library set USING_V8_SHARED.
+@@ -824,7 +831,7 @@ V8 shared library set USING_V8_SHARED.
  #elif defined(_M_IX86) || defined(__i386__)
  #define V8_HOST_ARCH_IA32 1
  #define V8_HOST_ARCH_32_BIT 1
@@ -171,7 +137,7 @@ index 68d8065..cf92682 100644
  #define V8_HOST_ARCH_ARM64 1
  #define V8_HOST_ARCH_64_BIT 1
  #elif defined(__ARMEL__)
-@@ -864,7 +871,7 @@ V8 shared library set USING_V8_SHARED.
+@@ -870,7 +877,7 @@ V8 shared library set USING_V8_SHARED.
  #define V8_TARGET_ARCH_X64 1
  #elif defined(_M_IX86) || defined(__i386__)
  #define V8_TARGET_ARCH_IA32 1
@@ -181,7 +147,7 @@ index 68d8065..cf92682 100644
  #elif defined(__ARMEL__)
  #define V8_TARGET_ARCH_ARM 1
 diff --git a/src/3rdparty/chromium/v8/src/base/bits.h b/src/3rdparty/chromium/v8/src/base/bits.h
-index d9ae9d6..72a04f2 100644
+index 7d7b232..16cbbf9 100644
 --- a/src/3rdparty/chromium/v8/src/base/bits.h
 +++ b/src/3rdparty/chromium/v8/src/base/bits.h
 @@ -17,6 +17,13 @@
@@ -227,19 +193,10 @@ index 861cfe4..8107672 100644
  #undef EXPORT_TEMPLATE_TEST
  #undef EXPORT_TEMPLATE_TEST_DEFAULT_DEFAULT
 diff --git a/src/3rdparty/chromium/v8/src/base/macros.h b/src/3rdparty/chromium/v8/src/base/macros.h
-index 488729d..38423e8 100644
+index 4684ade..cfe7dee 100644
 --- a/src/3rdparty/chromium/v8/src/base/macros.h
 +++ b/src/3rdparty/chromium/v8/src/base/macros.h
-@@ -192,7 +192,7 @@ V8_INLINE Dest bit_cast(Source const& source) {
- // DISABLE_CFI_ICALL -- Disable Control Flow Integrity indirect call checks,
- // useful because calls into JITed code can not be CFI verified. Same for
- // UBSan's function pointer type checks.
--#ifdef V8_OS_WIN
-+#ifdef V8_CC_MSVC
- // On Windows, also needs __declspec(guard(nocf)) for CFG.
- #define DISABLE_CFI_ICALL           \
-   V8_CLANG_NO_SANITIZE("cfi-icall") \
-@@ -297,8 +297,12 @@ V8_INLINE A implicit_cast(A x) {
+@@ -304,8 +304,12 @@ V8_INLINE A implicit_cast(A x) {
  # else
  #  define V8_PTR_PREFIX   ""
  # endif  // V8_HOST_ARCH_64_BIT
@@ -255,7 +212,7 @@ index 488729d..38423e8 100644
  # define V8_PTR_PREFIX    "l"
  #else
 diff --git a/src/3rdparty/chromium/v8/src/base/platform/platform-win32.cc b/src/3rdparty/chromium/v8/src/base/platform/platform-win32.cc
-index 5fb76f4..35207fc 100644
+index 95805a8..0b5b214 100644
 --- a/src/3rdparty/chromium/v8/src/base/platform/platform-win32.cc
 +++ b/src/3rdparty/chromium/v8/src/base/platform/platform-win32.cc
 @@ -80,7 +80,6 @@ inline void MemoryFence() {
@@ -336,7 +293,7 @@ index 4bede53..ab76910 100644
  double ThreadTicks::TSCTicksPerSecond() {
    DCHECK(IsSupported());
 diff --git a/src/3rdparty/chromium/v8/src/common/assert-scope.h b/src/3rdparty/chromium/v8/src/common/assert-scope.h
-index b003a75..e9b9e8f 100644
+index f9e8542..123b693 100644
 --- a/src/3rdparty/chromium/v8/src/common/assert-scope.h
 +++ b/src/3rdparty/chromium/v8/src/common/assert-scope.h
 @@ -65,7 +65,7 @@ class V8_NODISCARD PerThreadAssertScope
@@ -349,10 +306,10 @@ index b003a75..e9b9e8f 100644
    void Release();
  
 diff --git a/src/3rdparty/chromium/v8/src/diagnostics/unwinding-info-win64.cc b/src/3rdparty/chromium/v8/src/diagnostics/unwinding-info-win64.cc
-index a71b866..5c8c601 100644
+index 1312609..0290c5a 100644
 --- a/src/3rdparty/chromium/v8/src/diagnostics/unwinding-info-win64.cc
 +++ b/src/3rdparty/chromium/v8/src/diagnostics/unwinding-info-win64.cc
-@@ -471,7 +471,7 @@ static decltype(
+@@ -473,7 +473,7 @@ static decltype(
  void LoadNtdllUnwindingFunctionsOnce() {
    // Load functions from the ntdll.dll module.
    HMODULE ntdll_module =
@@ -362,10 +319,10 @@ index a71b866..5c8c601 100644
  
    // This fails on Windows 7.
 diff --git a/src/3rdparty/chromium/v8/src/profiler/heap-snapshot-generator.cc b/src/3rdparty/chromium/v8/src/profiler/heap-snapshot-generator.cc
-index 5b7a1fe..ae1d55a 100644
+index 53bdb78..16354fb 100644
 --- a/src/3rdparty/chromium/v8/src/profiler/heap-snapshot-generator.cc
 +++ b/src/3rdparty/chromium/v8/src/profiler/heap-snapshot-generator.cc
-@@ -422,11 +422,11 @@ HeapSnapshot::HeapSnapshot(HeapProfiler* profiler,
+@@ -426,11 +426,11 @@ HeapSnapshot::HeapSnapshot(HeapProfiler* profiler,
    static_assert(kSystemPointerSize != 4 || sizeof(HeapGraphEdge) == 12);
    static_assert(kSystemPointerSize != 8 || sizeof(HeapGraphEdge) == 24);
    static_assert(kSystemPointerSize != 4 || sizeof(HeapEntry) == 32);

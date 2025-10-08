@@ -1,5 +1,5 @@
 diff --git a/src/3rdparty/chromium/third_party/pdfium/BUILD.gn b/src/3rdparty/chromium/third_party/pdfium/BUILD.gn
-index e5cedba..9530435 100644
+index acb6ef6..9c0b29b 100644
 --- a/src/3rdparty/chromium/third_party/pdfium/BUILD.gn
 +++ b/src/3rdparty/chromium/third_party/pdfium/BUILD.gn
 @@ -204,6 +204,9 @@ config("pdfium_common_config") {
@@ -22,7 +22,7 @@ index e5cedba..9530435 100644
        # Override -Wno-narrowing for GCC.
        "-Wnarrowing",
 diff --git a/src/3rdparty/chromium/third_party/pdfium/skia/BUILD.gn b/src/3rdparty/chromium/third_party/pdfium/skia/BUILD.gn
-index 118fb73..95c960a 100644
+index 234ebd7..d38eb81 100644
 --- a/src/3rdparty/chromium/third_party/pdfium/skia/BUILD.gn
 +++ b/src/3rdparty/chromium/third_party/pdfium/skia/BUILD.gn
 @@ -176,11 +176,13 @@ config("skia_library_config") {

@@ -1,8 +1,8 @@
 diff --git a/src/3rdparty/chromium/media/audio/BUILD.gn b/src/3rdparty/chromium/media/audio/BUILD.gn
-index f5ef67e..aaa14f5 100644
+index 34691ac..9229a45 100644
 --- a/src/3rdparty/chromium/media/audio/BUILD.gn
 +++ b/src/3rdparty/chromium/media/audio/BUILD.gn
-@@ -231,14 +231,32 @@ jumbo_source_set("audio") {
+@@ -232,14 +232,32 @@ jumbo_source_set("audio") {
        "win/waveout_output_win.cc",
        "win/waveout_output_win.h",
      ]
@@ -42,10 +42,10 @@ index f5ef67e..aaa14f5 100644
  
    if (is_android) {
 diff --git a/src/3rdparty/chromium/media/audio/audio_manager.cc b/src/3rdparty/chromium/media/audio/audio_manager.cc
-index a75d9a4..9c08adc 100644
+index 4febfda..40dc9e9 100644
 --- a/src/3rdparty/chromium/media/audio/audio_manager.cc
 +++ b/src/3rdparty/chromium/media/audio/audio_manager.cc
-@@ -112,12 +112,16 @@ AudioManager::~AudioManager() {
+@@ -108,12 +108,16 @@ AudioManager::~AudioManager() {
  std::unique_ptr<AudioManager> AudioManager::Create(
      std::unique_ptr<AudioThread> audio_thread,
      AudioLogFactory* audio_log_factory) {
@@ -63,7 +63,7 @@ index a75d9a4..9c08adc 100644
  
  // static
 diff --git a/src/3rdparty/chromium/media/audio/simple_sources.cc b/src/3rdparty/chromium/media/audio/simple_sources.cc
-index 71f49e7..c1125f0 100644
+index 6fd3b7e..db56ec9 100644
 --- a/src/3rdparty/chromium/media/audio/simple_sources.cc
 +++ b/src/3rdparty/chromium/media/audio/simple_sources.cc
 @@ -12,6 +12,7 @@
@@ -75,10 +75,10 @@ index 71f49e7..c1125f0 100644
  #include <numbers>
  #include <string_view>
 diff --git a/src/3rdparty/chromium/media/audio/win/core_audio_util_win.cc b/src/3rdparty/chromium/media/audio/win/core_audio_util_win.cc
-index 1697173..cbafd39 100644
+index bd32ecb..92c0be2 100644
 --- a/src/3rdparty/chromium/media/audio/win/core_audio_util_win.cc
 +++ b/src/3rdparty/chromium/media/audio/win/core_audio_util_win.cc
-@@ -220,21 +220,27 @@ ChannelConfig GuessChannelConfig(WORD channels) {
+@@ -221,21 +221,27 @@ ChannelConfig GuessChannelConfig(WORD channels) {
      case 2:
        DVLOG(2) << "KSAUDIO_SPEAKER_STEREO";
        return KSAUDIO_SPEAKER_STEREO;
@@ -127,22 +127,22 @@ index e2f35a5..84d05fa 100644
      // Add combination of user-friendly and unique name to the output list.
      device_names->push_back(device);
 diff --git a/src/3rdparty/chromium/media/base/audio_bus.cc b/src/3rdparty/chromium/media/base/audio_bus.cc
-index b807443..124fa5b 100644
+index 410e941..914a512 100644
 --- a/src/3rdparty/chromium/media/base/audio_bus.cc
 +++ b/src/3rdparty/chromium/media/base/audio_bus.cc
-@@ -12,6 +12,7 @@
- #include <stddef.h>
+@@ -13,6 +13,7 @@
  #include <stdint.h>
  
+ #include <algorithm>
 +#include <cstring>
  #include <limits>
  #include <utility>
  
 diff --git a/src/3rdparty/chromium/media/base/audio_parameters.h b/src/3rdparty/chromium/media/base/audio_parameters.h
-index 5112263..7d8496a 100644
+index 4219618..9ee8129 100644
 --- a/src/3rdparty/chromium/media/base/audio_parameters.h
 +++ b/src/3rdparty/chromium/media/base/audio_parameters.h
-@@ -29,7 +29,7 @@ namespace media {
+@@ -30,7 +30,7 @@ namespace media {
  // instead of in Audio{Input,Output}Buffer to be able to calculate size like so.
  // Use a constexpr for the alignment value that's the same as
  // AudioBus::kChannelAlignment, since MSVC doesn't accept the latter to be used.
@@ -151,7 +151,7 @@ index 5112263..7d8496a 100644
  #pragma warning(push)
  #pragma warning(disable : 4324)  // Disable warning for added padding.
  #endif
-@@ -57,7 +57,7 @@ struct MEDIA_SHMEM_EXPORT alignas(kParametersAlignment)
+@@ -61,7 +61,7 @@ struct MEDIA_SHMEM_EXPORT alignas(kParametersAlignment)
    uint32_t bitstream_data_size;
    uint32_t bitstream_frames;
  };
@@ -161,7 +161,7 @@ index 5112263..7d8496a 100644
  #endif
  
 diff --git a/src/3rdparty/chromium/media/base/win/BUILD.gn b/src/3rdparty/chromium/media/base/win/BUILD.gn
-index 339d8f0..b5950dc 100644
+index 5571e2d..3f5cd3c 100644
 --- a/src/3rdparty/chromium/media/base/win/BUILD.gn
 +++ b/src/3rdparty/chromium/media/base/win/BUILD.gn
 @@ -7,12 +7,14 @@ import("//build/config/jumbo.gni")
@@ -185,8 +185,8 @@ index 339d8f0..b5950dc 100644
  }
  
  jumbo_component("media_foundation_util") {
-@@ -33,14 +35,25 @@ jumbo_component("media_foundation_util") {
-     "//media/base",
+@@ -34,14 +36,25 @@ jumbo_component("media_foundation_util") {
+     "//media/gpu:command_buffer_helper",
      "//third_party/libyuv",
    ]
 -  libs = [
@@ -219,7 +219,7 @@ index 339d8f0..b5950dc 100644
  
    # MediaFoundation is not available on Windows N, so must be delay loaded.
    all_dependent_configs = [ ":delay_load_mf" ]
-@@ -58,11 +71,19 @@ component("color_space_util_win") {
+@@ -59,11 +72,19 @@ component("color_space_util_win") {
      "//media/base",
      "//ui/gfx:color_space",
    ]
@@ -245,10 +245,10 @@ index 339d8f0..b5950dc 100644
    # MediaFoundation is not available on Windows N, so must be delay loaded.
    all_dependent_configs = [ ":delay_load_mf" ]
 diff --git a/src/3rdparty/chromium/media/base/win/mf_helpers.cc b/src/3rdparty/chromium/media/base/win/mf_helpers.cc
-index 45f4d12..34eb4de 100644
+index a20de3d..b979fb1 100644
 --- a/src/3rdparty/chromium/media/base/win/mf_helpers.cc
 +++ b/src/3rdparty/chromium/media/base/win/mf_helpers.cc
-@@ -38,7 +38,9 @@
+@@ -41,7 +41,9 @@
  namespace media {
  
  using Microsoft::WRL::ComPtr;
@@ -258,7 +258,7 @@ index 45f4d12..34eb4de 100644
  
  namespace {
  
-@@ -144,6 +146,7 @@ HRESULT AddEncryptAttributes(const DecryptConfig& decrypt_config,
+@@ -147,6 +149,7 @@ HRESULT AddEncryptAttributes(const DecryptConfig& decrypt_config,
                               GUID* last_key_id) {
    DVLOG(3) << __func__;
  
@@ -266,7 +266,7 @@ index 45f4d12..34eb4de 100644
    MFSampleEncryptionProtectionScheme mf_protection_scheme;
    if (decrypt_config.encryption_scheme() == EncryptionScheme::kCenc) {
      mf_protection_scheme = MFSampleEncryptionProtectionScheme::
-@@ -200,6 +203,7 @@ HRESULT AddEncryptAttributes(const DecryptConfig& decrypt_config,
+@@ -202,6 +205,7 @@ HRESULT AddEncryptAttributes(const DecryptConfig& decrypt_config,
    GUID key_id = GetGUIDFromString(decrypt_config.key_id());
    RETURN_IF_FAILED(mf_sample->SetGUID(MFSampleExtension_Content_KeyID, key_id));
    *last_key_id = key_id;
@@ -274,7 +274,7 @@ index 45f4d12..34eb4de 100644
  
    // IV
    size_t iv_length = decrypt_config.iv().length();
-@@ -215,6 +219,7 @@ HRESULT AddEncryptAttributes(const DecryptConfig& decrypt_config,
+@@ -217,6 +221,7 @@ HRESULT AddEncryptAttributes(const DecryptConfig& decrypt_config,
        reinterpret_cast<const uint8_t*>(decrypt_config.iv().c_str()),
        iv_length));
  
@@ -282,7 +282,7 @@ index 45f4d12..34eb4de 100644
    // Handle subsample entries.
    const auto& subsample_entries = decrypt_config.subsamples();
    if (subsample_entries.empty()) {
-@@ -233,6 +238,7 @@ HRESULT AddEncryptAttributes(const DecryptConfig& decrypt_config,
+@@ -235,6 +240,7 @@ HRESULT AddEncryptAttributes(const DecryptConfig& decrypt_config,
        MFSampleExtension_Encryption_SubSample_Mapping,
        reinterpret_cast<const uint8_t*>(mf_subsample_entries.data()),
        mf_sample_entries_size));
@@ -290,7 +290,7 @@ index 45f4d12..34eb4de 100644
  
    return S_OK;
  }
-@@ -675,6 +681,7 @@ HRESULT CreateDecryptConfigFromSample(
+@@ -710,6 +716,7 @@ HRESULT CreateDecryptConfigFromSample(
  
    EncryptionScheme encryption_scheme = EncryptionScheme::kUnencrypted;
    UINT32 mf_protection_scheme = 0;
@@ -298,7 +298,7 @@ index 45f4d12..34eb4de 100644
    RETURN_IF_FAILED(mf_sample->GetUINT32(
        MFSampleExtension_Encryption_ProtectionScheme, &mf_protection_scheme));
    switch (mf_protection_scheme) {
-@@ -693,6 +700,7 @@ HRESULT CreateDecryptConfigFromSample(
+@@ -728,6 +735,7 @@ HRESULT CreateDecryptConfigFromSample(
                    << mf_protection_scheme;
        return MF_E_UNEXPECTED;
    }
@@ -306,7 +306,7 @@ index 45f4d12..34eb4de 100644
  
    // IV
    UINT32 iv_length = 0;
-@@ -719,6 +727,7 @@ HRESULT CreateDecryptConfigFromSample(
+@@ -754,6 +762,7 @@ HRESULT CreateDecryptConfigFromSample(
    base::win::ScopedCoMem<MediaFoundationSubsampleEntry> subsample_mappings;
    uint32_t subsample_mappings_size = 0;
  
@@ -314,7 +314,7 @@ index 45f4d12..34eb4de 100644
    // If `MFSampleExtension_Encryption_SubSample_Mapping` attribute doesn't
    // exist, we should not fail the call. i.e., Encrypted audio content.
    if (SUCCEEDED(mf_sample->GetAllocatedBlob(
-@@ -737,6 +746,7 @@ HRESULT CreateDecryptConfigFromSample(
+@@ -772,6 +781,7 @@ HRESULT CreateDecryptConfigFromSample(
        }
      }
    }
@@ -322,7 +322,7 @@ index 45f4d12..34eb4de 100644
  
    // Key ID
    const auto key_id_string = GetStringFromGUID(key_id);
-@@ -748,6 +758,7 @@ HRESULT CreateDecryptConfigFromSample(
+@@ -783,6 +793,7 @@ HRESULT CreateDecryptConfigFromSample(
    if (encryption_scheme == EncryptionScheme::kCenc) {
      *decrypt_config =
          DecryptConfig::CreateCencConfig(key_id_string, iv_string, subsamples);
@@ -330,7 +330,7 @@ index 45f4d12..34eb4de 100644
    } else {
      EncryptionPattern encryption_pattern;
  
-@@ -767,6 +778,7 @@ HRESULT CreateDecryptConfigFromSample(
+@@ -802,6 +813,7 @@ HRESULT CreateDecryptConfigFromSample(
      DVLOG(3) << __func__ << ": encryption_pattern=" << encryption_pattern;
      *decrypt_config = DecryptConfig::CreateCbcsConfig(
          key_id_string, iv_string, subsamples, encryption_pattern);
@@ -501,10 +501,10 @@ index b637a3b..71b1a38 100644
    base::WeakPtrFactory<VideoCaptureDeviceFactoryWin> weak_ptr_factory_{this};
  };
 diff --git a/src/3rdparty/chromium/media/cdm/BUILD.gn b/src/3rdparty/chromium/media/cdm/BUILD.gn
-index 7125966..fd773ab 100644
+index 06cafd0..6753eff 100644
 --- a/src/3rdparty/chromium/media/cdm/BUILD.gn
 +++ b/src/3rdparty/chromium/media/cdm/BUILD.gn
-@@ -127,7 +127,7 @@ source_set("cdm") {
+@@ -128,7 +128,7 @@ source_set("cdm") {
      public_deps += [ "//components/crash/core/common:crash_key" ]
    }
  
@@ -557,7 +557,7 @@ index 932708d..daea1c8 100644
  
  #endif  // CDM_CONTENT_DECRYPTION_MODULE_EXPORT_H_
 diff --git a/src/3rdparty/chromium/media/cdm/cdm_auxiliary_helper.cc b/src/3rdparty/chromium/media/cdm/cdm_auxiliary_helper.cc
-index 3627a4b..f72b4cb 100644
+index a2a9125..3ad5538 100644
 --- a/src/3rdparty/chromium/media/cdm/cdm_auxiliary_helper.cc
 +++ b/src/3rdparty/chromium/media/cdm/cdm_auxiliary_helper.cc
 @@ -8,11 +8,11 @@
@@ -574,7 +574,7 @@ index 3627a4b..f72b4cb 100644
  
  namespace media {
  
-@@ -56,7 +56,7 @@ void CdmAuxiliaryHelper::GetStorageId(uint32_t version, StorageIdCB callback) {
+@@ -58,7 +58,7 @@ void CdmAuxiliaryHelper::GetStorageId(uint32_t version, StorageIdCB callback) {
    std::move(callback).Run(version, std::vector<uint8_t>());
  }
  
@@ -583,7 +583,7 @@ index 3627a4b..f72b4cb 100644
  void CdmAuxiliaryHelper::GetMediaFoundationCdmData(
      GetMediaFoundationCdmDataCB callback) {
    std::move(callback).Run(std::make_unique<MediaFoundationCdmData>(
-@@ -67,6 +67,6 @@ void CdmAuxiliaryHelper::SetCdmClientToken(
+@@ -69,6 +69,6 @@ void CdmAuxiliaryHelper::SetCdmClientToken(
      const std::vector<uint8_t>& client_token) {}
  
  void CdmAuxiliaryHelper::OnCdmEvent(CdmEvent event, HRESULT hresult) {}
@@ -592,10 +592,10 @@ index 3627a4b..f72b4cb 100644
  
  }  // namespace media
 diff --git a/src/3rdparty/chromium/media/cdm/cdm_auxiliary_helper.h b/src/3rdparty/chromium/media/cdm/cdm_auxiliary_helper.h
-index 30628a6..af77389 100644
+index d3dc1a8..b3cc53e 100644
 --- a/src/3rdparty/chromium/media/cdm/cdm_auxiliary_helper.h
 +++ b/src/3rdparty/chromium/media/cdm/cdm_auxiliary_helper.h
-@@ -69,11 +69,11 @@ class MEDIA_EXPORT CdmAuxiliaryHelper : public CdmAllocator,
+@@ -91,11 +91,11 @@ class MEDIA_EXPORT CdmAuxiliaryHelper : public CdmAllocator,
                           ChallengePlatformCB callback) override;
    void GetStorageId(uint32_t version, StorageIdCB callback) override;
  
@@ -645,12 +645,12 @@ index 4daf875..e8d8119 100644
  
  }  // namespace media
 diff --git a/src/3rdparty/chromium/media/cdm/mock_helpers.h b/src/3rdparty/chromium/media/cdm/mock_helpers.h
-index 06b1a34..874b13f 100644
+index a8b290b..860636c 100644
 --- a/src/3rdparty/chromium/media/cdm/mock_helpers.h
 +++ b/src/3rdparty/chromium/media/cdm/mock_helpers.h
-@@ -55,12 +55,12 @@ class MockCdmAuxiliaryHelper : public CdmAuxiliaryHelper {
-   MOCK_METHOD1(GetStorageIdCalled, std::vector<uint8_t>(uint32_t version));
-   void GetStorageId(uint32_t version, StorageIdCB callback) override;
+@@ -57,12 +57,12 @@ class MockCdmAuxiliaryHelper : public CdmAuxiliaryHelper {
+ 
+   MOCK_METHOD(void, RecordUkm, (const CdmMetricsData&), (override));
  
 -#if BUILDFLAG(IS_WIN)
 +#if BUILDFLAG(IS_MSVC)
@@ -710,7 +710,7 @@ index 60aaa65..f0fd5ef 100644
        "win/media_foundation_audio_decoder.cc",
        "win/media_foundation_audio_decoder.h",
 diff --git a/src/3rdparty/chromium/media/filters/ffmpeg_demuxer.cc b/src/3rdparty/chromium/media/filters/ffmpeg_demuxer.cc
-index 587540b..926be8d 100644
+index 90fb46e..65f301d 100644
 --- a/src/3rdparty/chromium/media/filters/ffmpeg_demuxer.cc
 +++ b/src/3rdparty/chromium/media/filters/ffmpeg_demuxer.cc
 @@ -125,6 +125,7 @@ static base::TimeDelta ExtractStartTime(AVStream* stream) {
@@ -729,7 +729,7 @@ index 587540b..926be8d 100644
  
    return start_time;
  }
-@@ -1665,8 +1667,10 @@ FFmpegDemuxerStream* FFmpegDemuxer::FindStreamWithLowestStartTimestamp(
+@@ -1673,8 +1675,10 @@ FFmpegDemuxerStream* FFmpegDemuxer::FindStreamWithLowestStartTimestamp(
    for (const auto& stream : streams_) {
      if (!stream || stream->IsEnabled() != enabled)
        continue;
@@ -740,7 +740,7 @@ index 587540b..926be8d 100644
      if (!lowest_start_time_stream ||
          stream->start_time() < lowest_start_time_stream->start_time()) {
        lowest_start_time_stream = stream.get();
-@@ -1686,8 +1690,10 @@ FFmpegDemuxerStream* FFmpegDemuxer::FindPreferredStreamForSeeking(
+@@ -1694,8 +1698,10 @@ FFmpegDemuxerStream* FFmpegDemuxer::FindPreferredStreamForSeeking(
      if (stream->type() != DemuxerStream::VIDEO)
        continue;
  
@@ -752,10 +752,10 @@ index 587540b..926be8d 100644
      if (!stream->IsEnabled())
        continue;
 diff --git a/src/3rdparty/chromium/media/gpu/BUILD.gn b/src/3rdparty/chromium/media/gpu/BUILD.gn
-index 28dbb78..65f2cb6 100644
+index 0e64edc..53cf6d0 100644
 --- a/src/3rdparty/chromium/media/gpu/BUILD.gn
 +++ b/src/3rdparty/chromium/media/gpu/BUILD.gn
-@@ -272,6 +272,12 @@ component("gpu") {
+@@ -284,6 +284,12 @@ component("gpu") {
        "windows/vp9_video_rate_control_wrapper.cc",
        "windows/vp9_video_rate_control_wrapper.h",
      ]
@@ -765,10 +765,10 @@ index 28dbb78..65f2cb6 100644
 +        "windows/media_foundation_video_encode_accelerator_win.h",
 +      ]
 +    }
-     if (enable_hevc_parser_and_hw_decoder) {
+     if (!is_qtwebengine) {
        sources += [
-         "windows/d3d11_h265_accelerator.cc",
-@@ -292,25 +298,39 @@ component("gpu") {
+         "windows/d3d12_video_encode_accelerator.cc",
+@@ -308,27 +314,40 @@ component("gpu") {
        "//third_party/libvpx:libvpxrc",
        "//ui/display",
      ]
@@ -778,6 +778,7 @@ index 28dbb78..65f2cb6 100644
 -      "d3d12.lib",
 -      "dxgi.lib",
 -      "dxva2.lib",
+-      "dxgi.lib",
 -      "strmiids.lib",
 -      "mf.lib",
 -      "mfplat.lib",
@@ -788,6 +789,7 @@ index 28dbb78..65f2cb6 100644
 -      "/DELAYLOAD:d3d11.dll",
 -      "/DELAYLOAD:d3d12.dll",
 -      "/DELAYLOAD:dxva2.dll",
+-      "/DELAYLOAD:dxgi.dll",
 -      "/DELAYLOAD:mf.dll",
 -      "/DELAYLOAD:mfplat.dll",
 -    ]
@@ -796,8 +798,8 @@ index 28dbb78..65f2cb6 100644
 +        "d3d9.lib",
 +        "d3d11.lib",
 +        "d3d12.lib",
-+        "dxgi.lib",
 +        "dxva2.lib",
++        "dxgi.lib",
 +        "strmiids.lib",
 +        "mf.lib",
 +        "mfplat.lib",
@@ -808,6 +810,7 @@ index 28dbb78..65f2cb6 100644
 +        "/DELAYLOAD:d3d11.dll",
 +        "/DELAYLOAD:d3d12.dll",
 +        "/DELAYLOAD:dxva2.dll",
++        "/DELAYLOAD:dxgi.dll",
 +        "/DELAYLOAD:mf.dll",
 +        "/DELAYLOAD:mfplat.dll",
 +      ]
@@ -827,17 +830,17 @@ index 28dbb78..65f2cb6 100644
    }
  
    if (use_ozone) {
-@@ -390,7 +410,7 @@ source_set("common") {
-     "//ui/gfx/geometry",
-   ]
+@@ -689,7 +708,7 @@ source_set("unit_tests") {
+     deps += [ "//media/gpu/mac:unit_tests" ]
+   }
  
 -  if (is_win || use_vaapi) {
 +  if (is_msvc || use_vaapi) {
      sources += [
-       "av1_builder.cc",
-       "av1_builder.h",
+       "av1_builder_unittest.cc",
+       "h264_builder_unittest.cc",
 diff --git a/src/3rdparty/chromium/media/gpu/gpu_video_encode_accelerator_factory.cc b/src/3rdparty/chromium/media/gpu/gpu_video_encode_accelerator_factory.cc
-index 45c2e1b..c762f0e 100644
+index d36cd42..91152a7 100644
 --- a/src/3rdparty/chromium/media/gpu/gpu_video_encode_accelerator_factory.cc
 +++ b/src/3rdparty/chromium/media/gpu/gpu_video_encode_accelerator_factory.cc
 @@ -83,7 +83,7 @@ std::unique_ptr<VideoEncodeAccelerator> CreateVTVEA() {
@@ -849,7 +852,7 @@ index 45c2e1b..c762f0e 100644
  std::unique_ptr<VideoEncodeAccelerator> CreateMediaFoundationVEA(
      const gpu::GpuPreferences& gpu_preferences,
      const gpu::GpuDriverBugWorkarounds& gpu_workarounds,
-@@ -134,7 +134,7 @@ std::vector<VEAFactoryFunction> GetVEAFactoryFunctions(
+@@ -141,7 +141,7 @@ std::vector<VEAFactoryFunction> GetVEAFactoryFunctions(
  #if BUILDFLAG(IS_MAC)
    vea_factory_functions.push_back(base::BindRepeating(&CreateVTVEA));
  #endif
@@ -891,10 +894,10 @@ index deb6529..aca4ae4 100644
    return std::make_unique<CopyingTexture2DWrapper>(
        size,
 diff --git a/src/3rdparty/chromium/media/gpu/windows/d3d11_texture_wrapper.cc b/src/3rdparty/chromium/media/gpu/windows/d3d11_texture_wrapper.cc
-index e74784a..5a36197 100644
+index 5a0ec8e..2185868 100644
 --- a/src/3rdparty/chromium/media/gpu/windows/d3d11_texture_wrapper.cc
 +++ b/src/3rdparty/chromium/media/gpu/windows/d3d11_texture_wrapper.cc
-@@ -135,6 +135,7 @@ D3D11Status DefaultTexture2DWrapper::Init(
+@@ -134,6 +134,7 @@ D3D11Status DefaultTexture2DWrapper::Init(
    picture_buffer_gpu_resource_init_done_cb_ =
        std::move(picture_buffer_gpu_resource_init_done_cb);
  
@@ -902,7 +905,7 @@ index e74784a..5a36197 100644
    // Start construction of the GpuResources.
    // We send the texture itself, since we assume that we're using the angle
    // device for decoding.  Sharing seems not to work very well.  Otherwise, we
-@@ -152,6 +153,7 @@ D3D11Status DefaultTexture2DWrapper::Init(
+@@ -151,6 +152,7 @@ D3D11Status DefaultTexture2DWrapper::Init(
        video_device_, texture, array_slice, std::move(picture_buffer),
        std::move(gpu_resource_init_cb));
    return D3D11Status::Codes::kOk;
@@ -910,7 +913,7 @@ index e74784a..5a36197 100644
  }
  
  void DefaultTexture2DWrapper::OnError(D3D11Status status) {
-@@ -194,6 +196,7 @@ DefaultTexture2DWrapper::GpuResources::GpuResources(
+@@ -193,6 +195,7 @@ DefaultTexture2DWrapper::GpuResources::GpuResources(
  
    auto* shared_image_manager = helper_->GetSharedImageManager();
  
@@ -918,7 +921,7 @@ index e74784a..5a36197 100644
    // Usage flags to allow the display compositor to draw from it, video to
    // decode from it, and webgl/canvas to read from it.
    gpu::SharedImageUsageSet usage =
-@@ -273,6 +276,7 @@ DefaultTexture2DWrapper::GpuResources::GpuResources(
+@@ -280,6 +283,7 @@ DefaultTexture2DWrapper::GpuResources::GpuResources(
    std::move(gpu_resource_init_cb)
        .Run(std::move(picture_buffer), std::move(shared_image_rep),
             std::move(shared_image));
@@ -947,10 +950,10 @@ index 0d2ec9c..f4e14fe 100644
    // We skip getting the stream counts and IDs because encoders only have one
    // input and output stream, and the ID of each is always 0.
 diff --git a/src/3rdparty/chromium/media/learning/common/media_learning_tasks.cc b/src/3rdparty/chromium/media/learning/common/media_learning_tasks.cc
-index a9a641b..8fc1073 100644
+index cc36dcb..96c5488 100644
 --- a/src/3rdparty/chromium/media/learning/common/media_learning_tasks.cc
 +++ b/src/3rdparty/chromium/media/learning/common/media_learning_tasks.cc
-@@ -4,6 +4,8 @@
+@@ -9,6 +9,8 @@
  
  #include "media/learning/common/media_learning_tasks.h"
  
@@ -960,7 +963,7 @@ index a9a641b..8fc1073 100644
  #include "base/notreached.h"
  
 diff --git a/src/3rdparty/chromium/media/midi/BUILD.gn b/src/3rdparty/chromium/media/midi/BUILD.gn
-index f5be74f..6296bc3 100644
+index 0ba1991..ac0e10e 100644
 --- a/src/3rdparty/chromium/media/midi/BUILD.gn
 +++ b/src/3rdparty/chromium/media/midi/BUILD.gn
 @@ -148,12 +148,23 @@ component("midi") {
@@ -991,7 +994,7 @@ index f5be74f..6296bc3 100644
    }
  
 diff --git a/src/3rdparty/chromium/media/midi/midi_manager_win.cc b/src/3rdparty/chromium/media/midi/midi_manager_win.cc
-index 81aaade..896b7f0 100644
+index 23c31dd..8853534 100644
 --- a/src/3rdparty/chromium/media/midi/midi_manager_win.cc
 +++ b/src/3rdparty/chromium/media/midi/midi_manager_win.cc
 @@ -899,9 +899,11 @@ void MidiManagerWin::SendOnTaskRunner(MidiManagerClient* client,
@@ -1007,10 +1010,10 @@ index 81aaade..896b7f0 100644
  }
  
 diff --git a/src/3rdparty/chromium/media/mojo/clients/BUILD.gn b/src/3rdparty/chromium/media/mojo/clients/BUILD.gn
-index 80596ad..64b5c1d 100644
+index e5086da..e0485a6 100644
 --- a/src/3rdparty/chromium/media/mojo/clients/BUILD.gn
 +++ b/src/3rdparty/chromium/media/mojo/clients/BUILD.gn
-@@ -100,7 +100,7 @@ jumbo_source_set("clients") {
+@@ -107,7 +107,7 @@ jumbo_source_set("clients") {
        "//ui/gl:gl",
      ]
    }
@@ -1020,10 +1023,10 @@ index 80596ad..64b5c1d 100644
        "win/media_foundation_renderer_client.cc",
        "win/media_foundation_renderer_client.h",
 diff --git a/src/3rdparty/chromium/media/mojo/mojom/BUILD.gn b/src/3rdparty/chromium/media/mojo/mojom/BUILD.gn
-index 5f28c24..55461f7 100644
+index 50c2f63..950c7bf 100644
 --- a/src/3rdparty/chromium/media/mojo/mojom/BUILD.gn
 +++ b/src/3rdparty/chromium/media/mojo/mojom/BUILD.gn
-@@ -704,7 +704,7 @@ mojom("mojom") {
+@@ -708,7 +708,7 @@ mojom("mojom") {
      },
    ]
  
@@ -1059,10 +1062,10 @@ index 4775950..08680f6 100644
    OnCdmEvent(CdmEvent event, uint32 hresult);
  };
 diff --git a/src/3rdparty/chromium/media/mojo/services/BUILD.gn b/src/3rdparty/chromium/media/mojo/services/BUILD.gn
-index bd028aa..d4833c2 100644
+index 563c903..39696a9 100644
 --- a/src/3rdparty/chromium/media/mojo/services/BUILD.gn
 +++ b/src/3rdparty/chromium/media/mojo/services/BUILD.gn
-@@ -187,7 +187,7 @@ jumbo_component("services") {
+@@ -188,7 +188,7 @@ jumbo_component("services") {
      deps += [ "//media/cdm:cdm_api" ]
    }
  
@@ -1072,23 +1075,23 @@ index bd028aa..d4833c2 100644
        "media_foundation_gpu_info_monitor.cc",
        "media_foundation_gpu_info_monitor.h",
 diff --git a/src/3rdparty/chromium/media/mojo/services/gpu_mojo_media_client_win.cc b/src/3rdparty/chromium/media/mojo/services/gpu_mojo_media_client_win.cc
-index 2ccc697..57a93df 100644
+index bd33420..b394675 100644
 --- a/src/3rdparty/chromium/media/mojo/services/gpu_mojo_media_client_win.cc
 +++ b/src/3rdparty/chromium/media/mojo/services/gpu_mojo_media_client_win.cc
-@@ -139,7 +139,11 @@ class GpuMojoMediaClientWin final : public GpuMojoMediaClient {
+@@ -126,7 +126,11 @@ class GpuMojoMediaClientWin final : public GpuMojoMediaClient {
    std::unique_ptr<AudioDecoder> CreatePlatformAudioDecoder(
        scoped_refptr<base::SequencedTaskRunner> task_runner,
        std::unique_ptr<MediaLog> media_log) final {
 +#if defined(COMPILER_MSVC)
      return MediaFoundationAudioDecoder::Create();
 +#else
-+  return nullptr;
++    return nullptr;
 +#endif
    }
  
    VideoDecoderType GetPlatformDecoderImplementationType() final {
 diff --git a/src/3rdparty/chromium/media/mojo/services/media_service_factory.cc b/src/3rdparty/chromium/media/mojo/services/media_service_factory.cc
-index bbe2dd7..f692f44 100644
+index 9e1ffc8..b0f1720 100644
 --- a/src/3rdparty/chromium/media/mojo/services/media_service_factory.cc
 +++ b/src/3rdparty/chromium/media/mojo/services/media_service_factory.cc
 @@ -17,7 +17,7 @@
@@ -1110,10 +1113,10 @@ index bbe2dd7..f692f44 100644
        std::make_unique<MediaFoundationMojoMediaClient>(), std::move(receiver));
  #else
 diff --git a/src/3rdparty/chromium/media/mojo/services/mojo_cdm_helper.cc b/src/3rdparty/chromium/media/mojo/services/mojo_cdm_helper.cc
-index 695e7ca..d6de16e 100644
+index 9becbb9..e5a3346 100644
 --- a/src/3rdparty/chromium/media/mojo/services/mojo_cdm_helper.cc
 +++ b/src/3rdparty/chromium/media/mojo/services/mojo_cdm_helper.cc
-@@ -50,7 +50,7 @@ url::Origin MojoCdmHelper::GetCdmOrigin() {
+@@ -60,7 +60,7 @@ url::Origin MojoCdmHelper::GetCdmOrigin() {
    return cdm_origin;
  }
  
@@ -1122,7 +1125,7 @@ index 695e7ca..d6de16e 100644
  void MojoCdmHelper::GetMediaFoundationCdmData(
      GetMediaFoundationCdmDataCB callback) {
    ConnectToCdmDocumentService();
-@@ -67,7 +67,7 @@ void MojoCdmHelper::OnCdmEvent(CdmEvent event, HRESULT hresult) {
+@@ -77,7 +77,7 @@ void MojoCdmHelper::OnCdmEvent(CdmEvent event, HRESULT hresult) {
    ConnectToCdmDocumentService();
    cdm_document_service_->OnCdmEvent(event, hresult);
  }
@@ -1132,10 +1135,10 @@ index 695e7ca..d6de16e 100644
  cdm::Buffer* MojoCdmHelper::CreateCdmBuffer(size_t capacity) {
    return GetAllocator()->CreateCdmBuffer(capacity);
 diff --git a/src/3rdparty/chromium/media/mojo/services/mojo_cdm_helper.h b/src/3rdparty/chromium/media/mojo/services/mojo_cdm_helper.h
-index 5904f5e..fe1adec 100644
+index 9bed939..745df11 100644
 --- a/src/3rdparty/chromium/media/mojo/services/mojo_cdm_helper.h
 +++ b/src/3rdparty/chromium/media/mojo/services/mojo_cdm_helper.h
-@@ -48,11 +48,11 @@ class MEDIA_MOJO_EXPORT MojoCdmHelper final : public CdmAuxiliaryHelper,
+@@ -51,11 +51,11 @@ class MEDIA_MOJO_EXPORT MojoCdmHelper final : public CdmAuxiliaryHelper,
                           const std::string& challenge,
                           ChallengePlatformCB callback) final;
    void GetStorageId(uint32_t version, StorageIdCB callback) final;
@@ -1150,7 +1153,7 @@ index 5904f5e..fe1adec 100644
    // MojoCdmFileIO::Delegate implementation.
    void CloseCdmFileIO(MojoCdmFileIO* cdm_file_io) final;
 diff --git a/src/3rdparty/chromium/media/renderers/BUILD.gn b/src/3rdparty/chromium/media/renderers/BUILD.gn
-index d7d0e1a..78da786 100644
+index 3f27372..05c5333 100644
 --- a/src/3rdparty/chromium/media/renderers/BUILD.gn
 +++ b/src/3rdparty/chromium/media/renderers/BUILD.gn
 @@ -63,7 +63,7 @@ source_set("renderers") {

@@ -1,9 +1,9 @@
 diff --git a/src/3rdparty/chromium/services/device/generic_sensor/BUILD.gn b/src/3rdparty/chromium/services/device/generic_sensor/BUILD.gn
-index 165ee6a..4a2aec0 100644
+index 77d81ba..ccea96c 100644
 --- a/src/3rdparty/chromium/services/device/generic_sensor/BUILD.gn
 +++ b/src/3rdparty/chromium/services/device/generic_sensor/BUILD.gn
-@@ -133,10 +133,23 @@ jumbo_source_set("generic_sensor") {
-       "platform_sensor_win.h",
+@@ -136,10 +136,17 @@ jumbo_source_set("generic_sensor") {
+       "platform_sensor_reader_winrt.cc",
      ]
  
 -    libs = [
@@ -11,12 +11,6 @@ index 165ee6a..4a2aec0 100644
 -      "sensorsapi.lib",
 -    ]
 +    if (is_mingw) {
-+      sources -= [
-+        "platform_sensor_provider_winrt.cc",
-+        "platform_sensor_provider_winrt.h",
-+        "platform_sensor_reader_winrt.cc",
-+        "platform_sensor_reader_winrt.h",
-+      ]
 +      libs = [
 +        "portabledeviceguids",
 +        "sensorsapi",
@@ -31,7 +25,7 @@ index 165ee6a..4a2aec0 100644
  }
  
 diff --git a/src/3rdparty/chromium/services/device/generic_sensor/platform_sensor_provider.cc b/src/3rdparty/chromium/services/device/generic_sensor/platform_sensor_provider.cc
-index 3f2dec4..e3aaf5c 100644
+index de925c9..82f5808 100644
 --- a/src/3rdparty/chromium/services/device/generic_sensor/platform_sensor_provider.cc
 +++ b/src/3rdparty/chromium/services/device/generic_sensor/platform_sensor_provider.cc
 @@ -68,7 +68,9 @@ std::unique_ptr<PlatformSensorProvider> PlatformSensorProvider::Create() {
@@ -105,10 +99,10 @@ index 1343660..616f10f 100644
  void PlatformSensorReaderWin32::SetClient(Client* client) {
    base::AutoLock autolock(lock_);
 diff --git a/src/3rdparty/chromium/services/device/geolocation/BUILD.gn b/src/3rdparty/chromium/services/device/geolocation/BUILD.gn
-index af0dea6..10d212e 100644
+index a2f8504..0717e89 100644
 --- a/src/3rdparty/chromium/services/device/geolocation/BUILD.gn
 +++ b/src/3rdparty/chromium/services/device/geolocation/BUILD.gn
-@@ -94,7 +94,7 @@ source_set("geolocation") {
+@@ -92,7 +92,7 @@ source_set("geolocation") {
      ]
    }
  
@@ -118,10 +112,10 @@ index af0dea6..10d212e 100644
        "win/location_provider_winrt.cc",
        "win/location_provider_winrt.h",
 diff --git a/src/3rdparty/chromium/services/device/hid/BUILD.gn b/src/3rdparty/chromium/services/device/hid/BUILD.gn
-index 7421fac..81ebc6c 100644
+index 89a178a..7f266d4 100644
 --- a/src/3rdparty/chromium/services/device/hid/BUILD.gn
 +++ b/src/3rdparty/chromium/services/device/hid/BUILD.gn
-@@ -61,10 +61,17 @@ source_set("hid") {
+@@ -59,10 +59,17 @@ source_set("hid") {
        "hid_service_win.cc",
        "hid_service_win.h",
      ]
@@ -144,7 +138,7 @@ index 7421fac..81ebc6c 100644
  
    if (is_mac) {
 diff --git a/src/3rdparty/chromium/services/device/hid/hid_service_win.cc b/src/3rdparty/chromium/services/device/hid/hid_service_win.cc
-index 6c0fe46..c4f1eb4 100644
+index c96b6f1..5d36b9d 100644
 --- a/src/3rdparty/chromium/services/device/hid/hid_service_win.cc
 +++ b/src/3rdparty/chromium/services/device/hid/hid_service_win.cc
 @@ -12,7 +12,9 @@
@@ -185,10 +179,10 @@ index 6c0fe46..c4f1eb4 100644
            reinterpret_cast<PBYTE>(&property_buffer), sizeof(property_buffer),
            /*RequiredSize=*/nullptr, /*Flags=*/0)) {
 diff --git a/src/3rdparty/chromium/services/device/serial/BUILD.gn b/src/3rdparty/chromium/services/device/serial/BUILD.gn
-index af6d4e0..4e5e82d 100644
+index 70e64a8..dbaa1fd 100644
 --- a/src/3rdparty/chromium/services/device/serial/BUILD.gn
 +++ b/src/3rdparty/chromium/services/device/serial/BUILD.gn
-@@ -9,8 +9,12 @@ if (is_win || ((is_linux || is_chromeos) && use_udev) || is_mac) {
+@@ -8,8 +8,12 @@ if (is_win || ((is_linux || is_chromeos) && use_udev) || is_mac) {
    config("platform_support") {
      visibility = [ ":serial" ]
      if (is_win) {
@@ -234,10 +228,10 @@ index a5c7dc3..d357ce7 100644
            reinterpret_cast<PBYTE>(base::WriteInto(&buffer, required_size)),
            required_size, /*RequiredSize=*/nullptr, /*Flags=*/0)) {
 diff --git a/src/3rdparty/chromium/services/device/usb/BUILD.gn b/src/3rdparty/chromium/services/device/usb/BUILD.gn
-index b518a5d..eb0a4b2 100644
+index 77ae219..ffa4e15 100644
 --- a/src/3rdparty/chromium/services/device/usb/BUILD.gn
 +++ b/src/3rdparty/chromium/services/device/usb/BUILD.gn
-@@ -81,12 +81,21 @@ static_library("usb") {
+@@ -80,12 +80,21 @@ static_library("usb") {
        "usb_service_win.h",
      ]
  
@@ -332,10 +326,10 @@ index ed4b004..fb72ec5 100644
    deps = [
      "//base",
 diff --git a/src/3rdparty/chromium/services/shape_detection/BUILD.gn b/src/3rdparty/chromium/services/shape_detection/BUILD.gn
-index 17edf62..170a946 100644
+index 8480cdf..2ba4c25 100644
 --- a/src/3rdparty/chromium/services/shape_detection/BUILD.gn
 +++ b/src/3rdparty/chromium/services/shape_detection/BUILD.gn
-@@ -40,7 +40,7 @@ source_set("lib") {
+@@ -38,7 +38,7 @@ source_set("lib") {
        "QuartzCore.framework",
        "Vision.framework",
      ]
@@ -395,10 +389,10 @@ index ad24ba9..1a75a04 100644
  #else
    FaceDetectionProviderImpl::Create(std::move(receiver));
 diff --git a/src/3rdparty/chromium/services/video_capture/device_media_to_mojo_adapter.cc b/src/3rdparty/chromium/services/video_capture/device_media_to_mojo_adapter.cc
-index c2505c3..8aa4410 100644
+index eac863c..a9db714 100644
 --- a/src/3rdparty/chromium/services/video_capture/device_media_to_mojo_adapter.cc
 +++ b/src/3rdparty/chromium/services/video_capture/device_media_to_mojo_adapter.cc
-@@ -163,15 +163,15 @@ void DeviceMediaToMojoAdapter::StartInternal(
+@@ -162,15 +162,15 @@ void DeviceMediaToMojoAdapter::StartInternal(
      TRACE_EVENT0(TRACE_DISABLED_BY_DEFAULT("video_and_image_capture"),
                   "CreateVideoCaptureBufferPoolImpl");
      // Create a dedicated buffer pool for the device usage session.
@@ -416,12 +410,12 @@ index c2505c3..8aa4410 100644
 +#endif  // !BUILDFLAG(IS_MSVC)
    }
  
- #if BUILDFLAG(IS_CHROMEOS_ASH)
+ #if BUILDFLAG(IS_CHROMEOS)
 diff --git a/src/3rdparty/chromium/services/video_capture/video_capture_service_impl.cc b/src/3rdparty/chromium/services/video_capture/video_capture_service_impl.cc
-index dadfad6..0e70e1a 100644
+index 76ce891..1717f84 100644
 --- a/src/3rdparty/chromium/services/video_capture/video_capture_service_impl.cc
 +++ b/src/3rdparty/chromium/services/video_capture/video_capture_service_impl.cc
-@@ -359,6 +359,7 @@ void VideoCaptureServiceImpl::LazyInitializeDeviceFactory() {
+@@ -319,6 +319,7 @@ void VideoCaptureServiceImpl::LazyInitializeDeviceFactory() {
  
    LazyInitializeGpuDependenciesContext();
  
@@ -429,28 +423,28 @@ index dadfad6..0e70e1a 100644
    // Create the platform-specific device factory.
    // The task runner passed to CreateFactory is used for things that need to
    // happen on a "UI thread equivalent", e.g. obtaining screen rotation on
-@@ -368,6 +369,7 @@ void VideoCaptureServiceImpl::LazyInitializeDeviceFactory() {
+@@ -328,6 +329,7 @@ void VideoCaptureServiceImpl::LazyInitializeDeviceFactory() {
  
    auto video_capture_system = std::make_unique<media::VideoCaptureSystemImpl>(
        std::move(media_device_factory));
 +#endif
  
- #if BUILDFLAG(IS_CHROMEOS_ASH)
+ #if BUILDFLAG(IS_CHROMEOS)
    device_factory_ = std::make_unique<VirtualDeviceEnabledDeviceFactory>(
-@@ -416,7 +418,7 @@ void VideoCaptureServiceImpl::LazyInitializeDeviceFactory() {
-     device_factory_ = std::make_unique<VirtualDeviceEnabledDeviceFactory>(
-         std::make_unique<DeviceFactoryImpl>(std::move(video_capture_system)));
-   }
+@@ -340,7 +342,7 @@ void VideoCaptureServiceImpl::LazyInitializeDeviceFactory() {
+   device_factory_ash_adapter_ =
+       std::make_unique<crosapi::VideoCaptureDeviceFactoryAsh>(
+           device_factory_.get());
 -#else
 +#elif !BUILDFLAG(IS_MINGW)
    device_factory_ = std::make_unique<VirtualDeviceEnabledDeviceFactory>(
        std::make_unique<DeviceFactoryImpl>(std::move(video_capture_system)));
- #endif  // BUILDFLAG(IS_CHROMEOS_ASH)
+ #endif  // BUILDFLAG(IS_CHROMEOS)
 diff --git a/src/3rdparty/chromium/services/webnn/BUILD.gn b/src/3rdparty/chromium/services/webnn/BUILD.gn
-index 3ef92bc..451b9c5 100644
+index 9d662a5..51893ed 100644
 --- a/src/3rdparty/chromium/services/webnn/BUILD.gn
 +++ b/src/3rdparty/chromium/services/webnn/BUILD.gn
-@@ -77,7 +77,7 @@ component("webnn_service") {
+@@ -47,7 +47,7 @@ component("webnn_service") {
      "//services/webnn/public/mojom",
    ]
  
@@ -459,7 +453,7 @@ index 3ef92bc..451b9c5 100644
      sources += [
        "dml/adapter.cc",
        "dml/adapter.h",
-@@ -212,7 +212,7 @@ source_set("tests") {
+@@ -179,7 +179,7 @@ source_set("tests") {
      "webnn_test_utils.h",
    ]
  
@@ -469,7 +463,7 @@ index 3ef92bc..451b9c5 100644
        "dml/adapter_test.cc",
        "dml/command_queue_test.cc",
 diff --git a/src/3rdparty/chromium/services/webnn/webnn_context_provider_impl.cc b/src/3rdparty/chromium/services/webnn/webnn_context_provider_impl.cc
-index c40f5f7..79f7776 100644
+index b4a9ae1..e8e1b2e 100644
 --- a/src/3rdparty/chromium/services/webnn/webnn_context_provider_impl.cc
 +++ b/src/3rdparty/chromium/services/webnn/webnn_context_provider_impl.cc
 @@ -18,7 +18,7 @@
@@ -481,7 +475,7 @@ index c40f5f7..79f7776 100644
  #include <wrl.h>
  
  #include "base/notreached.h"
-@@ -43,7 +43,7 @@
+@@ -39,7 +39,7 @@
  
  namespace webnn {
  
@@ -490,25 +484,34 @@ index c40f5f7..79f7776 100644
  using Microsoft::WRL::ComPtr;
  #endif
  
-@@ -54,7 +54,7 @@ WebNNContextProviderImpl::BackendForTesting* g_backend_for_testing = nullptr;
- using webnn::mojom::CreateContextOptionsPtr;
- using webnn::mojom::WebNNContextProvider;
+@@ -77,7 +77,7 @@ void RecordDeviceType(const mojom::CreateContextOptions::Device device) {
+   base::UmaHistogramEnumeration("WebNN.DeviceType", uma_value);
+ }
  
 -#if BUILDFLAG(IS_WIN)
 +#if BUILDFLAG(IS_MSVC)
  base::expected<scoped_refptr<dml::Adapter>, mojom::ErrorPtr> GetDmlGpuAdapter(
      gpu::SharedContextState* shared_context_state,
      const gpu::GpuFeatureInfo& gpu_feature_info) {
-@@ -210,7 +210,7 @@ void WebNNContextProviderImpl::CreateWebNNContext(
-   mojo::PendingRemote<mojom::WebNNContext> remote;
-   auto receiver = remote.InitWithNewPipeAndPassReceiver();
+@@ -125,7 +125,7 @@ bool ShouldCreateDmlContext(const mojom::CreateContextOptions& options) {
+       return true;
+   }
+ }
+-#endif  // BUILDFLAG(IS_WIN)
++#endif  // BUILDFLAG(IS_MSVC)
+ 
+ }  // namespace
+ 
+@@ -229,7 +229,7 @@ void WebNNContextProviderImpl::CreateWebNNContext(
+ 
+   RecordDeviceType(options->device);
  
 -#if BUILDFLAG(IS_WIN)
 +#if BUILDFLAG(IS_MSVC)
    if (ShouldCreateDmlContext(*options)) {
      DCHECK(gpu_feature_info_.IsInitialized());
      if (gpu_feature_info_.status_values[gpu::GPU_FEATURE_TYPE_WEBNN] !=
-@@ -262,7 +262,7 @@ void WebNNContextProviderImpl::CreateWebNNContext(
+@@ -281,7 +281,7 @@ void WebNNContextProviderImpl::CreateWebNNContext(
          std::move(adapter), std::move(receiver), this, std::move(options),
          std::move(command_recorder), gpu_feature_info_);
    }
@@ -517,16 +520,3 @@ index c40f5f7..79f7776 100644
  
  #if BUILDFLAG(IS_MAC)
    // TODO: crbug.com/325612086 - Consider using supporting older Macs either
-diff --git a/src/3rdparty/chromium/services/webnn/webnn_graph_impl.cc b/src/3rdparty/chromium/services/webnn/webnn_graph_impl.cc
-index 9711183..9412e5c 100644
---- a/src/3rdparty/chromium/services/webnn/webnn_graph_impl.cc
-+++ b/src/3rdparty/chromium/services/webnn/webnn_graph_impl.cc
-@@ -26,7 +26,7 @@
- #include "services/webnn/webnn_utils.h"
- #include "third_party/abseil-cpp/absl/types/variant.h"
- 
--#if BUILDFLAG(IS_WIN)
-+#if BUILDFLAG(IS_MSVC)
- #include "services/webnn/dml/graph_impl_dml.h"
- #endif
- 

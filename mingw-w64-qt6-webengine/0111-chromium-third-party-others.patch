@@ -26,10 +26,10 @@ index f6196ec..86d2afe 100644
  // Defines __GOOGLE_GRTE_VERSION__ (via glibc-specific features.h) when
  // supported.
 diff --git a/src/3rdparty/chromium/third_party/boringssl/BUILD.gn b/src/3rdparty/chromium/third_party/boringssl/BUILD.gn
-index b517102..d3531e5 100644
+index cb5c369..5e1363c 100644
 --- a/src/3rdparty/chromium/third_party/boringssl/BUILD.gn
 +++ b/src/3rdparty/chromium/third_party/boringssl/BUILD.gn
-@@ -102,7 +102,7 @@ if (enable_rust) {
+@@ -99,7 +99,7 @@ if (enable_rust) {
    }
  }
  
@@ -38,7 +38,7 @@ index b517102..d3531e5 100644
    # MSan instrumentation is incompatible with assembly optimizations.
    # BoringSSL's GAS-compatible assembly knows how to detect MSan, but the NASM
    # assembly does not, so we check for MSan explicitly.
-@@ -114,7 +114,7 @@ if (is_msan || (is_msvc && current_cpu == "arm64" && !is_clang)) {
+@@ -111,7 +111,7 @@ if (is_msan || (is_msvc && current_cpu == "arm64" && !is_clang)) {
      visibility = [ ":*" ]
      testonly = true
    }
@@ -48,10 +48,10 @@ index b517102..d3531e5 100644
    import("//third_party/nasm/nasm_assemble.gni")
    nasm_assemble("boringssl_asm") {
 diff --git a/src/3rdparty/chromium/third_party/boringssl/src/include/openssl/base.h b/src/3rdparty/chromium/third_party/boringssl/src/include/openssl/base.h
-index fa42e97..3fba90a 100644
+index b9db335..23f6ac6 100644
 --- a/src/3rdparty/chromium/third_party/boringssl/src/include/openssl/base.h
 +++ b/src/3rdparty/chromium/third_party/boringssl/src/include/openssl/base.h
-@@ -64,6 +64,7 @@
+@@ -26,6 +26,7 @@
  #if defined(__MINGW32__)
  // stdio.h is needed on MinGW for __MINGW_PRINTF_FORMAT.
  #include <stdio.h>
@@ -154,10 +154,10 @@ index 1ff0f72..d27d29a 100644
      } else {
        cflags = [ "-msse4.2" ]
 diff --git a/src/3rdparty/chromium/third_party/dav1d/BUILD.gn b/src/3rdparty/chromium/third_party/dav1d/BUILD.gn
-index 8c8e6b3..49cf99f 100644
+index 22a80ef..bcb0df8 100644
 --- a/src/3rdparty/chromium/third_party/dav1d/BUILD.gn
 +++ b/src/3rdparty/chromium/third_party/dav1d/BUILD.gn
-@@ -78,7 +78,7 @@ config("dav1d_config") {
+@@ -77,7 +77,7 @@ config("dav1d_config") {
      "libdav1d/include/dav1d",
      platform_config_root,
    ]
@@ -166,7 +166,7 @@ index 8c8e6b3..49cf99f 100644
      include_dirs += [ "libdav1d/include/compat/msvc" ]
    }
  }
-@@ -88,7 +88,7 @@ dav1d_copts = [
+@@ -87,7 +87,7 @@ dav1d_copts = [
    "-D_POSIX_C_SOURCE=200112L",
  ]
  
@@ -175,8 +175,8 @@ index 8c8e6b3..49cf99f 100644
    if (!is_clang) {
      dav1d_copts += [ "/wd4028" ]
    }
-@@ -97,7 +97,7 @@ if (is_win) {
-   if (is_mac || is_ios) {
+@@ -96,7 +96,7 @@ if (is_win) {
+   if (is_apple) {
      dav1d_copts += [ "-D_DARWIN_C_SOURCE" ]
    }
 -  if (is_linux || is_chromeos || is_android || current_os == "aix") {
@@ -184,7 +184,7 @@ index 8c8e6b3..49cf99f 100644
      if (!is_clang) {
        dav1d_copts += [ "-D_GNU_SOURCE" ]
      }
-@@ -105,7 +105,7 @@ if (is_win) {
+@@ -104,7 +104,7 @@ if (is_win) {
  }
  
  if (is_clang && (current_cpu == "arm" || current_cpu == "arm64")) {
@@ -194,10 +194,10 @@ index 8c8e6b3..49cf99f 100644
    } else {
      dav1d_copts += [ "-fno-align-functions" ]
 diff --git a/src/3rdparty/chromium/third_party/dav1d/config/win/arm64/config.h b/src/3rdparty/chromium/third_party/dav1d/config/win/arm64/config.h
-index 04bbe46..3718483 100644
+index db94257..b283a58 100644
 --- a/src/3rdparty/chromium/third_party/dav1d/config/win/arm64/config.h
 +++ b/src/3rdparty/chromium/third_party/dav1d/config/win/arm64/config.h
-@@ -63,6 +63,6 @@
+@@ -109,6 +109,6 @@
  
  #define __USE_MINGW_ANSI_STDIO 1
  
@@ -207,10 +207,10 @@ index 04bbe46..3718483 100644
 -#define ftello _ftelli64
 +// #define ftello _ftelli64
 diff --git a/src/3rdparty/chromium/third_party/dav1d/config/win/x64/config.h b/src/3rdparty/chromium/third_party/dav1d/config/win/x64/config.h
-index 7851543..0447304 100644
+index 114f988..61ede82 100644
 --- a/src/3rdparty/chromium/third_party/dav1d/config/win/x64/config.h
 +++ b/src/3rdparty/chromium/third_party/dav1d/config/win/x64/config.h
-@@ -59,6 +59,6 @@
+@@ -105,6 +105,6 @@
  
  #define __USE_MINGW_ANSI_STDIO 1
  
@@ -220,10 +220,10 @@ index 7851543..0447304 100644
 -#define ftello _ftelli64
 +// #define ftello _ftelli64
 diff --git a/src/3rdparty/chromium/third_party/dav1d/config/win/x86/config.h b/src/3rdparty/chromium/third_party/dav1d/config/win/x86/config.h
-index 43c446c..d44fd13 100644
+index a0ee49d..3061e60 100644
 --- a/src/3rdparty/chromium/third_party/dav1d/config/win/x86/config.h
 +++ b/src/3rdparty/chromium/third_party/dav1d/config/win/x86/config.h
-@@ -61,6 +61,6 @@
+@@ -107,6 +107,6 @@
  
  #define __USE_MINGW_ANSI_STDIO 1
  
@@ -233,7 +233,7 @@ index 43c446c..d44fd13 100644
 -#define ftello _ftelli64
 +// #define ftello _ftelli64
 diff --git a/src/3rdparty/chromium/third_party/dawn/src/dawn/common/BUILD.gn b/src/3rdparty/chromium/third_party/dawn/src/dawn/common/BUILD.gn
-index 63d20a8..76dd057 100644
+index 64ab821..c0e8a6a 100644
 --- a/src/3rdparty/chromium/third_party/dawn/src/dawn/common/BUILD.gn
 +++ b/src/3rdparty/chromium/third_party/dawn/src/dawn/common/BUILD.gn
 @@ -160,7 +160,7 @@ config("internal_config") {
@@ -338,10 +338,10 @@ index db16e21..df742ff 100644
      # util\cache_test.cc(171): warning C4018: '<': signed/unsigned mismatch
      cflags = [ "/wd4018" ]  # Signed/unsigned mismatch in comparison.
 diff --git a/src/3rdparty/chromium/third_party/libaom/BUILD.gn b/src/3rdparty/chromium/third_party/libaom/BUILD.gn
-index 589e4a5..5582d8a 100644
+index 2b96a91..aad4004 100644
 --- a/src/3rdparty/chromium/third_party/libaom/BUILD.gn
 +++ b/src/3rdparty/chromium/third_party/libaom/BUILD.gn
-@@ -121,7 +121,7 @@ if (current_cpu == "x86" || (current_cpu == "x64" && !is_msan)) {
+@@ -115,7 +115,7 @@ if (current_cpu == "x86" || (current_cpu == "x64" && !is_msan)) {
      configs += [ "//build/config/compiler:no_chromium_code" ]
      configs += [ ":libaom_config" ]
      configs -= [ "//build/config/compiler:default_init_stack_vars" ]
@@ -350,7 +350,7 @@ index 589e4a5..5582d8a 100644
        cflags = [ "-msse2" ]
      }
      sources = aom_av1_common_intrin_sse2
-@@ -136,7 +136,7 @@ if (current_cpu == "x86" || (current_cpu == "x64" && !is_msan)) {
+@@ -130,7 +130,7 @@ if (current_cpu == "x86" || (current_cpu == "x64" && !is_msan)) {
      configs += [ "//build/config/compiler:no_chromium_code" ]
      configs += [ ":libaom_config" ]
      configs -= [ "//build/config/compiler:default_init_stack_vars" ]
@@ -359,7 +359,7 @@ index 589e4a5..5582d8a 100644
        cflags = [ "-msse3" ]
      }
      sources = aom_av1_encoder_intrin_sse3
-@@ -148,7 +148,7 @@ if (current_cpu == "x86" || (current_cpu == "x64" && !is_msan)) {
+@@ -142,7 +142,7 @@ if (current_cpu == "x86" || (current_cpu == "x64" && !is_msan)) {
      configs += [ "//build/config/compiler:no_chromium_code" ]
      configs += [ ":libaom_config" ]
      configs -= [ "//build/config/compiler:default_init_stack_vars" ]
@@ -368,7 +368,7 @@ index 589e4a5..5582d8a 100644
        cflags = [ "-mssse3" ]
      }
      sources = aom_av1_common_intrin_ssse3
-@@ -165,7 +165,7 @@ if (current_cpu == "x86" || (current_cpu == "x64" && !is_msan)) {
+@@ -159,7 +159,7 @@ if (current_cpu == "x86" || (current_cpu == "x64" && !is_msan)) {
      configs += [ "//build/config/compiler:no_chromium_code" ]
      configs += [ ":libaom_config" ]
      configs -= [ "//build/config/compiler:default_init_stack_vars" ]
@@ -377,7 +377,7 @@ index 589e4a5..5582d8a 100644
        cflags = [ "-msse4.1" ]
      }
      sources = aom_av1_common_intrin_sse4_1
-@@ -180,7 +180,7 @@ if (current_cpu == "x86" || (current_cpu == "x64" && !is_msan)) {
+@@ -174,7 +174,7 @@ if (current_cpu == "x86" || (current_cpu == "x64" && !is_msan)) {
      configs += [ "//build/config/compiler:no_chromium_code" ]
      configs += [ ":libaom_config" ]
      configs -= [ "//build/config/compiler:default_init_stack_vars" ]
@@ -386,7 +386,7 @@ index 589e4a5..5582d8a 100644
        cflags = [ "-msse4.2" ]
      }
      sources = aom_av1_encoder_intrin_sse4_2
-@@ -192,7 +192,7 @@ if (current_cpu == "x86" || (current_cpu == "x64" && !is_msan)) {
+@@ -186,7 +186,7 @@ if (current_cpu == "x86" || (current_cpu == "x64" && !is_msan)) {
      configs += [ "//build/config/compiler:no_chromium_code" ]
      configs += [ ":libaom_config" ]
      configs -= [ "//build/config/compiler:default_init_stack_vars" ]
@@ -395,7 +395,7 @@ index 589e4a5..5582d8a 100644
        cflags = [ "/arch:AVX" ]
      } else {
        cflags = [ "-mavx" ]
-@@ -206,7 +206,7 @@ if (current_cpu == "x86" || (current_cpu == "x64" && !is_msan)) {
+@@ -200,7 +200,7 @@ if (current_cpu == "x86" || (current_cpu == "x64" && !is_msan)) {
      configs += [ "//build/config/compiler:no_chromium_code" ]
      configs += [ ":libaom_config" ]
      configs -= [ "//build/config/compiler:default_init_stack_vars" ]
@@ -404,7 +404,7 @@ index 589e4a5..5582d8a 100644
        cflags = [ "/arch:AVX2" ]
      } else {
        cflags = [ "-mavx2" ]
-@@ -245,7 +245,7 @@ if (current_cpu == "arm64") {
+@@ -239,7 +239,7 @@ if (current_cpu == "arm64") {
      configs += [ "//build/config/compiler:no_chromium_code" ]
      configs += [ ":libaom_config" ]
      configs -= [ "//build/config/compiler:default_init_stack_vars" ]
@@ -413,7 +413,7 @@ index 589e4a5..5582d8a 100644
        cflags = [ "-march=armv8-a+crc" ]
      }
      sources = aom_av1_encoder_intrin_arm_crc32
-@@ -257,7 +257,7 @@ if (current_cpu == "arm64") {
+@@ -251,7 +251,7 @@ if (current_cpu == "arm64") {
      configs += [ "//build/config/compiler:no_chromium_code" ]
      configs += [ ":libaom_config" ]
      configs -= [ "//build/config/compiler:default_init_stack_vars" ]
@@ -422,7 +422,7 @@ index 589e4a5..5582d8a 100644
        cflags = [ "-march=armv8.2-a+dotprod" ]
      }
      sources = aom_av1_common_intrin_neon_dotprod
-@@ -271,7 +271,7 @@ if (current_cpu == "arm64") {
+@@ -265,7 +265,7 @@ if (current_cpu == "arm64") {
      configs += [ "//build/config/compiler:no_chromium_code" ]
      configs += [ ":libaom_config" ]
      configs -= [ "//build/config/compiler:default_init_stack_vars" ]
@@ -431,7 +431,7 @@ index 589e4a5..5582d8a 100644
        cflags = [ "-march=armv8.2-a+dotprod+i8mm" ]
      }
      sources = aom_av1_common_intrin_neon_i8mm
-@@ -312,6 +312,13 @@ static_library("libaom") {
+@@ -336,6 +336,13 @@ static_library("libaom") {
      # overflows in the transform functions.
      defines += [ "DO_RANGE_CHECK_CLAMP=1" ]
    }
@@ -445,7 +445,7 @@ index 589e4a5..5582d8a 100644
    deps = []
    if (current_cpu == "x86" || (current_cpu == "x64" && !is_msan)) {
      deps += [
-@@ -362,6 +369,13 @@ static_library("libaomrc") {
+@@ -391,6 +398,13 @@ static_library("libaomrc") {
    configs -= [ "//build/config/compiler:chromium_code" ]
    configs += [ "//build/config/compiler:no_chromium_code" ]
    configs += [ ":libaom_config" ]
@@ -460,43 +460,43 @@ index 589e4a5..5582d8a 100644
    public_configs = [ ":libaom_public_config" ]
    public_deps = [ ":libaom" ]
 diff --git a/src/3rdparty/chromium/third_party/libaom/source/config/win/arm64-cpu-detect/config/aom_config.h b/src/3rdparty/chromium/third_party/libaom/source/config/win/arm64-cpu-detect/config/aom_config.h
-index 0e525ff..8aa4eae 100644
+index 2f86dfa..1b19e43 100644
 --- a/src/3rdparty/chromium/third_party/libaom/source/config/win/arm64-cpu-detect/config/aom_config.h
 +++ b/src/3rdparty/chromium/third_party/libaom/source/config/win/arm64-cpu-detect/config/aom_config.h
-@@ -82,7 +82,6 @@
+@@ -84,7 +84,6 @@
  #define HAVE_NEON 1
  #define HAVE_NEON_DOTPROD 1
  #define HAVE_NEON_I8MM 1
 -#define HAVE_PTHREAD_H  0
+ #define HAVE_RVV 0
  #define HAVE_SSE 0
  #define HAVE_SSE2 0
- #define HAVE_SSE3 0
 diff --git a/src/3rdparty/chromium/third_party/libaom/source/config/win/ia32/config/aom_config.h b/src/3rdparty/chromium/third_party/libaom/source/config/win/ia32/config/aom_config.h
-index 5a647c9..e2edb69 100644
+index 5807d90..0a9d806 100644
 --- a/src/3rdparty/chromium/third_party/libaom/source/config/win/ia32/config/aom_config.h
 +++ b/src/3rdparty/chromium/third_party/libaom/source/config/win/ia32/config/aom_config.h
-@@ -82,7 +82,6 @@
+@@ -84,7 +84,6 @@
  #define HAVE_NEON 0
  #define HAVE_NEON_DOTPROD 0
  #define HAVE_NEON_I8MM 0
 -#define HAVE_PTHREAD_H  0
+ #define HAVE_RVV 0
  #define HAVE_SSE 1
  #define HAVE_SSE2 1
- #define HAVE_SSE3 1
 diff --git a/src/3rdparty/chromium/third_party/libaom/source/config/win/x64/config/aom_config.h b/src/3rdparty/chromium/third_party/libaom/source/config/win/x64/config/aom_config.h
-index 2ef6551..6760073 100644
+index 3728fcb..7c80c61 100644
 --- a/src/3rdparty/chromium/third_party/libaom/source/config/win/x64/config/aom_config.h
 +++ b/src/3rdparty/chromium/third_party/libaom/source/config/win/x64/config/aom_config.h
-@@ -82,7 +82,6 @@
+@@ -84,7 +84,6 @@
  #define HAVE_NEON 0
  #define HAVE_NEON_DOTPROD 0
  #define HAVE_NEON_I8MM 0
 -#define HAVE_PTHREAD_H  0
+ #define HAVE_RVV 0
  #define HAVE_SSE 1
  #define HAVE_SSE2 1
- #define HAVE_SSE3 1
 diff --git a/src/3rdparty/chromium/third_party/libsrtp/BUILD.gn b/src/3rdparty/chromium/third_party/libsrtp/BUILD.gn
-index 45033b7..1988abc 100644
+index 2f8638d..785bd9b 100644
 --- a/src/3rdparty/chromium/third_party/libsrtp/BUILD.gn
 +++ b/src/3rdparty/chromium/third_party/libsrtp/BUILD.gn
 @@ -70,7 +70,7 @@ config("libsrtp_config") {
@@ -603,7 +603,7 @@ index f34c555..9265105 100644
      }
      if (cpu_arch_full == "arm64") {
 diff --git a/src/3rdparty/chromium/third_party/libxml/BUILD.gn b/src/3rdparty/chromium/third_party/libxml/BUILD.gn
-index f7aa11a..d605da2 100644
+index 2022a48..d3f6f21 100644
 --- a/src/3rdparty/chromium/third_party/libxml/BUILD.gn
 +++ b/src/3rdparty/chromium/third_party/libxml/BUILD.gn
 @@ -31,7 +31,7 @@ config("libxml_config") {
@@ -624,34 +624,11 @@ index f7aa11a..d605da2 100644
      cflags = [
        # gcc spits out a bunch of warnings about passing too many arguments to
        # __xmlSimpleError.
-@@ -274,13 +274,15 @@ static_library("bundled_libxml") {
-     ]
-   }
- 
--  if (is_win && !is_mingw) {
--    sources += [
--      "src/include/win32config.h",
--      "src/include/wsockcompat.h",
--      "win32/config.h",
--      "win32/include/libxml/xmlversion.h",
--    ]
-+  if (is_win) {
-+    if (!is_mingw) {
-+      sources += [
-+        "src/include/win32config.h",
-+        "src/include/wsockcompat.h",
-+        "win32/config.h",
-+        "win32/include/libxml/xmlversion.h",
-+      ]
-+    }
- 
-     # libxml2 already defines WIN32_LEAN_AND_MEAN.
-     configs -= [ "//build/config/win:lean_and_mean" ]
 diff --git a/src/3rdparty/chromium/third_party/libxslt/BUILD.gn b/src/3rdparty/chromium/third_party/libxslt/BUILD.gn
-index ce2c5eb..68634e3 100644
+index e3ac656..da68aff 100644
 --- a/src/3rdparty/chromium/third_party/libxslt/BUILD.gn
 +++ b/src/3rdparty/chromium/third_party/libxslt/BUILD.gn
-@@ -94,13 +94,17 @@ static_library("bundled_libxslt") {
+@@ -96,13 +96,17 @@ static_library("bundled_libxslt") {
      include_dirs = [ "linux" ]
    } else if (is_win) {
      include_dirs = [ "win32" ]
@@ -676,7 +653,7 @@ index ce2c5eb..68634e3 100644
      include_dirs = [ "mac" ]
    }
 diff --git a/src/3rdparty/chromium/third_party/libyuv/BUILD.gn b/src/3rdparty/chromium/third_party/libyuv/BUILD.gn
-index fb3c4f4..478da0f 100644
+index 1ea260e..5ef7314 100644
 --- a/src/3rdparty/chromium/third_party/libyuv/BUILD.gn
 +++ b/src/3rdparty/chromium/third_party/libyuv/BUILD.gn
 @@ -73,7 +73,7 @@ group("libyuv") {
@@ -697,7 +674,7 @@ index fb3c4f4..478da0f 100644
      cflags = [
        # "-mpopcnt",
        # "-mavx2",
-@@ -335,14 +335,14 @@ if (libyuv_use_lasx) {
+@@ -339,14 +339,14 @@ if (libyuv_use_lasx) {
  
  if (libyuv_include_tests) {
    config("libyuv_unittest_warnings_config") {
@@ -759,27 +736,27 @@ index 6be623b..8dcd889 100644
  #elif LONG_MAX == 9223372036854775807L
  
 diff --git a/src/3rdparty/chromium/third_party/node/node.py b/src/3rdparty/chromium/third_party/node/node.py
-index dbbab59..7a21902 100755
+index 4f483f6..906efea 100755
 --- a/src/3rdparty/chromium/third_party/node/node.py
 +++ b/src/3rdparty/chromium/third_party/node/node.py
-@@ -44,7 +44,11 @@ def GetBinaryPath():
+@@ -45,7 +45,11 @@ def GetBinaryPath():
  
  
  def RunNode(cmd_parts, stdout=None):
 -  cmd = [GetBinaryPath()] + cmd_parts
-+  if sys.platform == 'win32' and 'GCC' in sys.version:
++  if sys.platform == 'win32' and 'MINGW' in sys.version:
 +    # We have to invoke node.exe through winpty
 +    cmd = ['node'] + cmd_parts
 +  else:
 +    cmd = [GetBinaryPath()] + cmd_parts
    process = subprocess.Popen(
        cmd, cwd=os.getcwd(), stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-       universal_newlines=True)
+       universal_newlines=True, encoding='utf-8')
 diff --git a/src/3rdparty/chromium/third_party/protobuf/proto_library.gni b/src/3rdparty/chromium/third_party/protobuf/proto_library.gni
-index f43ac07..74ef4af 100644
+index e90d62b..57309d2 100644
 --- a/src/3rdparty/chromium/third_party/protobuf/proto_library.gni
 +++ b/src/3rdparty/chromium/third_party/protobuf/proto_library.gni
-@@ -604,7 +604,7 @@ template("proto_library") {
+@@ -618,7 +618,7 @@ template("proto_library") {
            public_deps += [ "$_this_dir:protobuf_lite" ]
          }
  
@@ -789,10 +766,10 @@ index f43ac07..74ef4af 100644
              # disable: C4125 decimal digit terminates octal escape sequence
              # Protoc generates such sequences frequently, there's no obvious
 diff --git a/src/3rdparty/chromium/third_party/sqlite/BUILD.gn b/src/3rdparty/chromium/third_party/sqlite/BUILD.gn
-index 392f0d8..43d8568 100644
+index b1eb6bf..27de2c4 100644
 --- a/src/3rdparty/chromium/third_party/sqlite/BUILD.gn
 +++ b/src/3rdparty/chromium/third_party/sqlite/BUILD.gn
-@@ -160,7 +160,7 @@ config("sqlite_warnings") {
+@@ -173,7 +173,7 @@ config("sqlite_warnings") {
        "-Wno-#warnings",
      ]
    }

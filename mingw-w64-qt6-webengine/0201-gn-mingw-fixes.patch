@@ -12,7 +12,7 @@ index b1bf9ff..27339a7 100644
  
  rule link
 diff --git a/src/3rdparty/gn/build/gen.py b/src/3rdparty/gn/build/gen.py
-index 4730836..81e9302 100755
+index 5d07c8b..f00241d 100755
 --- a/src/3rdparty/gn/build/gen.py
 +++ b/src/3rdparty/gn/build/gen.py
 @@ -40,7 +40,10 @@ class Platform(object):
@@ -27,23 +27,7 @@ index 4730836..81e9302 100755
      elif self._platform.startswith('aix'):
        self._platform = 'aix'
      elif self._platform.startswith('fuchsia'):
-@@ -338,10 +341,14 @@ def WriteGenericNinja(path, static_libraries, executables,
-   with open(template_filename) as f:
-     ninja_template = f.read()
- 
--  if platform.is_windows():
-+  if platform.is_msvc():
-     executable_ext = '.exe'
-     library_ext = '.lib'
-     object_ext = '.obj'
-+  elif platform.is_mingw():
-+    executable_ext = '.exe'
-+    library_ext = '.a'
-+    object_ext = '.obj'
-   else:
-     executable_ext = ''
-     library_ext = '.a'
-@@ -443,6 +450,9 @@ def WriteGNNinja(path, platform, host, options, args_list):
+@@ -453,6 +456,9 @@ def WriteGNNinja(path, platform, host, options, args_list):
    ld = options.ld
    ar = options.ar
  
@@ -53,7 +37,7 @@ index 4730836..81e9302 100755
    if not ar:
       if platform.is_msvc():
          ar = os.environ.get('AR', 'lib.exe')
-@@ -484,7 +494,8 @@ def WriteGNNinja(path, platform, host, options, args_list):
+@@ -494,7 +500,8 @@ def WriteGNNinja(path, platform, host, options, args_list):
        # or data item into its own section so --gc-sections can eliminate any
        # unused functions and data items.
        cflags.extend(['-fdata-sections', '-ffunction-sections'])
@@ -64,10 +48,10 @@ index 4730836..81e9302 100755
          ldflags.append('-Wl,-dead_strip')
        elif not platform.is_aix() and not platform.is_solaris() and not platform.is_zos():
 diff --git a/src/3rdparty/gn/src/gn/ninja_binary_target_writer.cc b/src/3rdparty/gn/src/gn/ninja_binary_target_writer.cc
-index e4f713c..557e50d 100644
+index 0d23087..cd20d15 100644
 --- a/src/3rdparty/gn/src/gn/ninja_binary_target_writer.cc
 +++ b/src/3rdparty/gn/src/gn/ninja_binary_target_writer.cc
-@@ -364,7 +364,11 @@ void NinjaBinaryTargetWriter::WriteLinkerFlags(
+@@ -379,7 +379,11 @@ void NinjaBinaryTargetWriter::WriteLinkerFlags(
    WriteLibrarySearchPath(out, tool);
  
    if (optional_def_file) {

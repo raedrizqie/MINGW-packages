@@ -2,9 +2,9 @@
 
 _realname=qt6-webengine
 pkgbase=mingw-w64-${_realname}
-pkgname=("${MINGW_PACKAGE_PREFIX}-${_realname}"
-         "${MINGW_PACKAGE_PREFIX}-${_realname}-debug")
-pkgver=6.9.2
+pkgname=("${MINGW_PACKAGE_PREFIX}-${_realname}")
+         #"${MINGW_PACKAGE_PREFIX}-${_realname}-debug")
+pkgver=6.10.2
 pkgrel=1
 pkgdesc='Provides support for web applications using the Chromium browser project'
 arch=(any)
@@ -147,8 +147,8 @@ prepare() {
     0110-chromium-third-party-webrtc.patch \
     0111-chromium-third-party-others.patch
 
-  #apply_patch_with_msg \
-  #  0201-gn-mingw-fixes.patch
+  apply_patch_with_msg \
+    0201-gn-mingw-fixes.patch
 }
 
 build() {
@@ -157,9 +157,10 @@ build() {
     -GNinja \
     -DCMAKE_BUILD_TYPE=RelWithDebInfo \
     -DCMAKE_INSTALL_PREFIX=${MINGW_PREFIX} \
-    -DPython3_EXECUTABLE=${MINGW_PREFIX}/bin/python \
+    -DPython3_EXECUTABLE=${MINGW_PREFIX}/bin/python3 \
     -DQT_FEATURE_qtpdf_build=OFF \
     -DQT_FEATURE_webengine_system_icu=ON \
+    -DQT_SHOW_EXTRA_IDE_SOURCES=OFF \
     -S ${_pkgfn} \
     -B build-${MSYSTEM}
 

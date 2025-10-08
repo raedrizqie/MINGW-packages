@@ -1,9 +1,9 @@
 diff --git a/src/3rdparty/chromium/sandbox/win/BUILD.gn b/src/3rdparty/chromium/sandbox/win/BUILD.gn
-index 7c7e809..b6ce79b 100644
+index 5c47439..4a3da81 100644
 --- a/src/3rdparty/chromium/sandbox/win/BUILD.gn
 +++ b/src/3rdparty/chromium/sandbox/win/BUILD.gn
 @@ -188,10 +188,17 @@ static_library("sandbox") {
-     "//base:base_static",
+     "//build/config/win:maybe_set_appcontainer_acls",
    ]
  
 -  libs = [
@@ -145,7 +145,7 @@ index 8df2c68..4844504 100644
  typedef NTSTATUS(WINAPI* NtQueryObjectFunction)(
      IN HANDLE Handle,
 diff --git a/src/3rdparty/chromium/sandbox/win/src/sandbox_nt_util.cc b/src/3rdparty/chromium/sandbox/win/src/sandbox_nt_util.cc
-index 35f0a45..0278da8 100644
+index 26158cc..ea4119c 100644
 --- a/src/3rdparty/chromium/sandbox/win/src/sandbox_nt_util.cc
 +++ b/src/3rdparty/chromium/sandbox/win/src/sandbox_nt_util.cc
 @@ -19,6 +19,7 @@
@@ -156,7 +156,7 @@ index 35f0a45..0278da8 100644
  #include "sandbox/win/src/internal_types.h"
  #include "sandbox/win/src/nt_internals.h"
  #include "sandbox/win/src/sandbox_factory.h"
-@@ -327,7 +328,9 @@ NTSTATUS CopyData(void* destination, const void* source, size_t bytes) {
+@@ -326,7 +327,9 @@ NTSTATUS CopyData(void* destination, const void* source, size_t bytes) {
    __try {
      GetNtExports()->memcpy(destination, source, bytes);
    } __except (EXCEPTION_EXECUTE_HANDLER) {
@@ -166,7 +166,7 @@ index 35f0a45..0278da8 100644
    }
    return ret;
  }
-@@ -353,7 +356,7 @@ NTSTATUS CopyNameAndAttributes(
+@@ -352,7 +355,7 @@ NTSTATUS CopyNameAndAttributes(
          break;
  
        size_t size = in_object->ObjectName->Length / sizeof(wchar_t);
@@ -175,7 +175,7 @@ index 35f0a45..0278da8 100644
        if (!*out_name)
          break;
  
-@@ -370,7 +373,9 @@ NTSTATUS CopyNameAndAttributes(
+@@ -369,7 +372,9 @@ NTSTATUS CopyNameAndAttributes(
        ret = STATUS_SUCCESS;
      } while (false);
    } __except (EXCEPTION_EXECUTE_HANDLER) {
@@ -185,7 +185,7 @@ index 35f0a45..0278da8 100644
    }
  
    if (!NT_SUCCESS(ret) && *out_name)
-@@ -476,7 +481,7 @@ UNICODE_STRING* AnsiToUnicode(const char* string) {
+@@ -475,7 +480,7 @@ UNICODE_STRING* AnsiToUnicode(const char* string) {
        ansi_string.MaximumLength * sizeof(wchar_t) + sizeof(UNICODE_STRING);
  
    UNICODE_STRING* out_string =
@@ -194,7 +194,7 @@ index 35f0a45..0278da8 100644
    if (!out_string)
      return nullptr;
  
-@@ -559,7 +564,7 @@ UNICODE_STRING* GetBackingFilePath(PVOID address) {
+@@ -558,7 +563,7 @@ UNICODE_STRING* GetBackingFilePath(PVOID address) {
  
    for (;;) {
      MEMORY_SECTION_NAME* section_name = reinterpret_cast<MEMORY_SECTION_NAME*>(
@@ -203,7 +203,7 @@ index 35f0a45..0278da8 100644
  
      if (!section_name)
        return nullptr;
-@@ -612,7 +617,7 @@ UNICODE_STRING* ExtractModuleName(const UNICODE_STRING* module_path) {
+@@ -611,7 +616,7 @@ UNICODE_STRING* ExtractModuleName(const UNICODE_STRING* module_path) {
    // Because module_path is a UNICODE_STRING, size_bytes will be small enough
    // to make the static_cast below safe.
    DCHECK_NT(UINT16_MAX > size_bytes);
@@ -213,10 +213,10 @@ index 35f0a45..0278da8 100644
      return nullptr;
  
 diff --git a/src/3rdparty/chromium/sandbox/win/src/target_process.cc b/src/3rdparty/chromium/sandbox/win/src/target_process.cc
-index 1a5d642..4c07c2e 100644
+index df0be21..4c963d8 100644
 --- a/src/3rdparty/chromium/sandbox/win/src/target_process.cc
 +++ b/src/3rdparty/chromium/sandbox/win/src/target_process.cc
-@@ -248,7 +248,7 @@ ResultCode TargetProcess::TransferVariable(const char* name,
+@@ -249,7 +249,7 @@ ResultCode TargetProcess::TransferVariable(const char* name,
    if (!module)
      return SBOX_ERROR_CANNOT_LOADLIBRARY_EXECUTABLE;
  

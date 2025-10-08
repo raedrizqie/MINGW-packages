@@ -1,8 +1,30 @@
 diff --git a/src/3rdparty/chromium/chrome/BUILD.gn b/src/3rdparty/chromium/chrome/BUILD.gn
-index d2c1857..2c8b67c 100644
+index e57b3b3..f0c29de 100644
 --- a/src/3rdparty/chromium/chrome/BUILD.gn
 +++ b/src/3rdparty/chromium/chrome/BUILD.gn
-@@ -482,9 +482,11 @@ if (is_win) {
+@@ -146,7 +146,7 @@ if (!is_android && !is_mac) {
+     }
+   }
+ 
+-  if (is_win) {
++  if (is_msvc) {
+     _chrome_output_name = "initialexe/chrome"
+   } else {
+     _chrome_output_name = "chrome"
+@@ -234,6 +234,12 @@ if (!is_android && !is_mac) {
+         "//third_party/crashpad/crashpad/util",
+         "//ui/gl",
+       ]
++      if (is_mingw) {
++        deps -= [
++          ":copy_first_run",
++          "//chrome/installer/util:did_run_support",
++        ]
++      }
+ 
+       data_deps = [
+         "//chrome/app/version_assembly:version_assembly_manifest",
+@@ -449,9 +455,11 @@ if (is_win) {
      }
    }
  
@@ -18,10 +40,10 @@ index d2c1857..2c8b67c 100644
  } else if (is_mac) {
    chrome_helper_name = chrome_product_full_name + " Helper"
 diff --git a/src/3rdparty/chromium/chrome/browser/BUILD.gn b/src/3rdparty/chromium/chrome/browser/BUILD.gn
-index 8da7530..73183ed 100644
+index a9eabc2..84cfb2b 100644
 --- a/src/3rdparty/chromium/chrome/browser/BUILD.gn
 +++ b/src/3rdparty/chromium/chrome/browser/BUILD.gn
-@@ -84,16 +84,18 @@ if (is_win) {
+@@ -86,16 +86,18 @@ if (is_win) {
    # ldflags in GN aren't automatically inherited.
    config("browser_win_linker_flags") {
      libs = [
@@ -50,7 +72,7 @@ index 8da7530..73183ed 100644
    }
  }
  
-@@ -6182,7 +6184,7 @@ static_library("browser") {
+@@ -5990,7 +5992,7 @@ static_library("browser") {
      ]
    }
  
@@ -76,6 +98,42 @@ index 51c2766..6edd2e8 100644
    }
  }
  
+diff --git a/src/3rdparty/chromium/chrome/browser/os_crypt/BUILD.gn b/src/3rdparty/chromium/chrome/browser/os_crypt/BUILD.gn
+index a1b5fbf..70a47f8 100644
+--- a/src/3rdparty/chromium/chrome/browser/os_crypt/BUILD.gn
++++ b/src/3rdparty/chromium/chrome/browser/os_crypt/BUILD.gn
+@@ -77,6 +77,9 @@ source_set("test_support") {
+     "//chrome/installer/util:work_item",
+     "//chrome/windows_services/service_program/test_support",
+   ]
++  if (is_mingw) {
++    deps -= [ "//chrome/installer/util:work_item" ]
++  }
+ }
+ 
+ # This binary is launched by the browser tests and makes calls to the app-bound
+diff --git a/src/3rdparty/chromium/chrome/browser/updater/BUILD.gn b/src/3rdparty/chromium/chrome/browser/updater/BUILD.gn
+index 0ef355d..7e48698 100644
+--- a/src/3rdparty/chromium/chrome/browser/updater/BUILD.gn
++++ b/src/3rdparty/chromium/chrome/browser/updater/BUILD.gn
+@@ -5,7 +5,7 @@
+ import("//build/config/chrome_build.gni")
+ import("//chrome/browser/buildflags.gni")
+ 
+-if (is_win || is_mac) {
++if (is_msvc || is_mac) {
+   source_set("browser_updater_client") {
+     sources = [
+       "browser_updater_client.cc",
+@@ -83,7 +83,7 @@ source_set("scheduler") {
+         "//chrome/common",
+         "//chrome/updater:browser_sources",
+       ]
+-    } else if (is_win) {
++    } else if (is_msvc) {
+       sources += [ "scheduler_win.cc" ]
+       deps += [
+         ":browser_updater_client",
 diff --git a/src/3rdparty/chromium/chrome/browser/win/conflicts/BUILD.gn b/src/3rdparty/chromium/chrome/browser/win/conflicts/BUILD.gn
 index daf7e5b..5dd143f 100644
 --- a/src/3rdparty/chromium/chrome/browser/win/conflicts/BUILD.gn
@@ -90,10 +148,10 @@ index daf7e5b..5dd143f 100644
    if (safe_browsing_mode == 1) {
      deps += [
 diff --git a/src/3rdparty/chromium/chrome/chrome_elf/BUILD.gn b/src/3rdparty/chromium/chrome/chrome_elf/BUILD.gn
-index 37e2d2a..8ab1a03 100644
+index a6072f9..41843f8 100644
 --- a/src/3rdparty/chromium/chrome/chrome_elf/BUILD.gn
 +++ b/src/3rdparty/chromium/chrome/chrome_elf/BUILD.gn
-@@ -85,7 +85,7 @@ shared_library("chrome_elf") {
+@@ -79,7 +79,7 @@ shared_library("chrome_elf") {
      "//build/config/win:delayloads_not_for_child_dll",
    ]
  
@@ -102,7 +160,7 @@ index 37e2d2a..8ab1a03 100644
      # Don"t set an x64 base address (to avoid breaking HE-ASLR).
      ldflags = [ "/BASE:0x01c20000" ]
    }
-@@ -162,8 +162,8 @@ static_library("nt_registry") {
+@@ -156,8 +156,8 @@ static_library("nt_registry") {
    ]
  
    libs = [
@@ -114,12 +172,12 @@ index 37e2d2a..8ab1a03 100644
  }
  
 diff --git a/src/3rdparty/chromium/chrome/elevation_service/BUILD.gn b/src/3rdparty/chromium/chrome/elevation_service/BUILD.gn
-index 88ed423..0050e38 100644
+index a0e3912..eef4e9e 100644
 --- a/src/3rdparty/chromium/chrome/elevation_service/BUILD.gn
 +++ b/src/3rdparty/chromium/chrome/elevation_service/BUILD.gn
-@@ -101,10 +101,17 @@ source_set("lib") {
- 
-   public_deps = [ ":public_headers" ]
+@@ -75,10 +75,17 @@ source_set("lib") {
+     "//base",
+   ]
  
 -  libs = [
 -    "crypt32.lib",
@@ -138,9 +196,9 @@ index 88ed423..0050e38 100644
 +  }
  }
  
- process_version_rc_template("version_resources") {
+ source_set("service_lib") {
 diff --git a/src/3rdparty/chromium/chrome/installer/setup/BUILD.gn b/src/3rdparty/chromium/chrome/installer/setup/BUILD.gn
-index b9b236a..6a23226 100644
+index 06424d7..ee68595 100644
 --- a/src/3rdparty/chromium/chrome/installer/setup/BUILD.gn
 +++ b/src/3rdparty/chromium/chrome/installer/setup/BUILD.gn
 @@ -7,7 +7,7 @@ import("//build/config/chrome_build.gni")
@@ -153,7 +211,7 @@ index b9b236a..6a23226 100644
      sources = [
        "setup.ico",
 diff --git a/src/3rdparty/chromium/chrome/installer/util/BUILD.gn b/src/3rdparty/chromium/chrome/installer/util/BUILD.gn
-index 8b494d7..eafb653 100644
+index 64bcc58..b16abcc 100644
 --- a/src/3rdparty/chromium/chrome/installer/util/BUILD.gn
 +++ b/src/3rdparty/chromium/chrome/installer/util/BUILD.gn
 @@ -7,7 +7,7 @@ import("//build/config/chrome_build.gni")
@@ -174,7 +232,7 @@ index 8b494d7..eafb653 100644
      sources = [
        "additional_parameters.cc",
        "additional_parameters.h",
-@@ -258,7 +258,7 @@ source_set("constants") {
+@@ -260,7 +260,7 @@ source_set("constants") {
    }
  }
  
@@ -218,10 +276,10 @@ index 0244dc3..fd4a85d 100644
 +  }
  }
 diff --git a/src/3rdparty/chromium/chrome/test/BUILD.gn b/src/3rdparty/chromium/chrome/test/BUILD.gn
-index 5a01117..dc5f6ff 100644
+index fc37f91..b888f6a 100644
 --- a/src/3rdparty/chromium/chrome/test/BUILD.gn
 +++ b/src/3rdparty/chromium/chrome/test/BUILD.gn
-@@ -822,7 +822,7 @@ static_library("test_support") {
+@@ -849,7 +849,7 @@ static_library("test_support") {
      deps += [ "//ui/events:test_support" ]
    }
  
@@ -230,7 +288,7 @@ index 5a01117..dc5f6ff 100644
      sources += [
        "../browser/webshare/win/fake_buffer.cc",
        "../browser/webshare/win/fake_buffer.h",
-@@ -5772,7 +5772,7 @@ if (is_linux || is_chromeos || is_mac || is_win || is_android) {
+@@ -5577,7 +5577,7 @@ if (is_linux || is_chromeos || is_mac || is_win || is_android) {
  
    sizes_test("chrome_sizes") {
      data_deps = [ "//chrome" ]
@@ -239,8 +297,26 @@ index 5a01117..dc5f6ff 100644
        data_deps += [ "//chrome/installer/mini_installer" ]
      }
      if (is_android) {
-@@ -10758,7 +10758,7 @@ if (!is_android) {
-       deps += [ "//chrome/browser/apps/app_shim:app_shim" ]
+@@ -6974,7 +6974,7 @@ test("unit_tests") {
+     deps += [ "//chrome/browser/enterprise/platform_auth:test_utils" ]
+   }
+ 
+-  if (is_win || is_mac) {
++  if (is_msvc || is_mac) {
+     sources += [
+       "../browser/updater/browser_updater_client_testutils.cc",
+       "../browser/updater/browser_updater_client_testutils.h",
+@@ -6986,7 +6986,7 @@ test("unit_tests") {
+     ]
+   }
+ 
+-  if (is_win && !is_qtwebengine) {
++  if (is_msvc && !is_qtwebengine) {
+     assert(toolkit_views)
+     sources += [
+       "../browser/accessibility/live_caption/live_caption_unavailability_notifier_unittest.cc",
+@@ -10497,7 +10497,7 @@ if (!is_android) {
+       ]
      }
  
 -    if (is_win) {
@@ -248,8 +324,8 @@ index 5a01117..dc5f6ff 100644
        sources += [
          "base/always_on_top_window_killer_win.cc",
          "base/always_on_top_window_killer_win.h",
-@@ -11665,7 +11665,7 @@ if (!is_android && !is_chromeos_device && !is_qtwebengine) {
-       ]
+@@ -11425,7 +11425,7 @@ if (!is_android && !is_chromeos_device && !is_qtwebengine) {
+       deps += [ "//chrome/browser/ui/signin:interactive_ui_tests" ]
      }
  
 -    if (is_win) {
@@ -272,10 +348,10 @@ index caef30a..f70a1d7 100644
      ":lib",
      "//base",
 diff --git a/src/3rdparty/chromium/chrome/updater/BUILD.gn b/src/3rdparty/chromium/chrome/updater/BUILD.gn
-index 685413c..cbe07b7 100644
+index 7781c85..67e3819 100644
 --- a/src/3rdparty/chromium/chrome/updater/BUILD.gn
 +++ b/src/3rdparty/chromium/chrome/updater/BUILD.gn
-@@ -16,7 +16,7 @@ import("//testing/test.gni")
+@@ -18,7 +18,7 @@ import("//testing/test.gni")
  # check that the C++ includes match the build dependency graph.
  
  group("updater") {
@@ -284,16 +360,16 @@ index 685413c..cbe07b7 100644
      deps = [ "//chrome/updater/win" ]
    }
    if (is_mac) {
-@@ -26,7 +26,7 @@ group("updater") {
+@@ -28,7 +28,7 @@ group("updater") {
      deps = [ "//chrome/updater/linux" ]
    }
  
 -  if (is_win || is_mac || is_linux) {
 +  if (is_msvc || is_mac || is_linux) {
      deps += [
+       ":updater_license",
        "//chrome/updater/test/qualification_app",
-       "//chrome/updater/tools",
-@@ -37,7 +37,7 @@ group("updater") {
+@@ -46,7 +46,7 @@ group("updater") {
  group("all") {
    testonly = true
  
@@ -302,16 +378,16 @@ index 685413c..cbe07b7 100644
      deps = [
        ":updater",
        ":updater_tests",
-@@ -49,7 +49,7 @@ group("all") {
+@@ -58,7 +58,7 @@ group("all") {
    }
  }
  
 -if (is_win || is_mac || is_linux) {
 +if (is_msvc || is_mac || is_linux) {
-   source_set("base") {
-     sources = [
-       "action_handler.h",
-@@ -234,7 +234,7 @@ if (is_win || is_mac || is_linux) {
+   action("updater_license") {
+     script = "//chrome/updater/fix_licenses.py"
+     deps = [ ":generate_updater_license" ]
+@@ -285,7 +285,7 @@ if (is_win || is_mac || is_linux) {
        ]
      }
  
@@ -320,7 +396,16 @@ index 685413c..cbe07b7 100644
        sources += [
          "activity_impl_win.cc",
          "app/app_install_util_win.cc",
-@@ -706,7 +706,7 @@ if (is_win || is_mac || is_linux) {
+@@ -669,7 +669,7 @@ if (is_win || is_mac || is_linux) {
+     }
+   }
+ 
+-  if (is_linux || is_mac || is_win) {
++  if (is_linux || is_mac || is_msvc) {
+     crx3("updater_selfupdate_test_crx") {
+       base_dir = "$root_build_dir"
+       key = "test/data/selfupdate_test_key.der"
+@@ -709,7 +709,7 @@ if (is_win || is_mac || is_linux) {
          }
        }
  
@@ -329,16 +414,16 @@ index 685413c..cbe07b7 100644
          inputs = [ "$root_build_dir/UpdaterSetup_test.exe" ]
          deps = [ "//chrome/updater/win/installer:installer_test" ]
  
-@@ -862,7 +862,7 @@ if (is_win || is_mac || is_linux) {
-       "//chrome/updater/test/test_installer:app_installers",
-     ]
+@@ -958,7 +958,7 @@ if (is_win || is_mac || is_linux) {
+ 
+     defines = []
  
 -    if (is_win) {
 +    if (is_msvc) {
        sources += [
          "activity_impl_win_unittest.cc",
          "app/app_install_win_unittest.cc",
-@@ -1086,7 +1086,7 @@ if (is_win || is_mac || is_linux) {
+@@ -1188,7 +1188,7 @@ if (is_win || is_mac || is_linux) {
      }
    }
  
@@ -347,7 +432,7 @@ index 685413c..cbe07b7 100644
      copy("test_service_files") {
        testonly = true
        sources = [
-@@ -1133,7 +1133,7 @@ if (is_win || is_mac || is_linux) {
+@@ -1235,7 +1235,7 @@ if (is_win || is_mac || is_linux) {
          "//third_party/updater:old_updater",
        ]
      }
@@ -356,7 +441,7 @@ index 685413c..cbe07b7 100644
        deps += [ "//chrome/installer/util:with_no_strings" ]
        data_deps = [
          ":test_service_files",
-@@ -1174,7 +1174,7 @@ if (is_win || is_mac || is_linux) {
+@@ -1276,7 +1276,7 @@ if (is_win || is_mac || is_linux) {
          "//third_party/updater:old_updater",
        ]
      }
@@ -365,7 +450,7 @@ index 685413c..cbe07b7 100644
        deps += [ "//chrome/installer/util:with_no_strings" ]
        data_deps += [
          ":test_service_files",
-@@ -1187,7 +1187,7 @@ if (is_win || is_mac || is_linux) {
+@@ -1289,7 +1289,7 @@ if (is_win || is_mac || is_linux) {
      }
    }
  
@@ -374,3 +459,17 @@ index 685413c..cbe07b7 100644
      group("updater_tests_win_uac") {
        testonly = true
        data = [ "//testing/scripts/run_telemetry_as_googletest.py" ]
+diff --git a/src/3rdparty/chromium/chrome/windows_services/service_program/test_support/BUILD.gn b/src/3rdparty/chromium/chrome/windows_services/service_program/test_support/BUILD.gn
+index 5adccba..9fa0034 100644
+--- a/src/3rdparty/chromium/chrome/windows_services/service_program/test_support/BUILD.gn
++++ b/src/3rdparty/chromium/chrome/windows_services/service_program/test_support/BUILD.gn
+@@ -28,6 +28,9 @@ source_set("test_support") {
+     "//chrome/windows_services/service_program:constants",
+     "//testing/gtest",
+   ]
++  if (is_mingw){
++    deps -= [ "//chrome/installer/util:work_item" ]
++  }
+ }
+ 
+ source_set("unit_tests") {

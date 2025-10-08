@@ -67,7 +67,7 @@ index f99c605..8c279f6 100644
            reinterpret_cast<PBYTE>(base::WriteInto(&buffer, required_size)),
            required_size, nullptr, 0)) {
 diff --git a/src/3rdparty/chromium/device/bluetooth/BUILD.gn b/src/3rdparty/chromium/device/bluetooth/BUILD.gn
-index 82d4f2b..44e43a3 100644
+index af32815..a0cfec4 100644
 --- a/src/3rdparty/chromium/device/bluetooth/BUILD.gn
 +++ b/src/3rdparty/chromium/device/bluetooth/BUILD.gn
 @@ -13,7 +13,7 @@ if (is_android) {
@@ -117,7 +117,7 @@ index 82d4f2b..44e43a3 100644
    }
  
 diff --git a/src/3rdparty/chromium/device/bluetooth/bluetooth_adapter_win.cc b/src/3rdparty/chromium/device/bluetooth/bluetooth_adapter_win.cc
-index 22b79c9..e64a439 100644
+index b37b0ae..8d8085f 100644
 --- a/src/3rdparty/chromium/device/bluetooth/bluetooth_adapter_win.cc
 +++ b/src/3rdparty/chromium/device/bluetooth/bluetooth_adapter_win.cc
 @@ -20,7 +20,9 @@
@@ -190,28 +190,13 @@ index 6dfae97..2ea4fa0 100644
  
  namespace device {
  namespace bluetooth_init_win {
-diff --git a/src/3rdparty/chromium/device/fido/aoa/android_accessory_discovery.h b/src/3rdparty/chromium/device/fido/aoa/android_accessory_discovery.h
-index 7e8737e..8066542 100644
---- a/src/3rdparty/chromium/device/fido/aoa/android_accessory_discovery.h
-+++ b/src/3rdparty/chromium/device/fido/aoa/android_accessory_discovery.h
-@@ -22,6 +22,10 @@
- #include "services/device/public/mojom/usb_manager.mojom.h"
- #include "services/device/public/mojom/usb_manager_client.mojom.h"
- 
-+#if defined(COMPILER_GCC)
-+#undef interface
-+#endif
-+
- namespace device {
- 
- // AndroidAccessoryDiscovery watches for USB devices that are inserted during
 diff --git a/src/3rdparty/chromium/device/fido/virtual_ctap2_device.cc b/src/3rdparty/chromium/device/fido/virtual_ctap2_device.cc
-index 726d43d..4acad18 100644
+index fb4c5c8..bc52403 100644
 --- a/src/3rdparty/chromium/device/fido/virtual_ctap2_device.cc
 +++ b/src/3rdparty/chromium/device/fido/virtual_ctap2_device.cc
-@@ -10,6 +10,7 @@
- #include "device/fido/virtual_ctap2_device.h"
+@@ -11,6 +11,7 @@
  
+ #include <algorithm>
  #include <array>
 +#include <cstring>
  #include <memory>

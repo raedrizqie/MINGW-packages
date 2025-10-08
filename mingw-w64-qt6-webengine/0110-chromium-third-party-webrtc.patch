@@ -1,9 +1,9 @@
 diff --git a/src/3rdparty/chromium/third_party/webrtc/BUILD.gn b/src/3rdparty/chromium/third_party/webrtc/BUILD.gn
-index 2bf28cc..ff4e420 100644
+index 253f5d0..6778fc0 100644
 --- a/src/3rdparty/chromium/third_party/webrtc/BUILD.gn
 +++ b/src/3rdparty/chromium/third_party/webrtc/BUILD.gn
-@@ -434,7 +434,7 @@ config("common_config") {
-       }
+@@ -422,7 +422,7 @@ config("common_config") {
+       ]
      }
  
 -    if (is_win && !is_clang) {
@@ -11,7 +11,7 @@ index 2bf28cc..ff4e420 100644
        # MSVC warning suppressions (needed to use Abseil).
        # TODO(bugs.webrtc.org/9274): Remove these warnings as soon as MSVC allows
        # external headers warning suppression (or fix them upstream).
-@@ -498,8 +498,8 @@ config("common_config") {
+@@ -486,8 +486,8 @@ config("common_config") {
  
    if (!build_with_chromium && rtc_win_undef_unicode) {
      cflags += [
@@ -23,7 +23,7 @@ index 2bf28cc..ff4e420 100644
    }
  
 diff --git a/src/3rdparty/chromium/third_party/webrtc/common_audio/BUILD.gn b/src/3rdparty/chromium/third_party/webrtc/common_audio/BUILD.gn
-index 3d1688f..3b06987 100644
+index 4845bc7..8b86311 100644
 --- a/src/3rdparty/chromium/third_party/webrtc/common_audio/BUILD.gn
 +++ b/src/3rdparty/chromium/third_party/webrtc/common_audio/BUILD.gn
 @@ -248,7 +248,7 @@ if (current_cpu == "x86" || current_cpu == "x64") {
@@ -45,10 +45,10 @@ index 3d1688f..3b06987 100644
      } else {
        cflags = [
 diff --git a/src/3rdparty/chromium/third_party/webrtc/modules/audio_processing/aec3/BUILD.gn b/src/3rdparty/chromium/third_party/webrtc/modules/audio_processing/aec3/BUILD.gn
-index 12a32b8..24012f1 100644
+index a0bda5f..5835b05 100644
 --- a/src/3rdparty/chromium/third_party/webrtc/modules/audio_processing/aec3/BUILD.gn
 +++ b/src/3rdparty/chromium/third_party/webrtc/modules/audio_processing/aec3/BUILD.gn
-@@ -260,7 +260,7 @@ if (current_cpu == "x86" || current_cpu == "x64") {
+@@ -261,7 +261,7 @@ if (current_cpu == "x86" || current_cpu == "x64") {
        "vector_math_avx2.cc",
      ]
  
@@ -58,10 +58,10 @@ index 12a32b8..24012f1 100644
      } else {
        cflags = [
 diff --git a/src/3rdparty/chromium/third_party/webrtc/modules/audio_processing/agc2/rnn_vad/BUILD.gn b/src/3rdparty/chromium/third_party/webrtc/modules/audio_processing/agc2/rnn_vad/BUILD.gn
-index a0dd394..4ab6507 100644
+index 025794d..8cab438 100644
 --- a/src/3rdparty/chromium/third_party/webrtc/modules/audio_processing/agc2/rnn_vad/BUILD.gn
 +++ b/src/3rdparty/chromium/third_party/webrtc/modules/audio_processing/agc2/rnn_vad/BUILD.gn
-@@ -122,7 +122,7 @@ rtc_source_set("vector_math") {
+@@ -121,7 +121,7 @@ rtc_source_set("vector_math") {
  if (current_cpu == "x86" || current_cpu == "x64") {
    rtc_library("vector_math_avx2") {
      sources = [ "vector_math_avx2.cc" ]
@@ -71,10 +71,10 @@ index a0dd394..4ab6507 100644
      } else {
        cflags = [
 diff --git a/src/3rdparty/chromium/third_party/webrtc/modules/desktop_capture/BUILD.gn b/src/3rdparty/chromium/third_party/webrtc/modules/desktop_capture/BUILD.gn
-index 27694d8..2139538 100644
+index eaedf62..a5309f4 100644
 --- a/src/3rdparty/chromium/third_party/webrtc/modules/desktop_capture/BUILD.gn
 +++ b/src/3rdparty/chromium/third_party/webrtc/modules/desktop_capture/BUILD.gn
-@@ -527,11 +527,19 @@ rtc_library("desktop_capture") {
+@@ -530,11 +530,19 @@ rtc_library("desktop_capture") {
        "window_finder_win.cc",
        "window_finder_win.h",
      ]
@@ -99,7 +99,7 @@ index 27694d8..2139538 100644
      deps += [
        "../../rtc_base:win32",
        "../../rtc_base/containers:flat_map",
-@@ -685,7 +693,7 @@ if (use_desktop_capture_differ_sse2) {
+@@ -688,7 +696,7 @@ if (use_desktop_capture_differ_sse2) {
        "differ_vector_sse2.h",
      ]
  
@@ -151,7 +151,7 @@ index 476ddc4..80a3ded 100644
  
  }  // namespace utils
 diff --git a/src/3rdparty/chromium/third_party/webrtc/rtc_base/BUILD.gn b/src/3rdparty/chromium/third_party/webrtc/rtc_base/BUILD.gn
-index e1282d7..ec3cddb 100644
+index ccdecd0..848445b 100644
 --- a/src/3rdparty/chromium/third_party/webrtc/rtc_base/BUILD.gn
 +++ b/src/3rdparty/chromium/third_party/webrtc/rtc_base/BUILD.gn
 @@ -575,7 +575,11 @@ rtc_library("timeutils") {
@@ -167,7 +167,7 @@ index e1282d7..ec3cddb 100644
      deps += [ ":win32" ]
    }
  }
-@@ -1114,11 +1118,19 @@ if (is_win) {
+@@ -1094,11 +1098,19 @@ if (is_win) {
        ":stringutils",
      ]
  
@@ -258,7 +258,7 @@ index 93af137..6914722 100644
  #endif
  
 diff --git a/src/3rdparty/chromium/third_party/webrtc/system_wrappers/BUILD.gn b/src/3rdparty/chromium/third_party/webrtc/system_wrappers/BUILD.gn
-index 5e66d4b..b0df8ac 100644
+index 786c469..65c2377 100644
 --- a/src/3rdparty/chromium/third_party/webrtc/system_wrappers/BUILD.gn
 +++ b/src/3rdparty/chromium/third_party/webrtc/system_wrappers/BUILD.gn
 @@ -67,7 +67,11 @@ rtc_library("system_wrappers") {
@@ -275,10 +275,10 @@ index 5e66d4b..b0df8ac 100644
      # Windows needs ../rtc_base due to include of
      # webrtc/rtc_base/win32.h in source/clock.cc.
 diff --git a/src/3rdparty/chromium/third_party/webrtc/webrtc.gni b/src/3rdparty/chromium/third_party/webrtc/webrtc.gni
-index 66ed843..6aeb6ea 100644
+index c5eeba5..7314e5c 100644
 --- a/src/3rdparty/chromium/third_party/webrtc/webrtc.gni
 +++ b/src/3rdparty/chromium/third_party/webrtc/webrtc.gni
-@@ -235,7 +235,7 @@ declare_args() {
+@@ -232,7 +232,7 @@ declare_args() {
    # When set to true, a capturer implementation that uses the
    # Windows.Graphics.Capture APIs will be available for use. This introduces a
    # dependency on the Win 10 SDK v10.0.17763.0.

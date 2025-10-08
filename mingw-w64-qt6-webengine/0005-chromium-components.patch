@@ -1,8 +1,8 @@
 diff --git a/src/3rdparty/chromium/components/download/internal/common/base_file.cc b/src/3rdparty/chromium/components/download/internal/common/base_file.cc
-index cafcdc6..6325e53 100644
+index 23323c5..9c6d167 100644
 --- a/src/3rdparty/chromium/components/download/internal/common/base_file.cc
 +++ b/src/3rdparty/chromium/components/download/internal/common/base_file.cc
-@@ -271,7 +271,11 @@ DownloadInterruptReason BaseFile::Rename(const base::FilePath& new_path) {
+@@ -275,7 +275,11 @@ DownloadInterruptReason BaseFile::Rename(const base::FilePath& new_path) {
  
      // A simple rename wouldn't work here since we want the file to have
      // permissions / security descriptors that makes sense in the new directory.
@@ -86,10 +86,10 @@ index 17a22c9..faea3b3 100644
  // The maximum number of retries for the SimpleURLLoader requests.
  const size_t kMaxRetries = 1;
 diff --git a/src/3rdparty/chromium/components/metrics/BUILD.gn b/src/3rdparty/chromium/components/metrics/BUILD.gn
-index 6a0147a..83ea67d 100644
+index 00a94a8..8987095 100644
 --- a/src/3rdparty/chromium/components/metrics/BUILD.gn
 +++ b/src/3rdparty/chromium/components/metrics/BUILD.gn
-@@ -310,7 +310,11 @@ if (!is_cronet_build || is_ios) {
+@@ -320,7 +320,11 @@ if (!is_cronet_build || is_ios) {
          "system_session_analyzer/system_session_analyzer_win.cc",
          "system_session_analyzer/system_session_analyzer_win.h",
        ]
@@ -103,10 +103,10 @@ index 6a0147a..83ea67d 100644
        sources += [ "machine_id_provider_nonwin.cc" ]
      }
 diff --git a/src/3rdparty/chromium/components/metrics/metrics_state_manager.cc b/src/3rdparty/chromium/components/metrics/metrics_state_manager.cc
-index 5d99b4c..52ad4dd 100644
+index 125faac..0540396 100644
 --- a/src/3rdparty/chromium/components/metrics/metrics_state_manager.cc
 +++ b/src/3rdparty/chromium/components/metrics/metrics_state_manager.cc
-@@ -84,12 +84,14 @@ std::unique_ptr<metrics::ClientInfo> NoOpLoadClientInfoBackup() {
+@@ -89,12 +89,14 @@ std::unique_ptr<metrics::ClientInfo> NoOpLoadClientInfoBackup() {
    return nullptr;
  }
  
@@ -122,11 +122,11 @@ index 5d99b4c..52ad4dd 100644
  // Returns a log normal distribution based on the feature params of
  // |kNonUniformityValidationFeature|.
 diff --git a/src/3rdparty/chromium/components/os_crypt/sync/BUILD.gn b/src/3rdparty/chromium/components/os_crypt/sync/BUILD.gn
-index 3b81e00..42650e8 100644
+index ff1e356..7f1bb84 100644
 --- a/src/3rdparty/chromium/components/os_crypt/sync/BUILD.gn
 +++ b/src/3rdparty/chromium/components/os_crypt/sync/BUILD.gn
-@@ -51,7 +51,11 @@ component("os_crypt") {
-   if (is_win) {
+@@ -41,7 +41,11 @@ component("sync") {
+   } else if (is_win) {
      sources += [ "os_crypt_win.cc" ]
      deps += [ "//components/version_info" ]
 -    libs = [ "crypt32.lib" ]
@@ -135,14 +135,14 @@ index 3b81e00..42650e8 100644
 +    } else {
 +      libs = [ "crypt32" ]
 +    }
-   }
- 
-   if (is_linux && !is_castos) {
+   } else if (is_linux && !is_castos) {
+     sources += [
+       "key_storage_config_linux.cc",
 diff --git a/src/3rdparty/chromium/components/policy/core/common/BUILD.gn b/src/3rdparty/chromium/components/policy/core/common/BUILD.gn
-index 30b6800..e14c40a 100644
+index 0aabcd7..53dd743 100644
 --- a/src/3rdparty/chromium/components/policy/core/common/BUILD.gn
 +++ b/src/3rdparty/chromium/components/policy/core/common/BUILD.gn
-@@ -290,13 +290,23 @@ jumbo_source_set("internal") {
+@@ -271,13 +271,23 @@ jumbo_source_set("internal") {
        "scoped_critical_policy_section.cc",
        "scoped_critical_policy_section.h",
      ]
@@ -174,10 +174,10 @@ index 30b6800..e14c40a 100644
  
    if (is_win || is_mac || is_linux) {
 diff --git a/src/3rdparty/chromium/components/signin/public/identity_manager/identity_manager_builder.cc b/src/3rdparty/chromium/components/signin/public/identity_manager/identity_manager_builder.cc
-index 1ba9360..f33c25a 100644
+index 31dd246..38a114b 100644
 --- a/src/3rdparty/chromium/components/signin/public/identity_manager/identity_manager_builder.cc
 +++ b/src/3rdparty/chromium/components/signin/public/identity_manager/identity_manager_builder.cc
-@@ -78,6 +78,7 @@ std::unique_ptr<AccountsMutator> BuildAccountsMutator(
+@@ -77,6 +77,7 @@ std::unique_ptr<AccountsMutator> BuildAccountsMutator(
  #endif
  }
  
@@ -185,7 +185,7 @@ index 1ba9360..f33c25a 100644
  std::unique_ptr<AccountFetcherService> BuildAccountFetcherService(
      SigninClient* signin_client,
      ProfileOAuth2TokenService* token_service,
-@@ -92,6 +93,7 @@ std::unique_ptr<AccountFetcherService> BuildAccountFetcherService(
+@@ -91,6 +92,7 @@ std::unique_ptr<AccountFetcherService> BuildAccountFetcherService(
        std::move(account_capabilities_fetcher_factory));
    return account_fetcher_service;
  }
@@ -206,7 +206,7 @@ index 27373c7..8583db9 100644
  #include <wrl/client.h>
  
 diff --git a/src/3rdparty/chromium/components/system_media_controls/BUILD.gn b/src/3rdparty/chromium/components/system_media_controls/BUILD.gn
-index 2e826eb..4deebc2 100644
+index b5d84cc..b0f242d 100644
 --- a/src/3rdparty/chromium/components/system_media_controls/BUILD.gn
 +++ b/src/3rdparty/chromium/components/system_media_controls/BUILD.gn
 @@ -38,7 +38,7 @@ component("system_media_controls") {
@@ -231,10 +231,10 @@ index 6f7b586..7a53f65 100644
  
  #include "base/component_export.h"
 diff --git a/src/3rdparty/chromium/components/viz/service/gl/gpu_service_impl.cc b/src/3rdparty/chromium/components/viz/service/gl/gpu_service_impl.cc
-index b4a68dd..aaf5e4e 100644
+index 7d85b1f..64e3982 100644
 --- a/src/3rdparty/chromium/components/viz/service/gl/gpu_service_impl.cc
 +++ b/src/3rdparty/chromium/components/viz/service/gl/gpu_service_impl.cc
-@@ -521,7 +521,7 @@ void GpuServiceImpl::UpdateGPUInfo() {
+@@ -527,7 +527,7 @@ void GpuServiceImpl::UpdateGPUInfo() {
          image_decode_accelerator_worker_->GetSupportedProfiles();
    }
  

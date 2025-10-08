@@ -1,5 +1,35 @@
+diff --git a/src/3rdparty/chromium/third_party/perfetto/gn/BUILD.gn b/src/3rdparty/chromium/third_party/perfetto/gn/BUILD.gn
+index 6ac0622..b3fa98c 100644
+--- a/src/3rdparty/chromium/third_party/perfetto/gn/BUILD.gn
++++ b/src/3rdparty/chromium/third_party/perfetto/gn/BUILD.gn
+@@ -319,7 +319,7 @@ config("protobuf_gen_config") {
+       "-Wno-undef",
+     ]
+   }
+-  if (!is_clang && is_win) {
++  if (!is_clang && is_msvc) {
+     # MSVC
+     cflags += [
+       "/wd4838",  # conversion from 'unsigned long' to 'int' requires a
+diff --git a/src/3rdparty/chromium/third_party/perfetto/gn/perfetto.gni b/src/3rdparty/chromium/third_party/perfetto/gn/perfetto.gni
+index 5fd06f7..aef84a7 100644
+--- a/src/3rdparty/chromium/third_party/perfetto/gn/perfetto.gni
++++ b/src/3rdparty/chromium/third_party/perfetto/gn/perfetto.gni
+@@ -395,9 +395,11 @@ declare_args() {
+   perfetto_use_system_zlib = false
+ }
+ 
+-if (is_win) {
++if (is_msvc) {
+   # clang-cl
+   perfetto_isystem_cflag = "/I"
++} else if (is_mingw) {
++  perfetto_isystem_cflag = "-I"
+ } else {
+   perfetto_isystem_cflag = "-isystem"
+ }
 diff --git a/src/3rdparty/chromium/third_party/perfetto/gn/standalone/BUILD.gn b/src/3rdparty/chromium/third_party/perfetto/gn/standalone/BUILD.gn
-index 36fb637..69d8da9 100644
+index 254a157..319386f 100644
 --- a/src/3rdparty/chromium/third_party/perfetto/gn/standalone/BUILD.gn
 +++ b/src/3rdparty/chromium/third_party/perfetto/gn/standalone/BUILD.gn
 @@ -40,7 +40,7 @@ hermetic_clang_suppressions = [ "-Wno-c99-designator" ]
@@ -11,7 +41,7 @@ index 36fb637..69d8da9 100644
      cflags = [
        "/W2",
        "/wd4244",  # conversion from 'float' to 'int', possible loss of data
-@@ -131,7 +131,7 @@ config("no_exceptions") {
+@@ -148,7 +148,7 @@ config("no_exceptions") {
  }
  
  config("no_rtti") {
@@ -20,7 +50,7 @@ index 36fb637..69d8da9 100644
      cflags_cc = [ "/GR-" ]
    } else {
      cflags_cc = [ "-fno-rtti" ]
-@@ -140,7 +140,7 @@ config("no_rtti") {
+@@ -157,7 +157,7 @@ config("no_rtti") {
  
  # Used in buildtools dependencies for standalone builds.
  config("c++17") {
@@ -29,16 +59,16 @@ index 36fb637..69d8da9 100644
      cflags_cc = [ "/std:c++17" ]
    } else {
      cflags_cc = [ "-std=c++17" ]
-@@ -158,7 +158,7 @@ config("c++20") {
- }
- 
- config("visibility_hidden") {
--  if (!is_win) {
-+  if (!is_msvc) {
-     cflags = [ "-fvisibility=hidden" ]
-   }
- }
-@@ -186,7 +186,7 @@ config("default") {
+@@ -167,7 +167,7 @@ config("c++17") {
+ # Used in buildtools dependencies for standalone builds.
+ config("c++20") {
+   visibility = [ "//buildtools:libc++config" ]
+-  if (is_win) {
++  if (is_msvc) {
+     cflags_cc = [ "/std:c++20" ]
+   } else {
+     cflags_cc = [ "-std=c++20" ]
+@@ -203,7 +203,7 @@ config("default") {
      ]
    }
  
@@ -47,8 +77,14 @@ index 36fb637..69d8da9 100644
      cflags += [
        "-fstrict-aliasing",
        "-Wformat",
-@@ -200,7 +200,7 @@ config("default") {
+@@ -217,12 +217,12 @@ config("default") {
      cflags += [ "-Wno-deprecated" ]
+   }
+ 
+-  if (!is_clang && is_win) {
++  if (!is_clang && is_msvc) {
+     # MSVC
+     cflags += [ "/permissive-" ]
    }
  
 -  if (is_win) {
@@ -56,7 +92,16 @@ index 36fb637..69d8da9 100644
      cflags += [
        "/bigobj",  # Some of our files are bigger than the regular limits.
        "/Gy",  # Enable function-level linking.
-@@ -228,7 +228,7 @@ config("default") {
+@@ -240,6 +240,8 @@ config("default") {
+     if (!use_custom_libcxx) {
+       defines += [ "_HAS_EXCEPTIONS=0" ]  # Disables exceptions in MSVC STL.
+     }
++  } else if (is_mingw) {
++    cflags += [ "-fstack-protector-strong" ]
+   } else if (!is_wasm) {  # !is_win
+     cflags += [
+       "-g",
+@@ -250,7 +252,7 @@ config("default") {
  
    # Treat warnings as errors, but give up on fuzzer builds.
    if (!is_fuzzer) {
@@ -65,7 +110,7 @@ index 36fb637..69d8da9 100644
        cflags += [ "/WX" ]
      } else {
        cflags += [ "-Werror" ]
-@@ -237,7 +237,7 @@ config("default") {
+@@ -259,7 +261,7 @@ config("default") {
  
    if (is_clang) {
      cflags += [ "-fcolor-diagnostics" ]
@@ -74,8 +119,17 @@ index 36fb637..69d8da9 100644
        cflags += [ "-fdiagnostics-show-template-tree" ]
      }
    }
-@@ -320,23 +320,25 @@ config("default") {
-     ]
+@@ -282,7 +284,7 @@ config("default") {
+     ldflags += [ "-flto=full" ]
+   }
+ 
+-  if (is_win) {
++  if (is_msvc) {
+     # We support only x86/x64 builds on Windows.
+     assert(current_cpu == "x64" || current_cpu == "x86")
+   } else if (current_cpu == "arm") {
+@@ -352,23 +354,25 @@ config("default") {
+     libs += [ "socket" ]
    }
  
 -  if (is_win && !is_clang) {
@@ -100,10 +154,10 @@ index 36fb637..69d8da9 100644
        }
 +    } else if (is_mingw) {
 +      cflags += [ "-g" ]
-     } else {
+     } else if (!is_qnx) {
        libs += [ "dl" ]
      }
-@@ -375,7 +377,7 @@ config("default") {
+@@ -407,7 +411,7 @@ config("default") {
  
  config("debug_noopt") {
    cflags = []
@@ -112,7 +166,7 @@ index 36fb637..69d8da9 100644
      cflags = [ "/Od" ]
    } else {
      cflags = [ "-O0" ]
-@@ -387,7 +389,7 @@ config("debug_noopt") {
+@@ -419,7 +423,7 @@ config("debug_noopt") {
  
  config("release") {
    # Compiler flags for release builds.
@@ -121,7 +175,7 @@ index 36fb637..69d8da9 100644
      cflags = [
        "/O2",
        "/Zc:inline",
-@@ -399,7 +401,7 @@ config("release") {
+@@ -431,7 +435,7 @@ config("release") {
    } else {
      cflags = [ "-O3" ]
    }
@@ -130,7 +184,7 @@ index 36fb637..69d8da9 100644
      cflags += [
        "-fdata-sections",
        "-ffunction-sections",
-@@ -407,13 +409,15 @@ config("release") {
+@@ -439,13 +443,15 @@ config("release") {
    }
  
    # Linker flags for release builds.
@@ -146,7 +200,7 @@ index 36fb637..69d8da9 100644
 +    ldflags = [ "-Wl,--gc-sections" ]
    } else if (is_mac) {
      ldflags = [ "-dead_strip" ]
-   } else if (!is_win && !is_wasm) {
+   } else if (is_qnx) {
 diff --git a/src/3rdparty/chromium/third_party/perfetto/gn/standalone/toolchain/llvm.gni b/src/3rdparty/chromium/third_party/perfetto/gn/standalone/toolchain/llvm.gni
 index 13bae47..8d924f4 100644
 --- a/src/3rdparty/chromium/third_party/perfetto/gn/standalone/toolchain/llvm.gni

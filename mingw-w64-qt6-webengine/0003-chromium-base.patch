@@ -1,9 +1,9 @@
 diff --git a/src/3rdparty/chromium/base/BUILD.gn b/src/3rdparty/chromium/base/BUILD.gn
-index 26ec43d..29b5dc0 100644
+index 57fd494..a5cf689 100644
 --- a/src/3rdparty/chromium/base/BUILD.gn
 +++ b/src/3rdparty/chromium/base/BUILD.gn
-@@ -128,7 +128,7 @@ buildflag_header("rust_buildflags") {
-   ]
+@@ -108,7 +108,7 @@ if (is_fuchsia) {
+   import("//third_party/fuchsia-gn-sdk/src/fidl_library.gni")
  }
  
 -if (is_win) {
@@ -11,7 +11,7 @@ index 26ec43d..29b5dc0 100644
    # This is in a separate config so the flags can be applied to dependents.
    # ldflags in GN aren't automatically inherited.
    config("base_win_linker_flags") {
-@@ -146,6 +146,9 @@ if (is_win) {
+@@ -126,6 +126,9 @@ if (is_win) {
        "/DELAYLOAD:shcore.dll",
      ]
    }
@@ -21,7 +21,7 @@ index 26ec43d..29b5dc0 100644
  }
  
  if (is_android) {
-@@ -1932,6 +1935,20 @@ jumbo_component("base") {
+@@ -1959,6 +1962,20 @@ jumbo_component("base") {
        "win/wrapped_window_proc.h",
      ]
  
@@ -42,7 +42,7 @@ index 26ec43d..29b5dc0 100644
      # winternl.h and NTSecAPI.h have different definitions of UNICODE_STRING.
      # There's only one client of NTSecAPI.h in base but several of winternl.h,
      # so exclude the NTSecAPI.h one.
-@@ -1947,17 +1964,17 @@ jumbo_component("base") {
+@@ -1974,17 +1991,17 @@ jumbo_component("base") {
      }
  
      libs += [
@@ -71,7 +71,7 @@ index 26ec43d..29b5dc0 100644
      ]
      all_dependent_configs += [
        ":base_win_linker_flags",
-@@ -2421,7 +2438,7 @@ jumbo_component("base") {
+@@ -2456,7 +2473,7 @@ jumbo_component("base") {
  
      all_dependent_configs += [ "//third_party/perfetto/gn:public_config" ]
  
@@ -80,7 +80,7 @@ index 26ec43d..29b5dc0 100644
        sources += [
          "trace_event/etw_interceptor_win.cc",
          "trace_event/etw_interceptor_win.h",
-@@ -2884,14 +2901,18 @@ if (is_win) {
+@@ -2954,14 +2971,18 @@ if (is_win) {
    # base/test/data/pe_image.
    shared_library("pe_image_test") {
      sources = [ "win/pe_image_test.cc" ]
@@ -107,10 +107,10 @@ index 26ec43d..29b5dc0 100644
    }
  
 diff --git a/src/3rdparty/chromium/base/allocator/partition_allocator/src/partition_alloc/partition_alloc_base/win/windows_types.h b/src/3rdparty/chromium/base/allocator/partition_allocator/src/partition_alloc/partition_alloc_base/win/windows_types.h
-index 7fb2205..b8e9752 100644
+index 649a3b7..f17561d 100644
 --- a/src/3rdparty/chromium/base/allocator/partition_allocator/src/partition_alloc/partition_alloc_base/win/windows_types.h
 +++ b/src/3rdparty/chromium/base/allocator/partition_allocator/src/partition_alloc/partition_alloc_base/win/windows_types.h
-@@ -64,12 +64,18 @@ struct PA_CHROME_SRWLOCK {
+@@ -80,12 +80,18 @@ struct PA_CHROME_SRWLOCK {
  
  // Define some macros needed when prototyping Windows functions.
  
@@ -130,7 +130,7 @@ index 7fb2205..b8e9752 100644
  WINBASEAPI BOOLEAN WINAPI TryAcquireSRWLockExclusive(_Inout_ PSRWLOCK SRWLock);
  
 diff --git a/src/3rdparty/chromium/base/debug/handle_hooks_win.cc b/src/3rdparty/chromium/base/debug/handle_hooks_win.cc
-index 9bb8907..0741259 100644
+index eb07225..6cb10f9 100644
 --- a/src/3rdparty/chromium/base/debug/handle_hooks_win.cc
 +++ b/src/3rdparty/chromium/base/debug/handle_hooks_win.cc
 @@ -9,6 +9,8 @@
@@ -185,10 +185,10 @@ index 248d0d9..0914ffe 100644
  #undef EXPORT_TEMPLATE_TEST
  #undef EXPORT_TEMPLATE_TEST_DEFAULT_DEFAULT
 diff --git a/src/3rdparty/chromium/base/lazy_instance.h b/src/3rdparty/chromium/base/lazy_instance.h
-index 5081e97..ae127ed 100644
+index 865bb4f..31331c4 100644
 --- a/src/3rdparty/chromium/base/lazy_instance.h
 +++ b/src/3rdparty/chromium/base/lazy_instance.h
-@@ -174,7 +174,7 @@ class LazyInstance {
+@@ -173,7 +173,7 @@ class LazyInstance {
    // MSVC gives a warning that the alignment expands the size of the
    // LazyInstance struct to make the size a multiple of the alignment. This
    // is expected in this case.
@@ -197,7 +197,7 @@ index 5081e97..ae127ed 100644
  #pragma warning(push)
  #pragma warning(disable : 4324)
  #endif
-@@ -187,7 +187,7 @@ class LazyInstance {
+@@ -186,7 +186,7 @@ class LazyInstance {
    // Preallocated space for the Type instance.
    alignas(Type) char private_buf_[sizeof(Type)];
  
@@ -207,10 +207,10 @@ index 5081e97..ae127ed 100644
  #endif
  
 diff --git a/src/3rdparty/chromium/base/memory/aligned_memory.cc b/src/3rdparty/chromium/base/memory/aligned_memory.cc
-index aa19b34..83e85d6 100644
+index 86dd238..9f5ad09 100644
 --- a/src/3rdparty/chromium/base/memory/aligned_memory.cc
 +++ b/src/3rdparty/chromium/base/memory/aligned_memory.cc
-@@ -21,7 +21,7 @@ void* AlignedAlloc(size_t size, size_t alignment) {
+@@ -22,7 +22,7 @@ void* AlignedAlloc(size_t size, size_t alignment) {
    DCHECK(std::has_single_bit(alignment));
    DCHECK_EQ(alignment % sizeof(void*), 0U);
    void* ptr = nullptr;
@@ -220,11 +220,11 @@ index aa19b34..83e85d6 100644
  #elif BUILDFLAG(IS_ANDROID)
    // Android technically supports posix_memalign(), but does not expose it in
 diff --git a/src/3rdparty/chromium/base/memory/aligned_memory.h b/src/3rdparty/chromium/base/memory/aligned_memory.h
-index 9385a1d..ffefe75 100644
+index 23bbf5c..5413284 100644
 --- a/src/3rdparty/chromium/base/memory/aligned_memory.h
 +++ b/src/3rdparty/chromium/base/memory/aligned_memory.h
-@@ -15,7 +15,7 @@
- #include "base/check.h"
+@@ -18,7 +18,7 @@
+ #include "base/containers/span.h"
  #include "build/build_config.h"
  
 -#if defined(COMPILER_MSVC)
@@ -232,7 +232,7 @@ index 9385a1d..ffefe75 100644
  #include <malloc.h>
  #else
  #include <stdlib.h>
-@@ -48,7 +48,7 @@ BASE_EXPORT void* AlignedAlloc(size_t size, size_t alignment);
+@@ -72,7 +72,7 @@ BASE_EXPORT void* AlignedAlloc(size_t size, size_t alignment);
  
  // Deallocate memory allocated by `AlignedAlloc`.
  inline void AlignedFree(void* ptr) {
@@ -242,7 +242,7 @@ index 9385a1d..ffefe75 100644
  #else
    free(ptr);
 diff --git a/src/3rdparty/chromium/base/power_monitor/speed_limit_observer_win.cc b/src/3rdparty/chromium/base/power_monitor/speed_limit_observer_win.cc
-index 7b9e2f9..0ded249 100644
+index 3cf82bc..9babc2a 100644
 --- a/src/3rdparty/chromium/base/power_monitor/speed_limit_observer_win.cc
 +++ b/src/3rdparty/chromium/base/power_monitor/speed_limit_observer_win.cc
 @@ -24,7 +24,9 @@
@@ -256,7 +256,7 @@ index 7b9e2f9..0ded249 100644
  // We poll for new speed-limit values once every second.
  constexpr base::TimeDelta kSampleInterval = base::Seconds(1);
 diff --git a/src/3rdparty/chromium/base/process/memory_win.cc b/src/3rdparty/chromium/base/process/memory_win.cc
-index 7f26781..68065c9 100644
+index 059324c..84edeba 100644
 --- a/src/3rdparty/chromium/base/process/memory_win.cc
 +++ b/src/3rdparty/chromium/base/process/memory_win.cc
 @@ -38,9 +38,13 @@ void EnableTerminationOnHeapCorruption() {
@@ -285,69 +285,6 @@ index dd28d17..f3c8dc8 100644
  #include <string>
  #include <string_view>
  
-diff --git a/src/3rdparty/chromium/base/trace_event/trace_log.cc b/src/3rdparty/chromium/base/trace_event/trace_log.cc
-index 69f684d..fe08d90 100644
---- a/src/3rdparty/chromium/base/trace_event/trace_log.cc
-+++ b/src/3rdparty/chromium/base/trace_event/trace_log.cc
-@@ -722,7 +722,7 @@ void TraceLog::UpdateCategoryState(TraceCategory* category) {
-     state_flags |= TraceCategory::ENABLED_FOR_RECORDING;
-   }
- 
--#if BUILDFLAG(IS_WIN)
-+#if BUILDFLAG(IS_MSVC)
-   if (base::trace_event::TraceEventETWExport::IsCategoryGroupEnabled(
-           category->name())) {
-     state_flags |= TraceCategory::ENABLED_FOR_ETW_EXPORT;
-@@ -1411,7 +1411,7 @@ bool TraceLog::ShouldAddAfterUpdatingState(
-     }
-   }
- 
--#if BUILDFLAG(IS_WIN)
-+#if BUILDFLAG(IS_MSVC)
-   // This is done sooner rather than later, to avoid creating the event and
-   // acquiring the lock, which is not needed for ETW as it's already threadsafe.
-   if (*category_group_enabled & TraceCategory::ENABLED_FOR_ETW_EXPORT) {
-@@ -1420,7 +1420,7 @@ bool TraceLog::ShouldAddAfterUpdatingState(
-     TraceEventETWExport::AddEvent(phase, category_group_enabled, name, id,
-                                   timestamp, args);
-   }
--#endif  // BUILDFLAG(IS_WIN)
-+#endif  // BUILDFLAG(IS_MSVC)
-   return true;
- }
- 
-@@ -1705,11 +1705,11 @@ void TraceLog::UpdateTraceEventDurationExplicit(
-   }
-   const AutoReset<bool> resetter(&thread_is_in_trace_event, true);
- 
--#if BUILDFLAG(IS_WIN)
-+#if BUILDFLAG(IS_MSVC)
-   // Generate an ETW event that marks the end of a complete event.
-   if (*category_group_enabled & TraceCategory::ENABLED_FOR_ETW_EXPORT)
-     TraceEventETWExport::AddCompleteEndEvent(category_group_enabled, name);
--#endif  // BUILDFLAG(IS_WIN)
-+#endif  // BUILDFLAG(IS_MSVC)
- 
-   if (*category_group_enabled & TraceCategory::ENABLED_FOR_RECORDING) {
-     auto update_duration_override =
-@@ -1962,7 +1962,7 @@ TraceBuffer* TraceLog::CreateTraceBuffer() {
-                                : kTraceEventVectorBufferChunks);
- }
- 
--#if BUILDFLAG(IS_WIN)
-+#if BUILDFLAG(IS_MSVC)
- void TraceLog::UpdateETWCategoryGroupEnabledFlags() {
-   // Go through each category and set/clear the ETW bit depending on whether the
-   // category is enabled.
-@@ -1975,7 +1975,7 @@ void TraceLog::UpdateETWCategoryGroupEnabledFlags() {
-     }
-   }
- }
--#endif  // BUILDFLAG(IS_WIN)
-+#endif  // BUILDFLAG(IS_MSVC)
- 
- void TraceLog::SetTraceBufferForTesting(
-     std::unique_ptr<TraceBuffer> trace_buffer) {
 diff --git a/src/3rdparty/chromium/base/trace_event/trace_logging_minimal_win.h b/src/3rdparty/chromium/base/trace_event/trace_logging_minimal_win.h
 index bf0f69e..4500f82 100644
 --- a/src/3rdparty/chromium/base/trace_event/trace_logging_minimal_win.h
@@ -447,7 +384,7 @@ index 41f9659..69809ba 100644
  // Undefine the poisonous defines
  #include "base/win/windows_undefines.inc"  // NOLINT(build/include)
 diff --git a/src/3rdparty/chromium/base/win/scoped_com_initializer.cc b/src/3rdparty/chromium/base/win/scoped_com_initializer.cc
-index cfb85a2..05e3ac3 100644
+index 4c26c94..2effe1f 100644
 --- a/src/3rdparty/chromium/base/win/scoped_com_initializer.cc
 +++ b/src/3rdparty/chromium/base/win/scoped_com_initializer.cc
 @@ -4,7 +4,9 @@
@@ -460,7 +397,7 @@ index cfb85a2..05e3ac3 100644
  
  #include <ostream>
  
-@@ -47,6 +49,7 @@ DWORD ScopedCOMInitializer::GetCOMBalancerReferenceCountForTesting() const {
+@@ -48,6 +50,7 @@ DWORD ScopedCOMInitializer::GetCOMBalancerReferenceCountForTesting() const {
  void ScopedCOMInitializer::Initialize(COINIT init,
                                        Uninitialization uninitialization) {
    DCHECK_CALLED_ON_VALID_THREAD(thread_checker_);
@@ -468,7 +405,7 @@ index cfb85a2..05e3ac3 100644
    // COINIT_DISABLE_OLE1DDE is always added based on:
    // https://docs.microsoft.com/en-us/windows/desktop/learnwin32/initializing-the-com-library
    if (uninitialization == Uninitialization::kBlockPremature) {
-@@ -72,6 +75,7 @@ void ScopedCOMInitializer::Initialize(COINIT init,
+@@ -73,6 +76,7 @@ void ScopedCOMInitializer::Initialize(COINIT init,
        hr_ == HRESULT_FROM_WIN32(ERROR_NOT_ENOUGH_MEMORY)) {
      base::win::OnResourceExhausted();
    }
@@ -477,7 +414,7 @@ index cfb85a2..05e3ac3 100644
  
  }  // namespace win
 diff --git a/src/3rdparty/chromium/base/win/scoped_variant.cc b/src/3rdparty/chromium/base/win/scoped_variant.cc
-index 9f500dc..3203bb7 100644
+index c4b2d06..d16e96a 100644
 --- a/src/3rdparty/chromium/base/win/scoped_variant.cc
 +++ b/src/3rdparty/chromium/base/win/scoped_variant.cc
 @@ -105,11 +105,13 @@ VARIANT* ScopedVariant::Receive() {
@@ -494,7 +431,7 @@ index 9f500dc..3203bb7 100644
  
  int ScopedVariant::Compare(const VARIANT& other, bool ignore_case) const {
    DCHECK(!V_ISARRAY(&var_))
-@@ -173,9 +175,11 @@ int ScopedVariant::Compare(const VARIANT& other, bool ignore_case) const {
+@@ -177,9 +179,11 @@ int ScopedVariant::Compare(const VARIANT& other, bool ignore_case) const {
      }
    }
  
@@ -506,7 +443,7 @@ index 9f500dc..3203bb7 100644
  }
  
  void ScopedVariant::Set(const wchar_t* str) {
-@@ -285,10 +289,12 @@ void ScopedVariant::Set(SAFEARRAY* array) {
+@@ -291,10 +295,12 @@ void ScopedVariant::Set(SAFEARRAY* array) {
  
  void ScopedVariant::Set(const VARIANT& var) {
    DCHECK(!IsLeakableVarType(var_.vt)) << "leaking variant: " << var_.vt;
@@ -536,10 +473,10 @@ index 2ca59ee..8ad4a59 100644
  // Undefine the poisonous defines
  #include "base/win/windows_undefines.inc"  // NOLINT(build/include)
 diff --git a/src/3rdparty/chromium/base/win/shortcut.cc b/src/3rdparty/chromium/base/win/shortcut.cc
-index d4a54d1..f63f21b 100644
+index 967e130..aa4b19d 100644
 --- a/src/3rdparty/chromium/base/win/shortcut.cc
 +++ b/src/3rdparty/chromium/base/win/shortcut.cc
-@@ -173,6 +173,7 @@ bool CreateOrUpdateShortcutLink(const FilePath& shortcut_path,
+@@ -179,6 +179,7 @@ bool CreateOrUpdateShortcutLink(const FilePath& shortcut_path,
                                                  properties.app_id.c_str())) {
        return false;
      }
@@ -547,7 +484,7 @@ index d4a54d1..f63f21b 100644
      if (has_dual_mode && !SetBooleanValueForPropertyStore(
                               property_store.Get(), PKEY_AppUserModel_IsDualMode,
                               properties.dual_mode)) {
-@@ -184,6 +185,7 @@ bool CreateOrUpdateShortcutLink(const FilePath& shortcut_path,
+@@ -190,6 +191,7 @@ bool CreateOrUpdateShortcutLink(const FilePath& shortcut_path,
                                    properties.toast_activator_clsid)) {
        return false;
      }
@@ -555,7 +492,7 @@ index d4a54d1..f63f21b 100644
    }
  
    // Release the interfaces to the old shortcut to make sure it doesn't prevent
-@@ -300,6 +302,7 @@ bool ResolveShortcutProperties(const FilePath& shortcut_path,
+@@ -322,6 +324,7 @@ bool ResolveShortcutProperties(const FilePath& shortcut_path,
        }
      }
  
@@ -563,7 +500,7 @@ index d4a54d1..f63f21b 100644
      if (options & ShortcutProperties::PROPERTIES_DUAL_MODE) {
        ScopedPropVariant pv_dual_mode;
        if (property_store->GetValue(PKEY_AppUserModel_IsDualMode,
-@@ -338,6 +341,7 @@ bool ResolveShortcutProperties(const FilePath& shortcut_path,
+@@ -360,6 +363,7 @@ bool ResolveShortcutProperties(const FilePath& shortcut_path,
                         << pv_toast_activator_clsid.get().vt;
        }
      }
@@ -588,51 +525,34 @@ index 649dcb0..bc023d3 100644
  // Undefine the poisonous defines
  #include "base/win/windows_undefines.inc"  // NOLINT(build/include)
 diff --git a/src/3rdparty/chromium/base/win/variant_vector.h b/src/3rdparty/chromium/base/win/variant_vector.h
-index 1148e37..6527bab 100644
+index 41ff85f..f49d4bc 100644
 --- a/src/3rdparty/chromium/base/win/variant_vector.h
 +++ b/src/3rdparty/chromium/base/win/variant_vector.h
-@@ -82,19 +82,6 @@ class BASE_EXPORT VariantVector final {
-     vector_.push_back(std::move(scoped_variant));
-   }
- 
--  // Specialize VT_DATE because ScopedVariant has a separate SetDate method,
--  // this is because VT_R8 and VT_DATE share the same underlying type.
--  template <>
--  void Insert<VT_DATE>(
--      typename internal::VariantConverter<VT_DATE>::Type value) {
--    if (vartype_ == VT_EMPTY)
--      vartype_ = VT_DATE;
--    AssertVartype<VT_DATE>();
--    ScopedVariant scoped_variant;
--    scoped_variant.SetDate(value);
--    vector_.push_back(std::move(scoped_variant));
--  }
--
-   // Populates a VARIANT based on what is stored, transferring ownership
-   // of managed contents.
-   // This is only valid when the VariantVector is empty or has a single element.
-@@ -137,6 +124,19 @@ class BASE_EXPORT VariantVector final {
+@@ -140,6 +140,22 @@ class BASE_EXPORT VariantVector final {
    std::vector<ScopedVariant> vector_;
  };
  
++#if 0
 +// Specialize VT_DATE because ScopedVariant has a separate SetDate method,
 +// this is because VT_R8 and VT_DATE share the same underlying type.
 +template <>
-+void VariantVector::Insert<VT_DATE>(
++void Insert<VT_DATE>(
 +    typename internal::VariantConverter<VT_DATE>::Type value) {
-+  if (vartype_ == VT_EMPTY)
++  if (vartype_ == VT_EMPTY) {
 +    vartype_ = VT_DATE;
++  }
 +  AssertVartype<VT_DATE>();
 +  ScopedVariant scoped_variant;
 +  scoped_variant.SetDate(value);
 +  vector_.push_back(std::move(scoped_variant));
 +}
++#endif
 +
  }  // namespace win
  }  // namespace base
  
 diff --git a/src/3rdparty/chromium/base/win/vector.h b/src/3rdparty/chromium/base/win/vector.h
-index dcbaec7..f47f6b2 100644
+index 7ec11da..cd8d5c3 100644
 --- a/src/3rdparty/chromium/base/win/vector.h
 +++ b/src/3rdparty/chromium/base/win/vector.h
 @@ -5,6 +5,7 @@
@@ -643,7 +563,7 @@ index dcbaec7..f47f6b2 100644
  #include <ivectorchangedeventargs.h>
  #include <windows.foundation.collections.h>
  #include <wrl/implements.h>
-@@ -400,4 +401,6 @@ class Vector
+@@ -410,4 +411,6 @@ class Vector
  }  // namespace win
  }  // namespace base
  
@@ -651,28 +571,28 @@ index dcbaec7..f47f6b2 100644
 +
  #endif  // BASE_WIN_VECTOR_H_
 diff --git a/src/3rdparty/chromium/base/win/win_util.cc b/src/3rdparty/chromium/base/win/win_util.cc
-index b8ae7d9..eb0f70c 100644
+index 2e0d6cd..3f56a45 100644
 --- a/src/3rdparty/chromium/base/win/win_util.cc
 +++ b/src/3rdparty/chromium/base/win/win_util.cc
-@@ -19,7 +19,9 @@
+@@ -20,7 +20,9 @@
  #include <cfgmgr32.h>
  #include <inspectable.h>
  #include <lm.h>
 +#if defined(COMPILER_MSVC)
  #include <mdmregistration.h>
 +#endif
+ #include <ntstatus.h>
  #include <powrprof.h>
  #include <propkey.h>
- #include <psapi.h>
-@@ -137,6 +139,7 @@ bool* GetDomainEnrollmentStateStorage() {
+@@ -160,6 +162,7 @@ bool* GetDomainEnrollmentStateStorage() {
    return &state;
  }
  
 +#if defined(COMPILER_MSVC)
  bool* GetRegisteredWithManagementStateStorage() {
-   static bool state = []() {
+   static bool state = [] {
      // Mitigate the issues caused by loading DLLs on a background thread
-@@ -205,6 +208,7 @@ bool* GetAzureADJoinStateStorage() {
+@@ -232,6 +235,7 @@ bool* GetAzureADJoinStateStorage() {
    }();
    return &state;
  }
@@ -680,23 +600,23 @@ index b8ae7d9..eb0f70c 100644
  
  NativeLibrary PinUser32Internal(NativeLibraryLoadError* error) {
    static NativeLibraryLoadError load_error;
-@@ -245,6 +249,7 @@ bool IsWindows10OrGreaterTabletMode(HWND hwnd) {
-            IsDeviceUsedAsATablet(/*reason=*/nullptr);
-   }
- 
+@@ -549,6 +553,7 @@ bool QueryDeviceConvertibility() {
+ // it to always return UserInteractionMode_Touch which as per documentation
+ // indicates tablet mode.
+ bool IsWindows10TabletMode(HWND hwnd) {
 +#if defined(COMPILER_MSVC)
    ScopedHString view_settings_guid = ScopedHString::Create(
        RuntimeClass_Windows_UI_ViewManagement_UIViewSettings);
    Microsoft::WRL::ComPtr<IUIViewSettingsInterop> view_settings_interop;
-@@ -263,6 +268,7 @@ bool IsWindows10OrGreaterTabletMode(HWND hwnd) {
-       ABI::Windows::UI::ViewManagement::UserInteractionMode_Mouse;
-   view_settings->get_UserInteractionMode(&mode);
+@@ -573,6 +578,7 @@ bool IsWindows10TabletMode(HWND hwnd) {
+   }
+ 
    return mode == ABI::Windows::UI::ViewManagement::UserInteractionMode_Touch;
 +#endif
  }
  
- // Returns true if a physical keyboard is detected on Windows 8 and up.
-@@ -514,7 +520,9 @@ void SetAbortBehaviorForCrashReporting() {
+ void IsDeviceSlateWithKeyboard(HWND hwnd,
+@@ -743,7 +749,9 @@ void SetAbortBehaviorForCrashReporting() {
    // Disabling the _CALL_REPORTFAULT behavior is important since otherwise it
    // has the sideffect of clearing our exception filter, which means we
    // don't get any crash.
@@ -706,7 +626,7 @@ index b8ae7d9..eb0f70c 100644
  
    // Set a SIGABRT handler for good measure. We will crash even if the default
    // is left in place, however this allows us to crash earlier. And it also
-@@ -605,6 +613,7 @@ bool IsEnrolledToDomain() {
+@@ -827,6 +835,7 @@ bool IsEnrolledToDomain() {
    return *GetDomainEnrollmentStateStorage();
  }
  
@@ -714,15 +634,15 @@ index b8ae7d9..eb0f70c 100644
  bool IsDeviceRegisteredWithManagement() {
    // GetRegisteredWithManagementStateStorage() can be true for devices running
    // the Home sku, however the Home sku does not allow for management of the web
-@@ -617,6 +626,7 @@ bool IsDeviceRegisteredWithManagement() {
+@@ -840,6 +849,7 @@ bool IsDeviceRegisteredWithManagement() {
  bool IsJoinedToAzureAD() {
    return *GetAzureADJoinStateStorage();
  }
 +#endif
  
  bool IsUser32AndGdi32Available() {
-   static const bool is_user32_and_gdi32_available = []() {
-@@ -680,6 +690,7 @@ bool GetLoadedModulesSnapshot(HANDLE process, std::vector<HMODULE>* snapshot) {
+   static const bool is_user32_and_gdi32_available = [] {
+@@ -903,6 +913,7 @@ bool GetLoadedModulesSnapshot(HANDLE process, std::vector<HMODULE>* snapshot) {
    return false;
  }
  
@@ -730,15 +650,15 @@ index b8ae7d9..eb0f70c 100644
  void EnableFlicks(HWND hwnd) {
    ::RemoveProp(hwnd, MICROSOFT_TABLETPENSERVICE_PROPERTY);
  }
-@@ -689,6 +700,7 @@ void DisableFlicks(HWND hwnd) {
+@@ -912,6 +923,7 @@ void DisableFlicks(HWND hwnd) {
              reinterpret_cast<HANDLE>(TABLET_DISABLE_FLICKS |
                                       TABLET_DISABLE_FLICKFALLBACKKEYS));
  }
 +#endif
  
  void EnableHighDPISupport() {
-   if (!IsUser32AndGdi32Available())
-@@ -850,6 +862,7 @@ ScopedDomainStateForTesting::~ScopedDomainStateForTesting() {
+   if (!IsUser32AndGdi32Available()) {
+@@ -1130,6 +1142,7 @@ ScopedDomainStateForTesting::~ScopedDomainStateForTesting() {
    *GetDomainEnrollmentStateStorage() = initial_state_;
  }
  
@@ -746,20 +666,20 @@ index b8ae7d9..eb0f70c 100644
  ScopedDeviceRegisteredWithManagementForTesting::
      ScopedDeviceRegisteredWithManagementForTesting(bool state)
      : initial_state_(IsDeviceRegisteredWithManagement()) {
-@@ -867,6 +880,7 @@ ScopedAzureADJoinStateForTesting::ScopedAzureADJoinStateForTesting(bool state)
+@@ -1147,6 +1160,7 @@ ScopedAzureADJoinStateForTesting::ScopedAzureADJoinStateForTesting(bool state)
  ScopedAzureADJoinStateForTesting::~ScopedAzureADJoinStateForTesting() {
    *GetAzureADJoinStateStorage() = initial_state_;
  }
 +#endif
  
- }  // namespace win
- }  // namespace base
+ ScopedDeviceConvertibilityStateForTesting::
+     ScopedDeviceConvertibilityStateForTesting(
 diff --git a/src/3rdparty/chromium/base/win/windows_types.h b/src/3rdparty/chromium/base/win/windows_types.h
-index 643b8d6..f5faf2c 100644
+index ad294c6..86ee761 100644
 --- a/src/3rdparty/chromium/base/win/windows_types.h
 +++ b/src/3rdparty/chromium/base/win/windows_types.h
-@@ -12,6 +12,8 @@
- #include <concurrencysal.h>
+@@ -11,6 +11,8 @@
+ // Needed for function prototypes.
  #include <sal.h>
  #include <specstrings.h>
 +#include <share.h> // for _SH_DENYNO
@@ -767,7 +687,7 @@ index 643b8d6..f5faf2c 100644
  
  #include "base/win/win_handle_types.h"
  
-@@ -23,8 +25,8 @@ extern "C" {
+@@ -22,8 +24,8 @@ extern "C" {
  
  typedef unsigned long DWORD;  // NOLINT(runtime/int)
  typedef long LONG;            // NOLINT(runtime/int)
@@ -778,7 +698,7 @@ index 643b8d6..f5faf2c 100644
  
  #define VOID void
  typedef char CHAR;
-@@ -33,7 +35,7 @@ typedef long LONG;    // NOLINT(runtime/int)
+@@ -32,7 +34,7 @@ typedef long LONG;    // NOLINT(runtime/int)
  typedef int INT;
  typedef unsigned int UINT;
  typedef unsigned int* PUINT;
@@ -787,7 +707,7 @@ index 643b8d6..f5faf2c 100644
  typedef void* LPVOID;
  typedef void* PVOID;
  typedef void* HANDLE;
-@@ -46,11 +48,11 @@ typedef WORD UWORD;
+@@ -45,11 +47,11 @@ typedef WORD UWORD;
  typedef WORD ATOM;
  
  #if defined(_WIN64)
@@ -803,7 +723,7 @@ index 643b8d6..f5faf2c 100644
  #else
  typedef __w64 int INT_PTR, *PINT_PTR;
  typedef __w64 unsigned int UINT_PTR, *PUINT_PTR;
-@@ -206,11 +208,30 @@ struct CHROME_MSG {
+@@ -215,11 +217,30 @@ struct CHROME_MSG {
  // Work around there being two slightly different definitions in the SDK.
  #define INVALID_HANDLE_VALUE ((HANDLE)(LONG_PTR)-1)
  #endif
@@ -834,7 +754,7 @@ index 643b8d6..f5faf2c 100644
  #define ERROR_SUCCESS 0L
  #define ERROR_FILE_NOT_FOUND 2L
  #define ERROR_ACCESS_DENIED 5L
-@@ -226,8 +247,12 @@ struct CHROME_MSG {
+@@ -235,8 +256,12 @@ struct CHROME_MSG {
  #define STATUS_PENDING ((DWORD   )0x00000103L)
  #endif  // STATUS_PENDING
  #define STILL_ACTIVE STATUS_PENDING
@@ -847,7 +767,7 @@ index 643b8d6..f5faf2c 100644
  
  #define HKEY_CLASSES_ROOT (( HKEY ) (ULONG_PTR)((LONG)0x80000000) )
  #define HKEY_LOCAL_MACHINE (( HKEY ) (ULONG_PTR)((LONG)0x80000002) )
-@@ -248,7 +273,9 @@ struct CHROME_MSG {
+@@ -257,7 +282,9 @@ struct CHROME_MSG {
  
  #define STANDARD_RIGHTS_READ (READ_CONTROL)
  #define STANDARD_RIGHTS_WRITE (READ_CONTROL)
@@ -857,7 +777,7 @@ index 643b8d6..f5faf2c 100644
  
  #define KEY_READ                ((STANDARD_RIGHTS_READ       |\
                                    KEY_QUERY_VALUE            |\
-@@ -285,15 +312,25 @@ struct CHROME_MSG {
+@@ -294,18 +321,28 @@ struct CHROME_MSG {
  
  // Define some macros needed when prototyping Windows functions.
  
@@ -873,17 +793,20 @@ index 643b8d6..f5faf2c 100644
 +#ifndef CALLBACK
  #define CALLBACK __stdcall
 +#endif
+ #define NTAPI __stdcall
+ 
+ typedef INT_PTR(WINAPI* FARPROC)();
  
  // Needed for LockImpl.
 +#ifdef _MSC_VER
  WINBASEAPI _Releases_exclusive_lock_(*SRWLock) VOID WINAPI
 +#else
-+VOID WINAPI
++WINBASEAPI VOID WINAPI
 +#endif
      ReleaseSRWLockExclusive(_Inout_ PSRWLOCK SRWLock);
  WINBASEAPI BOOLEAN WINAPI TryAcquireSRWLockExclusive(_Inout_ PSRWLOCK SRWLock);
  
-@@ -359,6 +396,29 @@ inline MSG* ChromeToWindowsType(CHROME_MSG* p) {
+@@ -371,6 +408,29 @@ inline MSG* ChromeToWindowsType(CHROME_MSG* p) {
  // undefined everywhere. As windows.h is removed from more source files we may
  // be able to shorten this list.
  
@@ -914,7 +837,7 @@ index 643b8d6..f5faf2c 100644
  #define CreateDirectory CreateDirectoryW
  #define CreateFile CreateFileW
 diff --git a/src/3rdparty/chromium/base/win/windows_version.cc b/src/3rdparty/chromium/base/win/windows_version.cc
-index b9a0a51..073b039 100644
+index 42c07eb..5608c1f 100644
 --- a/src/3rdparty/chromium/base/win/windows_version.cc
 +++ b/src/3rdparty/chromium/base/win/windows_version.cc
 @@ -23,7 +23,7 @@

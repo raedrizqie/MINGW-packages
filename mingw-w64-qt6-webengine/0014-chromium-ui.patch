@@ -1,5 +1,5 @@
 diff --git a/src/3rdparty/chromium/ui/accessibility/ax_text_attributes.h b/src/3rdparty/chromium/ui/accessibility/ax_text_attributes.h
-index 4c05e5a..72b67ba 100644
+index 001c839..f4fdd11 100644
 --- a/src/3rdparty/chromium/ui/accessibility/ax_text_attributes.h
 +++ b/src/3rdparty/chromium/ui/accessibility/ax_text_attributes.h
 @@ -5,6 +5,7 @@
@@ -11,7 +11,7 @@ index 4c05e5a..72b67ba 100644
  #include <vector>
  
 diff --git a/src/3rdparty/chromium/ui/aura/BUILD.gn b/src/3rdparty/chromium/ui/aura/BUILD.gn
-index 72fa0e0..bc08ecf 100644
+index 65f84ba..083fd86 100644
 --- a/src/3rdparty/chromium/ui/aura/BUILD.gn
 +++ b/src/3rdparty/chromium/ui/aura/BUILD.gn
 @@ -166,7 +166,12 @@ jumbo_component("aura") {
@@ -29,10 +29,10 @@ index 72fa0e0..bc08ecf 100644
        "wtsapi32.lib",
        "dwmapi.lib",
 diff --git a/src/3rdparty/chromium/ui/base/BUILD.gn b/src/3rdparty/chromium/ui/base/BUILD.gn
-index 3605556..31c8d89 100644
+index 903993c..55fae4c 100644
 --- a/src/3rdparty/chromium/ui/base/BUILD.gn
 +++ b/src/3rdparty/chromium/ui/base/BUILD.gn
-@@ -306,11 +306,19 @@ jumbo_component("base") {
+@@ -293,11 +293,19 @@ jumbo_component("base") {
        "win/window_event_target.cc",
        "win/window_event_target.h",
      ]
@@ -80,22 +80,31 @@ index c99fd18..a30da75 100644
  #elif BUILDFLAG(IS_APPLE)
    return std::make_unique<InputMethodMac>(ime_key_event_dispatcher);
 diff --git a/src/3rdparty/chromium/ui/base/ime/init/input_method_initializer.cc b/src/3rdparty/chromium/ui/base/ime/init/input_method_initializer.cc
-index a500669..245ddbe 100644
+index ce9d6fe..2623229 100644
 --- a/src/3rdparty/chromium/ui/base/ime/init/input_method_initializer.cc
 +++ b/src/3rdparty/chromium/ui/base/ime/init/input_method_initializer.cc
-@@ -21,13 +21,13 @@
- namespace ui {
+@@ -12,7 +12,7 @@
+ #if defined(USE_AURA) && BUILDFLAG(IS_LINUX)
+ #include "ui/base/ime/linux/fake_input_method_context.h"
+ #include "ui/base/ime/linux/linux_input_method_context_factory.h"
+-#elif BUILDFLAG(IS_WIN)
++#elif BUILDFLAG(IS_MSVC)
+ #include "ui/base/ime/init/input_method_factory.h"
+ #include "ui/base/ime/win/tsf_bridge.h"
+ #endif
+@@ -21,13 +21,13 @@ namespace ui {
  
  void InitializeInputMethod() {
--#if !BUILDFLAG(IS_CHROMEOS_ASH) && BUILDFLAG(IS_WIN)
-+#if !BUILDFLAG(IS_CHROMEOS_ASH) && BUILDFLAG(IS_MSVC)
+   TRACE_EVENT0("startup", "ui::InitializeInputMethod");
+-#if BUILDFLAG(IS_WIN)
++#if BUILDFLAG(IS_MSVC)
    TSFBridge::Initialize();
  #endif
  }
  
  void ShutdownInputMethod() {
--#if !BUILDFLAG(IS_CHROMEOS_ASH) && BUILDFLAG(IS_WIN)
-+#if !BUILDFLAG(IS_CHROMEOS_ASH) && BUILDFLAG(IS_MSVC)
+-#if BUILDFLAG(IS_WIN)
++#if BUILDFLAG(IS_MSVC)
    TSFBridge::Shutdown();
  #endif
  }
@@ -108,7 +117,7 @@ index a500669..245ddbe 100644
    TSFBridge::InitializeForTesting();
  #endif
  }
-@@ -50,7 +50,7 @@ void ShutdownInputMethodForTesting() {
+@@ -49,7 +49,7 @@ void ShutdownInputMethodForTesting() {
    // The function owns the factory (as a static variable that's returned by
    // reference), so setting this to an empty factory will free the old one.
    GetInputMethodContextFactoryForTest() = LinuxInputMethodContextFactory();
@@ -140,11 +149,11 @@ index 03d9c95..74c0d32 100644
    // translated into other predefined event callbacks. Currently this method is
    // used only for IME functionalities specific to Windows.
 diff --git a/src/3rdparty/chromium/ui/base/ime/mock_input_method.cc b/src/3rdparty/chromium/ui/base/ime/mock_input_method.cc
-index 35fa2b6..fac8167 100644
+index 2218718..d9da6b7 100644
 --- a/src/3rdparty/chromium/ui/base/ime/mock_input_method.cc
 +++ b/src/3rdparty/chromium/ui/base/ime/mock_input_method.cc
-@@ -70,7 +70,7 @@ void MockInputMethod::OnBlur() {
-     observer.OnBlur();
+@@ -67,7 +67,7 @@ void MockInputMethod::OnBlur() {
+   observer_list_.Notify(&InputMethodObserver::OnBlur);
  }
  
 -#if BUILDFLAG(IS_WIN)
@@ -166,7 +175,7 @@ index aa57ed6..c88e910 100644
                                  NativeEventResult* result) override;
    void OnInputLocaleChanged() override;
 diff --git a/src/3rdparty/chromium/ui/base/ime/win/BUILD.gn b/src/3rdparty/chromium/ui/base/ime/win/BUILD.gn
-index 18db932..2719ed5 100644
+index 9db7511..ec8bcdd 100644
 --- a/src/3rdparty/chromium/ui/base/ime/win/BUILD.gn
 +++ b/src/3rdparty/chromium/ui/base/ime/win/BUILD.gn
 @@ -30,7 +30,24 @@ jumbo_component("win") {
@@ -235,10 +244,10 @@ index f89b23d..e43e369 100644
 +
  #endif  // UI_BASE_IME_WIN_ON_SCREEN_KEYBOARD_DISPLAY_MANAGER_INPUT_PANE_H_
 diff --git a/src/3rdparty/chromium/ui/display/BUILD.gn b/src/3rdparty/chromium/ui/display/BUILD.gn
-index 5d077c2..b904b48 100644
+index 180c1a9..1780e8b 100644
 --- a/src/3rdparty/chromium/ui/display/BUILD.gn
 +++ b/src/3rdparty/chromium/ui/display/BUILD.gn
-@@ -102,6 +102,12 @@ jumbo_component("display") {
+@@ -98,6 +98,12 @@ jumbo_component("display") {
        "win/uwp_text_scale_factor.cc",
        "win/uwp_text_scale_factor.h",
      ]
@@ -251,7 +260,7 @@ index 5d077c2..b904b48 100644
    }
  
    if (is_ios) {
-@@ -139,8 +145,12 @@ jumbo_component("display") {
+@@ -134,8 +140,12 @@ jumbo_component("display") {
      # Don't conflict with Windows' "display.dll".
      output_name = "ui_display"
      deps += [ "//ui/gfx/mojom:dxgi_info" ]
@@ -291,10 +300,10 @@ index cc3c603..2e91de8 100644
  
  namespace internal {
 diff --git a/src/3rdparty/chromium/ui/display/win/screen_win.cc b/src/3rdparty/chromium/ui/display/win/screen_win.cc
-index db01034..7f27f0c 100644
+index 0d27762..70fcc1d 100644
 --- a/src/3rdparty/chromium/ui/display/win/screen_win.cc
 +++ b/src/3rdparty/chromium/ui/display/win/screen_win.cc
-@@ -63,9 +63,13 @@ std::optional<int> GetPerMonitorDPI(HMONITOR monitor) {
+@@ -65,9 +65,13 @@ std::optional<int> GetPerMonitorDPI(HMONITOR monitor) {
  
  float GetScaleFactorForDPI(int dpi, bool include_accessibility) {
    const float scale = display::win::internal::GetScalingFactorFromDPI(dpi);
@@ -308,9 +317,9 @@ index db01034..7f27f0c 100644
  }
  
  // Gets the raw monitor scale factor.
-@@ -930,10 +934,12 @@ void ScreenWin::Initialize() {
+@@ -969,10 +973,12 @@ void ScreenWin::Initialize() {
+       base::BindRepeating(&ScreenWin::OnWndProc, base::Unretained(this)));
    UpdateFromDisplayInfos(GetDisplayInfosFromSystem());
-   RecordDisplayScaleFactors();
  
 +#if defined(COMPILER_MSVC)
    // We want to remember that we've observed a screen metrics object so that we
@@ -320,16 +329,16 @@ index db01034..7f27f0c 100644
 +#endif
  }
  
- MONITORINFOEX ScreenWin::MonitorInfoFromScreenPoint(
-@@ -1119,6 +1125,7 @@ void ScreenWin::RecordDisplayScaleFactors() const {
-   }
+ std::optional<MONITORINFOEX> ScreenWin::MonitorInfoFromScreenPoint(
+@@ -1159,6 +1165,7 @@ int ScreenWin::GetSystemMetricsForScaleFactor(float scale_factor,
+                           GetPrimaryDisplay().device_scale_factor());
  }
  
 +#if defined(COMPILER_MSVC)
  void ScreenWin::OnUwpTextScaleFactorChanged() {
    UpdateAllDisplaysAndNotify();
  }
-@@ -1127,6 +1134,7 @@ void ScreenWin::OnUwpTextScaleFactorCleanup(UwpTextScaleFactor* source) {
+@@ -1167,6 +1174,7 @@ void ScreenWin::OnUwpTextScaleFactorCleanup(UwpTextScaleFactor* source) {
    scale_factor_observation_.Reset();
    UwpTextScaleFactor::Observer::OnUwpTextScaleFactorCleanup(source);
  }
@@ -338,10 +347,10 @@ index db01034..7f27f0c 100644
  bool ScreenWin::PerProcessDPIAwarenessDisabledForTesting() const {
    return per_process_dpi_awareness_disabled_for_testing_;
 diff --git a/src/3rdparty/chromium/ui/display/win/screen_win.h b/src/3rdparty/chromium/ui/display/win/screen_win.h
-index 788451e..1ca3921 100644
+index 19aefcf..6efba30 100644
 --- a/src/3rdparty/chromium/ui/display/win/screen_win.h
 +++ b/src/3rdparty/chromium/ui/display/win/screen_win.h
-@@ -39,8 +39,12 @@ class DisplayInfo;
+@@ -40,8 +40,12 @@ class DisplayInfo;
  }  // namespace internal
  
  class DISPLAY_EXPORT ScreenWin : public Screen,
@@ -354,7 +363,7 @@ index 788451e..1ca3921 100644
   public:
    ScreenWin();
  
-@@ -272,8 +276,10 @@ class DISPLAY_EXPORT ScreenWin : public Screen,
+@@ -276,8 +280,10 @@ class DISPLAY_EXPORT ScreenWin : public Screen,
    //-----------------------------------------------------------------
    // UwpTextScaleFactor::Observer:
  
@@ -365,7 +374,7 @@ index 788451e..1ca3921 100644
  
    // Tests don't want to use the actual DPI settings of the monitor(s) on
    // the machine running the test.
-@@ -303,8 +309,10 @@ class DISPLAY_EXPORT ScreenWin : public Screen,
+@@ -307,8 +313,10 @@ class DISPLAY_EXPORT ScreenWin : public Screen,
    // Information gathered from DXGI adapters and outputs.
    gfx::mojom::DXGIInfoPtr dxgi_info_;
  
@@ -377,10 +386,10 @@ index 788451e..1ca3921 100644
    // Used to avoid calling GetSystemMetricsForDpi in unit tests.
    bool per_process_dpi_awareness_disabled_for_testing_ = false;
 diff --git a/src/3rdparty/chromium/ui/events/BUILD.gn b/src/3rdparty/chromium/ui/events/BUILD.gn
-index 5b6fddb..14d4cd1 100644
+index 8e3b944..6d93a71 100644
 --- a/src/3rdparty/chromium/ui/events/BUILD.gn
 +++ b/src/3rdparty/chromium/ui/events/BUILD.gn
-@@ -493,6 +493,10 @@ jumbo_component("gesture_detection") {
+@@ -499,6 +499,10 @@ jumbo_component("gesture_detection") {
  
    defines = [ "GESTURE_DETECTION_IMPLEMENTATION" ]
  
@@ -392,10 +401,10 @@ index 5b6fddb..14d4cd1 100644
      sources += [ "gesture_detection/gesture_configuration_android.cc" ]
    } else if (is_ios) {
 diff --git a/src/3rdparty/chromium/ui/gfx/BUILD.gn b/src/3rdparty/chromium/ui/gfx/BUILD.gn
-index 09f14f7..dbf96e9 100644
+index 9e55ad4..398f962 100644
 --- a/src/3rdparty/chromium/ui/gfx/BUILD.gn
 +++ b/src/3rdparty/chromium/ui/gfx/BUILD.gn
-@@ -63,10 +63,12 @@ if (is_win) {
+@@ -56,10 +56,12 @@ if (is_win) {
    config("gfx_win_linker_flags") {
      # This is in a separate config so the flags can be applied to dependents.
      # ldflags in GN aren't automatically inherited.
@@ -412,7 +421,7 @@ index 09f14f7..dbf96e9 100644
    }
  }
  
-@@ -242,6 +244,14 @@ jumbo_component("gfx") {
+@@ -245,6 +247,14 @@ jumbo_component("gfx") {
        "win/window_impl.cc",
        "win/window_impl.h",
      ]
@@ -427,7 +436,7 @@ index 09f14f7..dbf96e9 100644
    }
    if (is_apple) {
      sources += [ "font_render_params_mac.cc" ]
-@@ -399,12 +409,21 @@ jumbo_component("gfx") {
+@@ -398,12 +408,21 @@ jumbo_component("gfx") {
    # Windows.
    if (is_win) {
      deps += [ "//ui/base:features" ]
@@ -456,10 +465,10 @@ index 09f14f7..dbf96e9 100644
      all_dependent_configs = [ ":gfx_win_linker_flags" ]
      public_deps += [ "//components/crash/core/common" ]
 diff --git a/src/3rdparty/chromium/ui/gfx/codec/BUILD.gn b/src/3rdparty/chromium/ui/gfx/codec/BUILD.gn
-index 416a792..d4c528b 100644
+index def3b78..6ad85d8 100644
 --- a/src/3rdparty/chromium/ui/gfx/codec/BUILD.gn
 +++ b/src/3rdparty/chromium/ui/gfx/codec/BUILD.gn
-@@ -37,7 +37,7 @@ jumbo_component("codec") {
+@@ -36,7 +36,7 @@ jumbo_component("codec") {
      ]
    }
  
@@ -469,11 +478,11 @@ index 416a792..d4c528b 100644
                              # which is uninteresting.
    }
 diff --git a/src/3rdparty/chromium/ui/gl/BUILD.gn b/src/3rdparty/chromium/ui/gl/BUILD.gn
-index 076b15d..0202d53 100644
+index 8c44b2d..0c4fbae 100644
 --- a/src/3rdparty/chromium/ui/gl/BUILD.gn
 +++ b/src/3rdparty/chromium/ui/gl/BUILD.gn
-@@ -265,15 +265,25 @@ jumbo_component("gl") {
-       "vsync_thread_win.h",
+@@ -276,15 +276,25 @@ jumbo_component("gl") {
+       "vsync_thread_win_dxgi.h",
      ]
  
 -    libs = [
@@ -508,10 +517,10 @@ index 076b15d..0202d53 100644
        "//ui/base",
        "//ui/display:display",
 diff --git a/src/3rdparty/chromium/ui/gl/dc_layer_tree.cc b/src/3rdparty/chromium/ui/gl/dc_layer_tree.cc
-index 15cbe12..4cf7fe0 100644
+index f44333e..2a077eb 100644
 --- a/src/3rdparty/chromium/ui/gl/dc_layer_tree.cc
 +++ b/src/3rdparty/chromium/ui/gl/dc_layer_tree.cc
-@@ -30,6 +30,7 @@ bool NeedSwapChainPresenter(const DCLayerOverlayParams* overlay) {
+@@ -32,6 +32,7 @@ bool NeedSwapChainPresenter(const DCLayerOverlayParams* overlay) {
                                         DCLayerOverlayType::kDCompVisualContent;
  }
  
@@ -519,7 +528,7 @@ index 15cbe12..4cf7fe0 100644
  // Unconditionally get a IDCompositionVisual2 as a IDCompositionVisual3.
  //
  // |IDCompositionVisual3| should be available since Windows 8.1, but we noticed
-@@ -66,6 +67,7 @@ D2D_MATRIX_4X4_F TransformToD2D_MATRIX_4X4_F(const gfx::Transform& transform) {
+@@ -68,6 +69,7 @@ D2D_MATRIX_4X4_F TransformToD2D_MATRIX_4X4_F(const gfx::Transform& transform) {
                            t.rc(0, 2), t.rc(1, 2), t.rc(2, 2), t.rc(3, 2),
                            t.rc(0, 3), t.rc(1, 3), t.rc(2, 3), t.rc(3, 3));
  }
@@ -527,7 +536,7 @@ index 15cbe12..4cf7fe0 100644
  
  // The size the surfaces in the pool. Used in |VisualSubtree::Update| to
  // determine how to scale the background color visual. This can be any size
-@@ -606,6 +608,7 @@ bool DCLayerTree::VisualTree::VisualSubtree::Update(
+@@ -610,6 +612,7 @@ bool DCLayerTree::VisualTree::VisualSubtree::Update(
      }
    }
  
@@ -535,7 +544,7 @@ index 15cbe12..4cf7fe0 100644
    if (opacity_changed) {
      if (opacity_ != 1) {
        hr = CheckedCastToVisual3(clip_visual_)->SetOpacity(opacity_);
-@@ -622,6 +625,7 @@ bool DCLayerTree::VisualTree::VisualSubtree::Update(
+@@ -626,6 +629,7 @@ bool DCLayerTree::VisualTree::VisualSubtree::Update(
        CHECK_EQ(hr, S_OK);
      }
    }
@@ -543,7 +552,7 @@ index 15cbe12..4cf7fe0 100644
  
    if (rounded_corner_bounds_changed) {
      if (!rounded_corner_bounds_.IsEmpty()) {
-@@ -684,6 +688,7 @@ bool DCLayerTree::VisualTree::VisualSubtree::Update(
+@@ -688,6 +692,7 @@ bool DCLayerTree::VisualTree::VisualSubtree::Update(
      }
    }
  
@@ -551,7 +560,7 @@ index 15cbe12..4cf7fe0 100644
    if (quad_to_root_transform_changed) {
      if (quad_to_root_transform_.Is2dTransform()) {
        const D2D_MATRIX_3X2_F matrix =
-@@ -698,6 +703,7 @@ bool DCLayerTree::VisualTree::VisualSubtree::Update(
+@@ -702,6 +707,7 @@ bool DCLayerTree::VisualTree::VisualSubtree::Update(
        CHECK_EQ(hr, S_OK);
      }
    }
@@ -559,7 +568,7 @@ index 15cbe12..4cf7fe0 100644
  
    if (nearest_neighbor_filter_changed) {
      hr = transform_visual_->SetBitmapInterpolationMode(
-@@ -764,6 +770,7 @@ bool DCLayerTree::VisualTree::VisualSubtree::Update(
+@@ -768,6 +774,7 @@ bool DCLayerTree::VisualTree::VisualSubtree::Update(
      // update. No visual changes are needed in this case.
    }
  
@@ -567,7 +576,7 @@ index 15cbe12..4cf7fe0 100644
    if (quad_rect_changed || background_color_surface_changed ||
        background_color_changed) {
      if (!background_color_surface_ || background_color.fA == 0.0) {
-@@ -787,6 +794,7 @@ bool DCLayerTree::VisualTree::VisualSubtree::Update(
+@@ -791,6 +798,7 @@ bool DCLayerTree::VisualTree::VisualSubtree::Update(
        CHECK_EQ(hr, S_OK);
      }
    }
@@ -575,15 +584,15 @@ index 15cbe12..4cf7fe0 100644
  
    if (quad_to_root_transform_changed || quad_rect_changed ||
        allow_antialiasing_changed) {
-@@ -1169,6 +1177,7 @@ void DCLayerTree::VisualTree::GetSwapChainVisualInfoForTesting(
+@@ -1171,6 +1179,7 @@ void DCLayerTree::VisualTree::GetSwapChainVisualInfoForTesting(
  
- bool DCLayerTree::CommitAndClearPendingOverlays(
+ base::expected<void, CommitError> DCLayerTree::CommitAndClearPendingOverlays(
      std::vector<std::unique_ptr<DCLayerOverlayParams>> overlays) {
 +#if !defined(COMPILER_GCC) // FIXME: missing Microsoft::WRL::ComPtr<IDXGISwapChain1>
    TRACE_EVENT1("gpu", "DCLayerTree::CommitAndClearPendingOverlays",
                 "num_overlays", overlays.size());
  
-@@ -1270,6 +1279,7 @@ bool DCLayerTree::CommitAndClearPendingOverlays(
+@@ -1274,6 +1283,7 @@ base::expected<void, CommitError> DCLayerTree::CommitAndClearPendingOverlays(
    solid_color_surface_pool_->TrimAfterCommit();
  
    return status;
@@ -611,10 +620,10 @@ index f8fd6c7..ed77b43 100644
      sources += [
        "gl_factory_mac.cc",
 diff --git a/src/3rdparty/chromium/ui/gl/swap_chain_presenter.cc b/src/3rdparty/chromium/ui/gl/swap_chain_presenter.cc
-index 79e140a..e10454d 100644
+index d15792c..2253eb7 100644
 --- a/src/3rdparty/chromium/ui/gl/swap_chain_presenter.cc
 +++ b/src/3rdparty/chromium/ui/gl/swap_chain_presenter.cc
-@@ -441,6 +441,7 @@ bool TryDisableDesktopPlane(IDXGIDecodeSwapChain* decode_swap_chain,
+@@ -413,6 +413,7 @@ bool TryDisableDesktopPlane(IDXGIDecodeSwapChain* decode_swap_chain,
      return false;
    }
  
@@ -622,7 +631,7 @@ index 79e140a..e10454d 100644
    // Set the target region to the specified rectangle if necessary.
    RECT target_region = target_rect.ToRECT();
    if (target_region != original_target_rect) {
-@@ -452,6 +453,7 @@ bool TryDisableDesktopPlane(IDXGIDecodeSwapChain* decode_swap_chain,
+@@ -424,6 +425,7 @@ bool TryDisableDesktopPlane(IDXGIDecodeSwapChain* decode_swap_chain,
        return false;
      }
    }
@@ -631,10 +640,10 @@ index 79e140a..e10454d 100644
    return true;
  }
 diff --git a/src/3rdparty/chromium/ui/native_theme/BUILD.gn b/src/3rdparty/chromium/ui/native_theme/BUILD.gn
-index bf24f99..dcf03d0 100644
+index f7ac0fc..1bf278b 100644
 --- a/src/3rdparty/chromium/ui/native_theme/BUILD.gn
 +++ b/src/3rdparty/chromium/ui/native_theme/BUILD.gn
-@@ -131,7 +131,11 @@ if (is_win) {
+@@ -128,7 +128,11 @@ if (is_win) {
        "//ui/gfx",
      ]
  
@@ -648,10 +657,10 @@ index bf24f99..dcf03d0 100644
  } else {
    source_set("native_theme_browser") {
 diff --git a/src/3rdparty/chromium/ui/shell_dialogs/BUILD.gn b/src/3rdparty/chromium/ui/shell_dialogs/BUILD.gn
-index 422241c..8f9c4af 100644
+index 2c003ec..9e59882 100644
 --- a/src/3rdparty/chromium/ui/shell_dialogs/BUILD.gn
 +++ b/src/3rdparty/chromium/ui/shell_dialogs/BUILD.gn
-@@ -42,7 +42,7 @@ jumbo_component("shell_dialogs") {
+@@ -41,7 +41,7 @@ jumbo_component("shell_dialogs") {
      "//url",
    ]
  
@@ -660,7 +669,7 @@ index 422241c..8f9c4af 100644
      sources += [ "shell_dialog_stub.cc" ]
    }
  
-@@ -90,7 +90,7 @@ jumbo_component("shell_dialogs") {
+@@ -84,7 +84,7 @@ jumbo_component("shell_dialogs") {
      ]
    }
  

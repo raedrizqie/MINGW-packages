@@ -1,8 +1,8 @@
 diff --git a/src/3rdparty/chromium/third_party/angle/BUILD.gn b/src/3rdparty/chromium/third_party/angle/BUILD.gn
-index bdd0871..34ff5bc 100644
+index 34b9fed..de41235 100644
 --- a/src/3rdparty/chromium/third_party/angle/BUILD.gn
 +++ b/src/3rdparty/chromium/third_party/angle/BUILD.gn
-@@ -326,7 +326,7 @@ config("extra_warnings") {
+@@ -327,7 +327,7 @@ config("extra_warnings") {
    }
  
    # Enable more default warnings on Windows.
@@ -11,7 +11,7 @@ index bdd0871..34ff5bc 100644
      cflags += [
        "/we4244",  # Conversion: possible loss of data.
        "/we4312",  # Conversion: greater size.
-@@ -666,7 +666,15 @@ angle_static_library("angle_gpu_info_util") {
+@@ -667,7 +667,15 @@ angle_static_library("angle_gpu_info_util") {
      deps += [ "$angle_root/src/common/vulkan:angle_vulkan_entry_points" ]
    }
  
@@ -28,16 +28,16 @@ index bdd0871..34ff5bc 100644
      sources += libangle_gpu_info_util_win_sources
      if (!angle_is_winuwp) {
        libs += [ "setupapi.lib" ]
-@@ -819,7 +827,7 @@ template("translator_lib") {
-       ":angle_version_info",
-     ]
+@@ -815,7 +823,7 @@ angle_static_library("translator") {
+     ":angle_version_info",
+   ]
  
--    if (is_win) {
-+    if (is_msvc) {
-       # Necessary to suppress some system header xtree warnings in Release.
-       # For some reason this warning doesn't get triggered in Chromium
-       cflags = [ "/wd4718" ]
-@@ -1011,7 +1019,7 @@ config("libANGLE_config") {
+-  if (is_win) {
++  if (is_msvc) {
+     # Necessary to suppress some system header xtree warnings in Release.
+     # For some reason this warning doesn't get triggered in Chromium
+     cflags = [ "/wd4718" ]
+@@ -996,7 +1004,7 @@ config("libANGLE_config") {
    ldflags = []
    defines += [ "LIBANGLE_IMPLEMENTATION" ]
  
@@ -46,7 +46,7 @@ index bdd0871..34ff5bc 100644
      cflags += [ "/wd4530" ]  # C++ exception handler used, but unwind semantics
                               # are not enabled.
    }
-@@ -1114,7 +1122,14 @@ angle_source_set("libANGLE_no_vulkan") {
+@@ -1095,7 +1103,14 @@ angle_source_set("libANGLE_no_vulkan") {
      ":includes",
    ]
  
@@ -62,7 +62,7 @@ index bdd0871..34ff5bc 100644
      libs += [
        "gdi32.lib",
        "user32.lib",
-@@ -1146,7 +1161,11 @@ angle_source_set("libANGLE_no_vulkan") {
+@@ -1127,7 +1142,11 @@ angle_source_set("libANGLE_no_vulkan") {
    }
  
    if (angle_enable_d3d11) {
@@ -75,15 +75,15 @@ index bdd0871..34ff5bc 100644
    }
  
    if (angle_enable_metal) {
-@@ -1531,6 +1550,7 @@ if (angle_enable_gl_desktop_frontend) {
+@@ -1469,6 +1488,7 @@ if (angle_has_frame_capture) {
  
  angle_static_library("libGLESv2_static") {
    sources = libglesv2_sources
 +  output_name = "libGLESv2"
-   if (angle_enable_gl_desktop_frontend) {
-     sources += libglesv2_gl_sources
-     defines = [ "ANGLE_ENABLE_GL_DESKTOP_FRONTEND" ]
-@@ -1676,6 +1696,7 @@ if (angle_enable_vulkan) {
+   if (angle_enable_cl) {
+     sources += libglesv2_cl_sources
+   }
+@@ -1592,6 +1612,7 @@ if (angle_enable_vulkan) {
  }
  
  libEGL_template("libEGL_static") {
@@ -92,7 +92,7 @@ index bdd0871..34ff5bc 100644
    public_configs = [ ":angle_static_config" ]
    deps = [ ":libGLESv2_static" ]
 diff --git a/src/3rdparty/chromium/third_party/angle/src/libANGLE/MemoryProgramCache.cpp b/src/3rdparty/chromium/third_party/angle/src/libANGLE/MemoryProgramCache.cpp
-index d9b666f..58afffe 100644
+index ec2047d..8567d86 100644
 --- a/src/3rdparty/chromium/third_party/angle/src/libANGLE/MemoryProgramCache.cpp
 +++ b/src/3rdparty/chromium/third_party/angle/src/libANGLE/MemoryProgramCache.cpp
 @@ -8,7 +8,9 @@

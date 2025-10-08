@@ -1,8 +1,18 @@
 diff --git a/configure.cmake b/configure.cmake
-index 6b3b5f7..ca06b90 100644
+index 931071f..1c83a9b 100644
 --- a/configure.cmake
 +++ b/configure.cmake
-@@ -455,6 +455,8 @@ qt_webengine_configure_check("compiler"
+@@ -31,7 +31,9 @@ qt_webengine_set_version(libavutil 58.29.100)
+ qt_webengine_set_version(libavcodec 60.31.102)
+ qt_webengine_set_version(libavformat 60.16.100)
+ qt_webengine_set_version(openh264 2.4.1)
++if(NOT MINGW)
+ qt_webengine_set_version(windows_sdk 26100) # we only care about minor number "10.0.26100.0"
++endif()
+ 
+ 
+ #### find_package checks
+@@ -428,6 +430,8 @@ qt_webengine_configure_check("compiler"
      CONDITION MSVC OR
          (LINUX AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU") OR
          (LINUX AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang") OR
@@ -11,47 +21,33 @@ index 6b3b5f7..ca06b90 100644
          (MACOS AND CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
      MESSAGE
          "${CMAKE_CXX_COMPILER_ID} compiler is not supported."
-@@ -511,20 +513,20 @@ qt_webengine_configure_check("gcc-pdf"
-     TAGS LINUX_PLATFORM
- )
- 
--if(WIN32)
-+if(MSVC)
-     qt_webengine_get_windows_sdk_version(windows_sdk_version sdk_minor)
-     message("-- Windows 10 SDK version: ${windows_sdk_version}")
+@@ -517,6 +521,7 @@ if(WIN32)
      unset(windows_sdk_version)
--endif()
+ endif()
  
--qt_webengine_configure_check("windows-sdk"
--    MODULES QtWebEngine
--    CONDITION NOT WIN32 OR sdk_minor GREATER_EQUAL ${QT_CONFIGURE_CHECK_windows_sdk_version}
--    MESSAGE "Build requires Windows 11 SDK at least version 10.0.${QT_CONFIGURE_CHECK_windows_sdk_version}.0"
--    DOCUMENTATION "Windows 11 SDK at least version 10.0.${QT_CONFIGURE_CHECK_windows_sdk_version}.0"
--    TAGS WINDOWS_PLATFORM
--)
--unset(sdk_minor)
-+    qt_webengine_configure_check("windows-sdk"
-+        MODULES QtWebEngine
-+        CONDITION NOT WIN32 OR sdk_minor GREATER_EQUAL ${QT_CONFIGURE_CHECK_windows_sdk_version}
-+        MESSAGE "Build requires Windows 11 SDK at least version 10.0.${QT_CONFIGURE_CHECK_windows_sdk_version}.0"
-+        DOCUMENTATION "Windows 11 SDK at least version 10.0.${QT_CONFIGURE_CHECK_windows_sdk_version}.0"
-+        TAGS WINDOWS_PLATFORM
-+    )
-+    unset(sdk_minor)
++if(NOT MINGW)
+ qt_webengine_configure_check("windows-sdk"
+     MODULES QtWebEngine
+     CONDITION NOT WIN32 OR sdk_minor GREATER_EQUAL ${QT_CONFIGURE_CHECK_windows_sdk_version}
+@@ -525,6 +530,7 @@ qt_webengine_configure_check("windows-sdk"
+     TAGS WINDOWS_PLATFORM
+ )
+ unset(sdk_minor)
 +endif()
  
- #### Features
+ ### Support Checks (optional)
  
-@@ -607,7 +609,7 @@ qt_feature("webengine-system-re2" PRIVATE
+@@ -644,19 +650,19 @@ qt_feature("webengine-system-re2" PRIVATE
  qt_feature("webengine-system-icu" PRIVATE
      LABEL "icu"
      AUTODETECT FALSE
--    CONDITION UNIX AND NOT APPLE AND ICU_FOUND
-+    CONDITION (UNIX OR MINGW) AND NOT APPLE AND ICU_FOUND
+-    CONDITION UNIX AND ICU_FOUND
++    CONDITION (UNIX OR MINGW) AND ICU_FOUND
  )
  qt_feature("webengine-system-libwebp" PRIVATE
      LABEL "libwebp, libwebpmux and libwebpdemux"
-@@ -615,11 +617,11 @@ qt_feature("webengine-system-libwebp" PRIVATE
+-    CONDITION UNIX AND WEBP_FOUND
++    CONDITION (UNIX OR MINGW) AND WEBP_FOUND
  )
  qt_feature("webengine-system-libopenjpeg2" PRIVATE
      LABEL "libopenjpeg2"
@@ -65,7 +61,7 @@ index 6b3b5f7..ca06b90 100644
  )
  qt_feature("webengine-system-ffmpeg" PRIVATE
      LABEL "ffmpeg"
-@@ -629,11 +631,11 @@ qt_feature("webengine-system-ffmpeg" PRIVATE
+@@ -666,11 +672,11 @@ qt_feature("webengine-system-ffmpeg" PRIVATE
  qt_feature("webengine-system-libvpx" PRIVATE
      LABEL "libvpx"
      AUTODETECT FALSE
@@ -79,7 +75,7 @@ index 6b3b5f7..ca06b90 100644
  )
  qt_feature("webengine-system-glib" PRIVATE
      LABEL "glib"
-@@ -641,7 +643,7 @@ qt_feature("webengine-system-glib" PRIVATE
+@@ -678,7 +684,7 @@ qt_feature("webengine-system-glib" PRIVATE
  )
  qt_feature("webengine-system-zlib" PRIVATE
      LABEL "zlib"
@@ -88,16 +84,12 @@ index 6b3b5f7..ca06b90 100644
  )
  qt_feature("webengine-qt-zlib" PRIVATE
      LABEL "qtzlib"
-@@ -651,7 +653,7 @@ qt_feature("webengine-qt-zlib" PRIVATE
+@@ -688,23 +694,23 @@ qt_feature("webengine-qt-zlib" PRIVATE
  )
  qt_feature("webengine-system-minizip" PRIVATE
      LABEL "minizip"
 -    CONDITION UNIX AND MINIZIP_FOUND
 +    CONDITION (UNIX OR MINGW) AND MINIZIP_FOUND
- )
- qt_feature("webengine-system-libevent" PRIVATE
-     LABEL "libevent"
-@@ -659,19 +661,19 @@ qt_feature("webengine-system-libevent" PRIVATE
  )
  qt_feature("webengine-system-libxml" PRIVATE
      LABEL "libxml2 and libxslt"
@@ -121,7 +113,7 @@ index 6b3b5f7..ca06b90 100644
  )
  qt_feature("webengine-qt-libpng" PRIVATE
      LABEL "qtpng"
-@@ -682,7 +684,7 @@ qt_feature("webengine-qt-libpng" PRIVATE
+@@ -715,7 +721,7 @@ qt_feature("webengine-qt-libpng" PRIVATE
  )
  qt_feature("webengine-system-libjpeg" PRIVATE
      LABEL "jpeg"
@@ -130,7 +122,7 @@ index 6b3b5f7..ca06b90 100644
  )
  qt_feature("webengine-qt-libjpeg" PRIVATE
      LABEL "qtjpeg"
-@@ -693,7 +695,7 @@ qt_feature("webengine-qt-libjpeg" PRIVATE
+@@ -726,7 +732,7 @@ qt_feature("webengine-qt-libjpeg" PRIVATE
  )
  qt_feature("webengine-system-harfbuzz" PRIVATE
      LABEL "harfbuzz"
@@ -139,7 +131,7 @@ index 6b3b5f7..ca06b90 100644
  )
  qt_feature("webengine-qt-harfbuzz" PRIVATE
      LABEL "qtharfbuzz"
-@@ -704,7 +706,7 @@ qt_feature("webengine-qt-harfbuzz" PRIVATE
+@@ -737,7 +743,7 @@ qt_feature("webengine-qt-harfbuzz" PRIVATE
  )
  qt_feature("webengine-system-freetype" PRIVATE
      LABEL "freetype"
@@ -148,7 +140,16 @@ index 6b3b5f7..ca06b90 100644
  )
  qt_feature("webengine-qt-freetype" PRIVATE
      LABEL "qtfreetype"
-@@ -755,7 +757,7 @@ qt_configure_add_summary_entry(ARGS "qtpdf-widgets-build")
+@@ -758,7 +764,7 @@ qt_feature("webengine-system-libudev" PRIVATE
+ 
+ qt_feature("webengine-system-openh264" PRIVATE
+     LABEL "openh264"
+-    CONDITION UNIX AND OPENH264_FOUND
++    CONDITION (UNIX OR MINGW) AND OPENH264_FOUND
+ )
+ 
+ qt_feature("webengine-ozone-x11" PRIVATE
+@@ -795,7 +801,7 @@ qt_configure_add_summary_entry(ARGS "qtpdf-widgets-build")
  qt_configure_add_summary_entry(ARGS "qtpdf-quick-build")
  qt_configure_end_summary_section()
  # >> Optional system libraries
@@ -157,11 +158,23 @@ index 6b3b5f7..ca06b90 100644
      qt_configure_add_summary_section(NAME "Optional system libraries")
      qt_configure_add_summary_entry(ARGS "webengine-system-re2")
      qt_configure_add_summary_entry(ARGS "webengine-system-icu")
+diff --git a/src/core/api/CMakeLists.txt b/src/core/api/CMakeLists.txt
+index 970c071..340fd7f 100644
+--- a/src/core/api/CMakeLists.txt
++++ b/src/core/api/CMakeLists.txt
+@@ -89,6 +89,7 @@ if(CLANG OR GCC)
+     target_compile_options(WebEngineCore PRIVATE
+         "-Wno-unused-parameter"
+         "-Wno-expansion-to-defined"
++        "-Wno-deprecated-declarations"
+     )
+ endif()
+ 
 diff --git a/src/core/CMakeLists.txt b/src/core/CMakeLists.txt
-index 2b71f80..4fc11f2 100644
+index eb83a82..94ecb82 100644
 --- a/src/core/CMakeLists.txt
 +++ b/src/core/CMakeLists.txt
-@@ -592,6 +592,47 @@ foreach(arch ${archs})
+@@ -615,6 +615,47 @@ foreach(arch ${archs})
              )
          endif()
  
@@ -209,20 +222,8 @@ index 2b71f80..4fc11f2 100644
          add_gn_command(
              CMAKE_TARGET WebEngineCore
              NINJA_TARGETS QtWebEngineCore convert_dict
-diff --git a/src/core/api/CMakeLists.txt b/src/core/api/CMakeLists.txt
-index 34a467d..6584108 100644
---- a/src/core/api/CMakeLists.txt
-+++ b/src/core/api/CMakeLists.txt
-@@ -86,6 +86,7 @@ if(CLANG OR GCC)
-     target_compile_options(WebEngineCore PRIVATE
-         "-Wno-unused-parameter"
-         "-Wno-expansion-to-defined"
-+        "-Wno-deprecated-declarations"
-     )
- endif()
- 
 diff --git a/src/core/configure/BUILD.root.gn.in b/src/core/configure/BUILD.root.gn.in
-index efb49a5..42e80ab 100644
+index 0e611c2..17b8e59 100644
 --- a/src/core/configure/BUILD.root.gn.in
 +++ b/src/core/configure/BUILD.root.gn.in
 @@ -78,6 +78,20 @@ config("QtWebEngineCore_config") {

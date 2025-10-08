@@ -1,12 +1,15 @@
 diff --git a/src/3rdparty/chromium/crypto/BUILD.gn b/src/3rdparty/chromium/crypto/BUILD.gn
-index bf39871..6dc2a99 100644
+index 4f4c450..40bb493 100644
 --- a/src/3rdparty/chromium/crypto/BUILD.gn
 +++ b/src/3rdparty/chromium/crypto/BUILD.gn
-@@ -110,7 +110,11 @@ component("crypto") {
+@@ -122,10 +122,11 @@ component("crypto") {
        "unexportable_key_win.h",
        "user_verifying_key_win.cc",
      ]
--    libs = [ "ncrypt.lib" ]
+-    libs = [
+-      "crypt32.lib",
+-      "ncrypt.lib",
+-    ]
 +    if (is_mingw) {
 +      libs = [ "ncrypt" ]
 +    } else {
@@ -16,10 +19,10 @@ index bf39871..6dc2a99 100644
  
    # Some files are built when NSS is used for the platform certificate library.
 diff --git a/src/3rdparty/chromium/crypto/unexportable_key_win.cc b/src/3rdparty/chromium/crypto/unexportable_key_win.cc
-index f904b67..29897ca 100644
+index 26757d1..e4425c1 100644
 --- a/src/3rdparty/chromium/crypto/unexportable_key_win.cc
 +++ b/src/3rdparty/chromium/crypto/unexportable_key_win.cc
-@@ -177,6 +177,7 @@ std::optional<std::vector<uint8_t>> GetP256ECDSASPKI(NCRYPT_KEY_HANDLE key) {
+@@ -178,6 +178,7 @@ std::optional<std::vector<uint8_t>> GetP256ECDSASPKI(NCRYPT_KEY_HANDLE key) {
      return std::nullopt;
    }
  
@@ -27,7 +30,7 @@ index f904b67..29897ca 100644
    // Sometimes NCrypt will return a generic dwMagic even when asked for a P-256
    // key. In that case, do extra validation to make sure that `key` is in fact
    // a P-256 key.
-@@ -193,6 +194,7 @@ std::optional<std::vector<uint8_t>> GetP256ECDSASPKI(NCRYPT_KEY_HANDLE key) {
+@@ -194,6 +195,7 @@ std::optional<std::vector<uint8_t>> GetP256ECDSASPKI(NCRYPT_KEY_HANDLE key) {
        return std::nullopt;
      }
    }
@@ -35,7 +38,7 @@ index f904b67..29897ca 100644
  
    uint8_t x962[1 + 32 + 32];
    x962[0] = POINT_CONVERSION_UNCOMPRESSED;
-@@ -707,6 +709,7 @@ class VirtualUnexportableKeyProviderWin
+@@ -699,6 +701,7 @@ class VirtualUnexportableKeyProviderWin
        return nullptr;
      }
  
@@ -43,7 +46,7 @@ index f904b67..29897ca 100644
      ScopedNCryptKey key;
      {
        SCOPED_MAY_LOAD_LIBRARY_AT_BACKGROUND_PRIORITY();
-@@ -748,6 +751,7 @@ class VirtualUnexportableKeyProviderWin
+@@ -740,6 +743,7 @@ class VirtualUnexportableKeyProviderWin
        default:
          return nullptr;
      }
@@ -52,21 +55,21 @@ index f904b67..29897ca 100644
  
    std::unique_ptr<VirtualUnexportableSigningKey> FromKeyName(
 diff --git a/src/3rdparty/chromium/skia/BUILD.gn b/src/3rdparty/chromium/skia/BUILD.gn
-index c9c09df..82bfac3 100644
+index 9b6e42e..74d7312 100644
 --- a/src/3rdparty/chromium/skia/BUILD.gn
 +++ b/src/3rdparty/chromium/skia/BUILD.gn
-@@ -416,7 +416,9 @@ component("skia") {
-   # Remove unused util sources.
-   sources -= [ "//third_party/skia/src/utils/SkParsePath.cpp" ]
+@@ -412,7 +412,9 @@ component("skia") {
+     sources -= [ "//third_party/skia/src/utils/SkParsePath.cpp" ]
+   }
  
 -  if (is_win) {
 +  if (is_mingw) {
 +    libs = [ "fontsub" ]
-+  } else {
++  } else if (is_msvc) {
      libs = [ "fontsub.lib" ]
    }
  
-@@ -705,10 +707,14 @@ template("skia_source_set") {
+@@ -709,10 +711,14 @@ template("skia_source_set") {
        configs -= [ "//build/config/compiler:afdo_optimize_size" ]
      }
      if (is_win) {
@@ -85,7 +88,7 @@ index c9c09df..82bfac3 100644
      }
    }
  }
-@@ -739,7 +745,7 @@ skia_source_set("skia_core_and_effects") {
+@@ -757,7 +763,7 @@ skia_source_set("skia_core_and_effects") {
  if (current_cpu == "x86" || current_cpu == "x64") {
    skia_source_set("skia_opts_hsw") {
      sources = skia_opts.hsw_sources
@@ -94,7 +97,7 @@ index c9c09df..82bfac3 100644
        cflags = [
          "-mavx2",
          "-mbmi",
-@@ -814,7 +820,7 @@ skia_source_set("skia_opts") {
+@@ -832,7 +838,7 @@ skia_source_set("skia_opts") {
  if (current_cpu == "x64") {
    skia_source_set("skcms_TransformHsw") {
      sources = skcms_TransformHsw
@@ -103,7 +106,7 @@ index c9c09df..82bfac3 100644
        cflags = [
          "-w",
          "-mavx2",
-@@ -828,7 +834,7 @@ if (current_cpu == "x64") {
+@@ -846,7 +852,7 @@ if (current_cpu == "x64") {
    }
    skia_source_set("skcms_TransformSkx") {
      sources = skcms_TransformSkx
@@ -112,7 +115,7 @@ index c9c09df..82bfac3 100644
        cflags = [
          "-w",
          "-mavx512f",
-@@ -855,7 +861,7 @@ if (current_cpu == "x64") {
+@@ -873,7 +879,7 @@ if (current_cpu == "x64") {
  }
  
  source_set("skcms_TransformBaseline_and_public") {
@@ -122,7 +125,7 @@ index c9c09df..82bfac3 100644
        "-w",
        "-std=c11",
 diff --git a/src/3rdparty/chromium/sql/sqlite_result_code.cc b/src/3rdparty/chromium/sql/sqlite_result_code.cc
-index ea8cfb2..b4da953 100644
+index c1b96e2..870dc21 100644
 --- a/src/3rdparty/chromium/sql/sqlite_result_code.cc
 +++ b/src/3rdparty/chromium/sql/sqlite_result_code.cc
 @@ -158,7 +158,7 @@ constexpr SqliteResultCodeMappingEntry kResultCodeMapping[] = {
