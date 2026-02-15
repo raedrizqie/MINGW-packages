@@ -158,11 +158,11 @@ build() {
   fi
 
   export MSYS2_ENV_CONV_EXCL="QMAKE_MOC;QMAKE_UIC"
+  export QMAKE_MOC=${MINGW_PREFIX/bin/moc
+  export QMAKE_UIC=${MINGW_PREFIX/bin/uic
+  export QT_ARCH=${_arch}
 
   qmake-qt5 ../${_pkgfn/-opensource/} \
-    QMAKE_MOC=${MINGW_PREFIX/bin/moc \
-    QMAKE_UIC=${MINGW_PREFIX/bin/uic \
-    QT_ARCH=${_arch} \
     CONFIG+=silent -- \
     -no-build-qtpdf \
     -no-ffmpeg \
