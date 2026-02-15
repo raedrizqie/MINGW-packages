@@ -314,7 +314,7 @@ index b511a58..a057541 100644
      if (target_os == "android") {
        cxx11_override = use_cxx11_on_android
 -    } else {
-+    } else if (!is_mingw) {
++    } else { ##
        cxx11_override = use_cxx11
      }
  
