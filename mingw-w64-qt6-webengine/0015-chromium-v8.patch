@@ -96,7 +96,7 @@ index af2fc03..9c2785f 100644
        # cross compile Windows arm64 with host toolchain.
        v8_snapshot_toolchain = host_toolchain
      }
-+  } else if (host_cpu == "arm64" && target_cpu == "arm64" &&
++  } else if (v8_current_cpu == "arm64" &&
 +             host_os == "win") {
 +    v8_snapshot_toolchain = current_toolchain
    } else if (host_cpu == "arm64" && current_cpu == "arm64" &&
