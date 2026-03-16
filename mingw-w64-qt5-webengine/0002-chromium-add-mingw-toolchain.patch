@@ -236,7 +236,7 @@ index 3815dd6..81e20f2 100644
  } else if (target_os == "winuwp") {
    # Only target WinUWP on for a Windows store application and only
 diff --git a/src/3rdparty/chromium/build/config/compiler/BUILD.gn b/src/3rdparty/chromium/build/config/compiler/BUILD.gn
-index b511a58..c526678 100644
+index b511a58..5ae37c5 100644
 --- a/src/3rdparty/chromium/build/config/compiler/BUILD.gn
 +++ b/src/3rdparty/chromium/build/config/compiler/BUILD.gn
 @@ -268,7 +268,7 @@ config("compiler") {
@@ -454,6 +454,15 @@ index b511a58..c526678 100644
        # Enable extra warnings for chromium_code when we control the compiler.
        cflags += [ "-Wextra" ]
      }
+@@ -1631,7 +1693,7 @@ config("chromium_code") {
+       "__STDC_FORMAT_MACROS",
+     ]
+ 
+-    if (!is_debug && !using_sanitizer && current_cpu != "s390x" &&
++    if (!is_debug && !is_mingw && !using_sanitizer && current_cpu != "s390x" &&
+         current_cpu != "s390" && current_cpu != "ppc64" &&
+         current_cpu != "mips" && current_cpu != "mips64") {
+       # Non-chromium code is not guaranteed to compile cleanly with
 @@ -1646,7 +1708,7 @@ config("chromium_code") {
      }
    }
@@ -493,16 +502,19 @@ index b511a58..c526678 100644
      cflags_cc = [ "/GR" ]
    } else {
      cflags_cc = [ "-frtti" ]
-@@ -1763,7 +1830,7 @@ config("rtti") {
+@@ -1763,8 +1830,10 @@ config("rtti") {
  config("no_rtti") {
    # Some sanitizer configs may require RTTI to be left enabled globally
    if (!use_rtti) {
 -    if (is_win) {
 +    if (is_msvc) {
        cflags_cc = [ "/GR-" ]
++    } else if (is_mingw) {
++      cflags_cc = []
      } else {
        cflags_cc = [ "-fno-rtti" ]
-@@ -1805,7 +1872,7 @@ config("thin_archive") {
+       cflags_objcc = cflags_cc
+@@ -1805,7 +1874,7 @@ config("thin_archive") {
    # archive names to 16 characters, which is not what we want).
    if ((is_posix && !is_nacl && !is_apple) || is_fuchsia) {
      arflags = [ "-T" ]
@@ -511,7 +523,7 @@ index b511a58..c526678 100644
      arflags = [ "/llvmlibthin" ]
    }
  }
-@@ -1816,12 +1883,15 @@ config("thin_archive") {
+@@ -1816,7 +1885,7 @@ config("thin_archive") {
  # Note: exceptions are disallowed in Google code.
  
  config("exceptions") {
@@ -520,15 +532,7 @@ index b511a58..c526678 100644
      # Enables exceptions in the STL.
      if (!use_custom_libcxx) {
        defines = [ "_HAS_EXCEPTIONS=1" ]
-     }
-     cflags_cc = [ "/EHsc" ]
-+  } else if (is_mingw) {
-+    cflags_cc = []
-+    cflags_objcc = cflags_cc
-   } else {
-     cflags_cc = [ "-fexceptions" ]
-     cflags_objcc = cflags_cc
-@@ -1829,7 +1899,7 @@ config("exceptions") {
+@@ -1829,7 +1898,7 @@ config("exceptions") {
  }
  
  config("no_exceptions") {
@@ -537,17 +541,16 @@ index b511a58..c526678 100644
      # Disables exceptions in the STL.
      # libc++ uses the __has_feature macro to control whether to use exceptions,
      # so defining this macro is unnecessary. Defining _HAS_EXCEPTIONS to 0 also
-@@ -1839,6 +1909,9 @@ config("no_exceptions") {
+@@ -1839,6 +1908,8 @@ config("no_exceptions") {
      if (!use_custom_libcxx) {
        defines = [ "_HAS_EXCEPTIONS=0" ]
      }
 +  } else if (is_mingw) {
 +    cflags_cc = []
-+    cflags_objcc = cflags_cc
    } else {
      cflags_cc = [ "-fno-exceptions" ]
      cflags_objcc = cflags_cc
-@@ -1890,7 +1963,7 @@ config("no_shorten_64_warnings") {
+@@ -1890,7 +1961,7 @@ config("no_shorten_64_warnings") {
      if (is_clang) {
        cflags = [ "-Wno-shorten-64-to-32" ]
      } else {
@@ -556,7 +559,7 @@ index b511a58..c526678 100644
          # MSVC does not have an explicit warning equivalent to
          # -Wshorten-64-to-32 but 4267 warns for size_t -> int
          # on 64-bit builds, so is the closest.
-@@ -1907,7 +1980,7 @@ config("no_shorten_64_warnings") {
+@@ -1907,7 +1978,7 @@ config("no_shorten_64_warnings") {
  # the gcc 4.9 toolchains.
  config("no_incompatible_pointer_warnings") {
    cflags = []
@@ -565,7 +568,7 @@ index b511a58..c526678 100644
      cflags += [ "-Wno-incompatible-pointer-types" ]
    } else if (current_cpu == "mipsel" || current_cpu == "mips64el") {
      cflags += [ "-w" ]
-@@ -1930,7 +2003,7 @@ config("no_incompatible_pointer_warnings") {
+@@ -1930,7 +2001,7 @@ config("no_incompatible_pointer_warnings") {
  
  # Shared settings for both "optimize" and "optimize_max" configs.
  # IMPORTANT: On Windows "/O1" and "/O2" must go before the common flags.
@@ -574,7 +577,7 @@ index b511a58..c526678 100644
    common_optimize_on_cflags = [
      "/Ob2",  # Both explicit and auto inlining.
      "/Oy-",  # Disable omitting frame pointers, must be after /O2.
-@@ -1985,6 +2058,14 @@ if (is_win) {
+@@ -1985,6 +2056,14 @@ if (is_win) {
          "-Wl,-no_function_starts",
        ]
      }
@@ -589,7 +592,7 @@ index b511a58..c526678 100644
    } else if (current_os != "aix") {
      # Non-Mac Posix flags.
      # Aix does not support these.
-@@ -2011,7 +2092,7 @@ if (is_win) {
+@@ -2011,7 +2090,7 @@ if (is_win) {
  }
  
  config("default_stack_frames") {
@@ -598,7 +601,7 @@ index b511a58..c526678 100644
      if (enable_frame_pointers) {
        cflags = [ "-fno-omit-frame-pointer" ]
  
-@@ -2038,7 +2119,7 @@ config("default_stack_frames") {
+@@ -2038,7 +2117,7 @@ config("default_stack_frames") {
  
  # Default "optimization on" config.
  config("optimize") {
@@ -607,7 +610,7 @@ index b511a58..c526678 100644
      if (chrome_pgo_phase != 2) {
        # Favor size over speed, /O1 must be before the common flags.
        # /O1 implies /Os and /GF.
-@@ -2073,7 +2154,7 @@ config("optimize") {
+@@ -2073,7 +2152,7 @@ config("optimize") {
  
  # Turn off optimizations.
  config("no_optimize") {
@@ -616,7 +619,7 @@ index b511a58..c526678 100644
      cflags = [
        "/Od",  # Disable optimization.
        "/Ob0",  # Disable all inlining (on by default).
-@@ -2110,7 +2191,7 @@ config("no_optimize") {
+@@ -2110,7 +2189,7 @@ config("no_optimize") {
  }
  
  config("optimize_size_only") {
@@ -625,7 +628,7 @@ index b511a58..c526678 100644
      cflags = [ "/O1" ]
    } else {
      cflags = [ "-Os" ]
-@@ -2133,7 +2214,7 @@ config("optimize_max") {
+@@ -2133,7 +2212,7 @@ config("optimize_max") {
      configs = [ "//build/config/nacl:irt_optimize" ]
    } else {
      ldflags = common_optimize_on_ldflags
@@ -634,7 +637,7 @@ index b511a58..c526678 100644
        # Favor speed over size, /O2 must be before the common flags.
        # /O2 implies /Ot, /Oi, and /GF.
        cflags = [ "/O2" ] + common_optimize_on_cflags
-@@ -2165,7 +2246,7 @@ config("optimize_speed") {
+@@ -2165,7 +2244,7 @@ config("optimize_speed") {
      configs = [ "//build/config/nacl:irt_optimize" ]
    } else {
      ldflags = common_optimize_on_ldflags
@@ -643,7 +646,7 @@ index b511a58..c526678 100644
        # Favor speed over size, /O2 must be before the common flags.
        # /O2 implies /Ot, /Oi, and /GF.
        cflags = [ "/O2" ] + common_optimize_on_cflags
-@@ -2290,12 +2371,14 @@ config("win_pdbaltpath") {
+@@ -2290,12 +2369,14 @@ config("win_pdbaltpath") {
    # absolute path into just the basename of the pdb file, which helps with
    # build reproducibility. Debuggers look for pdb files next to executables,
    # so there's no downside to always using this.
@@ -660,7 +663,7 @@ index b511a58..c526678 100644
      if (is_clang) {
        cflags = [ "/Z7" ]  # Debug information in the .obj files.
      } else {
-@@ -2348,7 +2431,7 @@ config("symbols") {
+@@ -2348,7 +2429,7 @@ config("symbols") {
      }
  
      # TODO(https://crbug.com/1050118): Investigate missing debug info on mac.
@@ -669,7 +672,7 @@ index b511a58..c526678 100644
        cflags += [
          "-Xclang",
          "-debug-info-kind=constructor",
-@@ -2403,7 +2486,7 @@ config("symbols") {
+@@ -2403,7 +2484,7 @@ config("symbols") {
  # This config guarantees to hold symbol for stack trace which are shown to user
  # when crash happens in unittests running on buildbot.
  config("minimal_symbols") {
@@ -678,7 +681,7 @@ index b511a58..c526678 100644
      # Functions, files, and line tables only.
      cflags = []
      ldflags = [ "/DEBUG" ]
-@@ -2456,7 +2539,7 @@ config("minimal_symbols") {
+@@ -2456,7 +2537,7 @@ config("minimal_symbols") {
  # told to not generate debug information and the linker then just puts function
  # names in the final debug information.
  config("no_symbols") {
@@ -687,7 +690,7 @@ index b511a58..c526678 100644
      ldflags = [ "/DEBUG" ]
  
      # All configs using /DEBUG should include this:
-@@ -2514,7 +2597,7 @@ if (is_chromeos && is_chromeos_device) {
+@@ -2514,7 +2595,7 @@ if (is_chromeos && is_chromeos_device) {
    }
  }
  
@@ -834,7 +837,7 @@ index 594c3f4..cdd5617 100644
            "/Oy-",
            "/Ob0",
 diff --git a/src/3rdparty/chromium/build/config/win/BUILD.gn b/src/3rdparty/chromium/build/config/win/BUILD.gn
-index b4f4f4f..65b5460 100644
+index b4f4f4f..e8b99c0 100644
 --- a/src/3rdparty/chromium/build/config/win/BUILD.gn
 +++ b/src/3rdparty/chromium/build/config/win/BUILD.gn
 @@ -50,6 +50,27 @@ declare_args() {
@@ -842,7 +845,7 @@ index b4f4f4f..65b5460 100644
  # Windows-only.
  config("compiler") {
 +  if (is_mingw) {
-+    cflags = [ "-Wa,-mbig-obj" ]
++    cflags = []
 +
 +    if (win_enable_cfg_guards && current_cpu != "arm64") {
 +        cflags += [ "-fcf-protection" ]
@@ -852,8 +855,8 @@ index b4f4f4f..65b5460 100644
 +      cflags += [ "-fno-keep-inline-dllexport" ]
 +    }
 +
-+    if (current_cpu == "x86" || current_cpu == "x64") {
-+      cflags += [ "-msse3" ]
++    if (current_cpu == "arm64") {
++      cflags += [ "--target=aarch64-pc-windows-gnu" ]
 +    }
 +
 +    if (current_cpu == "x64" || current_cpu == "arm64") {
@@ -881,7 +884,7 @@ index b4f4f4f..65b5460 100644
    if (current_cpu == "x64") {
      ldflags = [ "/MACHINE:X64" ]
    } else if (current_cpu == "x86") {
-@@ -340,25 +363,34 @@ config("sdk_link") {
+@@ -340,25 +363,33 @@ config("sdk_link") {
    if (defined(vc_lib_atlmfc_path)) {
      lib_dirs += [ "$vc_lib_atlmfc_path" ]
    }
@@ -905,7 +908,6 @@ index b4f4f4f..65b5460 100644
 -      "/time",
 -      "/verbose:incr",
 +  if (is_mingw) {
-+    # Enable DEP and ASLR
 +    ldflags = [
 +      "-Wl,-dynamicbase",
 +      "-Wl,-nxcompat",
@@ -928,7 +930,7 @@ index b4f4f4f..65b5460 100644
    }
  }
  
-@@ -370,7 +402,7 @@ config("cfi_linker") {
+@@ -370,7 +401,7 @@ config("cfi_linker") {
    # ASan and CFG leads to slow process startup. Chromium's test runner uses
    # lots of child processes, so this means things are really slow. Disable CFG
    # for now. https://crbug.com/846966
@@ -937,7 +939,7 @@ index b4f4f4f..65b5460 100644
      # Turn on CFG bitmap generation and CFG load config.
      if (target_cpu == "arm64") {
        # longjmp protection is temporarily disabled on Windows on Arm64 due to
-@@ -398,6 +430,7 @@ config("cfi_linker") {
+@@ -398,6 +429,7 @@ config("cfi_linker") {
  # This config should also be used for any test binary whose goal is to run
  # tests with the full browser.
  config("delayloads") {
@@ -945,7 +947,7 @@ index b4f4f4f..65b5460 100644
    ldflags = [
      "/DELAYLOAD:api-ms-win-core-winrt-error-l1-1-0.dll",
      "/DELAYLOAD:api-ms-win-core-winrt-l1-1-0.dll",
-@@ -439,9 +472,11 @@ config("delayloads") {
+@@ -439,9 +471,11 @@ config("delayloads") {
      "/DELAYLOAD:wsock32.dll",
      "/DELAYLOAD:wtsapi32.dll",
    ]
@@ -957,7 +959,7 @@ index b4f4f4f..65b5460 100644
    ldflags = [
      "/DELAYLOAD:advapi32.dll",
      "/DELAYLOAD:crypt32.dll",
-@@ -459,6 +494,7 @@ config("delayloads_not_for_child_dll") {
+@@ -459,6 +493,7 @@ config("delayloads_not_for_child_dll") {
      "/DELAYLOAD:wintrust.dll",
      "/DELAYLOAD:ws2_32.dll",
    ]
@@ -965,23 +967,7 @@ index b4f4f4f..65b5460 100644
  }
  
  # CRT --------------------------------------------------------------------------
-@@ -467,6 +503,7 @@ config("delayloads_not_for_child_dll") {
- # See https://msdn.microsoft.com/en-us/library/2kzt1wy3.aspx for a reference of
- # what each value does.
- config("default_crt") {
-+  if (is_msvc) {
-   if (is_shared) {
-     # Component mode: dynamic CRT. Since the library is shared, it requires
-     # exceptions or will give errors about things not matching, so keep
-@@ -488,6 +525,7 @@ config("default_crt") {
-       configs = [ ":static_crt" ]
-     }
-   }
-+  }
- }
- 
- # Use this to force use of the release CRT when building perf-critical build
-@@ -495,28 +533,34 @@ config("default_crt") {
+@@ -495,28 +530,34 @@ config("default_crt") {
  # when the debug CRT is part of the bottleneck. This also avoids *implicitly*
  # defining _DEBUG.
  config("release_crt") {
@@ -1030,7 +1016,7 @@ index b4f4f4f..65b5460 100644
    }
  }
  
-@@ -526,20 +570,28 @@ config("static_crt") {
+@@ -526,20 +567,28 @@ config("static_crt") {
  if (current_cpu == "x64") {
    # The number after the comma is the minimum required OS version.
    # 5.02 = Windows Server 2003.
@@ -1064,7 +1050,7 @@ index b4f4f4f..65b5460 100644
  }
  
  # Incremental linking ----------------------------------------------------------
-@@ -560,7 +612,7 @@ config("default_incremental_linking") {
+@@ -560,7 +609,7 @@ config("default_incremental_linking") {
        # lld.
        ldflags += [ "/OPT:NOREF" ]
      }

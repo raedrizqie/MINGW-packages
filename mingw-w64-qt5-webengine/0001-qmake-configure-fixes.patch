@@ -120,7 +120,7 @@ index cb53c93..cf5cbfd 100644
 +    }
  }
 diff --git a/mkspecs/features/gn_generator.prf b/mkspecs/features/gn_generator.prf
-index 306e58d..2f8cb20 100644
+index 306e58d..fbbc1c5 100644
 --- a/mkspecs/features/gn_generator.prf
 +++ b/mkspecs/features/gn_generator.prf
 @@ -49,7 +49,7 @@ INCLUDE_LIST = $$join(INCLUDEPATH, " -I", "-I")
@@ -211,10 +211,10 @@ index a9df3d2..fe3e1ab 100644
      return(true)
  }
 diff --git a/src/buildtools/config/windows.pri b/src/buildtools/config/windows.pri
-index f7b80e6..e2ddb4f 100644
+index f7b80e6..1a70842 100644
 --- a/src/buildtools/config/windows.pri
 +++ b/src/buildtools/config/windows.pri
-@@ -20,7 +20,54 @@ clang_cl {
+@@ -20,7 +20,57 @@ clang_cl {
          clang_use_chrome_plugins=false \
          clang_base_path=\"$$system_path($$clean_path($$clang_prefix))\"
  } else {
@@ -266,11 +266,14 @@ index f7b80e6..e2ddb4f 100644
 +        use_system_zlib=true \
 +        use_thin_lto=false \
 +        use_v8_context_snapshot=false \
++        v8_enable_pointer_compression=false \
++        v8_enable_shared_ro_heap=false \
++        v8_enable_snapshot_compression=false \
 +        v8_use_external_startup_data=false
  }
  
  qtConfig(webengine-developer-build) {
-@@ -85,7 +132,8 @@ msvc {
+@@ -85,7 +135,8 @@ msvc {
      gn_args += windows_sdk_path=\"$$clean_path($$SDK_PATH)\"
  
      GN_TARGET_CPU = $$gnArch($$QT_ARCH)
@@ -482,6 +485,24 @@ index 5e5d9d7..a6e5732 100644
                          "webengine-system-harfbuzz",
                          "webengine-system-freetype"
                       ]
+diff --git a/src/core/core_common.pri b/src/core/core_common.pri
+index e10d142..cd10c5c 100644
+--- a/src/core/core_common.pri
++++ b/src/core/core_common.pri
+@@ -15,6 +15,10 @@ qtConfig(webengine-webchannel): QT += webchannel
+ # LTO does not work for Chromium at the moment, so disable it completely for core.
+ CONFIG -= ltcg
+ 
+-# Chromium requires C++14
+-CONFIG += c++14
+-
++# Chromium requires C++17
++clang {
++  CONFIG += c++17
++  DEFINES += _GNU_SOURCE
++} else {
++  CONFIG += gnu++17
++}
 diff --git a/src/core/core_gn_config.pri b/src/core/core_gn_config.pri
 index 379bbac..d9e015a 100644
 --- a/src/core/core_gn_config.pri
@@ -498,7 +519,7 @@ index 379bbac..d9e015a 100644
  qtConfig(webengine-extensions) {
    GN_INCLUDES += $$PWD/qtwebengine_sources.gni $$PWD/qtwebengine_resources.gni $$PWD/common/extensions/api/qtwebengine_extensions_features.gni
 diff --git a/src/core/core_module.pro b/src/core/core_module.pro
-index 9e087c8..e7aeea0 100644
+index 9e087c8..a29df7e 100644
 --- a/src/core/core_module.pro
 +++ b/src/core/core_module.pro
 @@ -13,7 +13,7 @@ LIBS_PRIVATE += -L$$api_library_path
@@ -510,12 +531,13 @@ index 9e087c8..e7aeea0 100644
      !qtConfig(webengine-developer-build) {
          # Remove unused functions and data in debug non-developer builds, because the binaries will
          # be smaller in the shipped packages.
-@@ -28,11 +28,13 @@ osx {
+@@ -28,11 +28,14 @@ osx {
      # Simulate -whole-archive by passing the list of object files that belong to the public
      # API library as response file to the linker.
      QMAKE_LFLAGS += @$${api_library_path}$${QMAKE_DIR_SEP}$${api_library_name}.lib.objects
 +} else: mingw {
 +    QMAKE_LFLAGS += @$${api_library_path}$${QMAKE_DIR_SEP}$${api_library_name}.a
++    LIBS_PRIVATE = -Wl,--start-group $$NINJA_LIBS -Wl,--end-group
  } else {
      QMAKE_LFLAGS += -Wl,-whole-archive -l$$api_library_name -Wl,-no-whole-archive
  }
