@@ -316,9 +316,9 @@ index 4bd1190..0e96b92 100644
  #include "gpu/config/gpu_info_collector.h"
  
  // C system before C++ system.
-+#if BUILDFLAG(USE_ML)
++//#if BUILDFLAG(USE_ML)
  #include <DirectML.h>
-+#endif
++//#endif
  #include <d3d11.h>
  #include <d3d11_3.h>
  #include <dxgi.h>
