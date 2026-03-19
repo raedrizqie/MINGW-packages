@@ -95,7 +95,7 @@ index 2c3e81e..ff5d5bd 100644
 +#undef __except
 +#define __except(x) catch(...)
 +#undef __catch
-+#define __catch(x) catch(x)
++#define __catch catch
 +#endif
 +
  #endif  // BUILD_BUILD_CONFIG_H_
