@@ -85,7 +85,7 @@ diff --git a/src/3rdparty/chromium/build/build_config.h b/src/3rdparty/chromium/
 index 2c3e81e..ff5d5bd 100644
 --- a/src/3rdparty/chromium/build/build_config.h
 +++ b/src/3rdparty/chromium/build/build_config.h
-@@ -225,4 +225,11 @@
+@@ -225,4 +225,13 @@
  #define BASE_STRING16_ITERATOR_IS_CHAR16_POINTER
  #endif
  
@@ -94,6 +94,8 @@ index 2c3e81e..ff5d5bd 100644
 +#define __try try
 +#undef __except
 +#define __except(x) catch(...)
++#undef __catch
++#define __catch(x) catch(x)
 +#endif
 +
  #endif  // BUILD_BUILD_CONFIG_H_
