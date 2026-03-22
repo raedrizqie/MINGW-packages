@@ -537,7 +537,7 @@ index 9e087c8..a29df7e 100644
      QMAKE_LFLAGS += @$${api_library_path}$${QMAKE_DIR_SEP}$${api_library_name}.lib.objects
 +} else: mingw {
 +    LIBS_PRIVATE += -L$${api_library_path} -l$${api_library_name}
-+    POST_TARGETDEPS = -Wl,--start-group $$POST_TARGETDEPS -Wl,--end-group
++    QT = -Wl,--start-group $$QT $$LIBS -Wl,--end-group
  } else {
      QMAKE_LFLAGS += -Wl,-whole-archive -l$$api_library_name -Wl,-no-whole-archive
  }
