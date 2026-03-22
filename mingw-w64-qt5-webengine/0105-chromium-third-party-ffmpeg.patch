@@ -7,7 +7,7 @@ index 8dacfa7..2d15f56 100644
  }
  
 -if (is_win) {
-+if (is_msvc) {
++if (is_msvc || is_mingw) {
    # Stub generator script and signatures of all functions used by Chrome.
    generate_stubs_script = "//tools/generate_stubs/generate_stubs.py"
  
