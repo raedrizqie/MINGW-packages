@@ -520,19 +520,6 @@ index 641db9f..16e9f20 100644
          if (opcode == 0x51) {
            mnemonic = "sqrtpd";
          } else if (opcode == 0x54) {
-diff --git a/src/3rdparty/chromium/v8/src/heap/cppgc/marking-state.h b/src/3rdparty/chromium/v8/src/heap/cppgc/marking-state.h
-index d3533274ba7..1f42edd7783 100644
---- a/src/3rdparty/chromium/v8/src/heap/cppgc/marking-state.h
-+++ b/src/3rdparty/chromium/v8/src/heap/cppgc/marking-state.h
-@@ -358,7 +358,7 @@ class MutatorMarkingState final : public BasicMarkingState {
-   ~MutatorMarkingState() override = default;
-
-   inline bool MarkNoPush(HeapObjectHeader& header) {
--    return MutatorMarkingState::BasicMarkingState::MarkNoPush(header);
-+    return BasicMarkingState::MarkNoPush(header);
-   }
-
-   inline void ReTraceMarkedWeakContainer(cppgc::Visitor&, HeapObjectHeader&);
 diff --git a/src/3rdparty/chromium/v8/src/inspector/string-16.cc b/src/3rdparty/chromium/v8/src/inspector/string-16.cc
 index 466852f..f36ee21 100644
 --- a/src/3rdparty/chromium/v8/src/inspector/string-16.cc
