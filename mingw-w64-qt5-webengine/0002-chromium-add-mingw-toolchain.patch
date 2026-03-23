@@ -857,9 +857,9 @@ index b4f4f4f..e8b99c0 100644
 +      cflags += [ "-fno-keep-inline-dllexport" ]
 +    }
 +
-+    #if (current_cpu == "arm64") {
-+    #  cflags += [ "--target=aarch64-pc-windows-gnu" ]
-+    #}
++    if (current_cpu == "arm64") {
++      cflags += [ "--target=aarch64-windows-gnu" ]
++    }
 +
 +    if (current_cpu == "x64") {
 +      ldflags = [ "-m64" ]
