@@ -154,7 +154,7 @@ build() {
   mkdir -p build-${MSYSTEM} && cd build-${MSYSTEM}
 
   qmake-qt5 ../${_pkgfn/-opensource/} \
-    CONFIG+='exceptions rtti' \
+    CONFIG+=exceptions \
     MOC_EXE=$(cygpath -m ${MINGW_PREFIX}/bin/moc.exe) \
     RCC_EXE=$(cygpath -m ${MINGW_PREFIX}/bin/rcc.exe) \
     -- \
