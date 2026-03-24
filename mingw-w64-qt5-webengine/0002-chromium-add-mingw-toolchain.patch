@@ -858,11 +858,11 @@ index b4f4f4f..e8b99c0 100644
 +    }
 +
 +    if (current_cpu == "arm64") {
-+      cflags += [ "-march=armv8.1-a", "--target=aarch64-pc-windows-gnu" ]
++      cflags += [ "-march=armv8.1", "--target=aarch64-pc-windows-gnu" ]
 +    }
 +
 +    if (current_cpu == "x64" || current_cpu == "arm64") {
-+      ldflags = [ "-m64" ]
++      ldflags = [ "-msse3", "-m64" ]
 +    } else if (current_cpu == "x86") {
 +      ldflags = [ "-m32" ]
 +    }
