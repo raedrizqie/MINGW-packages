@@ -847,7 +847,7 @@ index b4f4f4f..e8b99c0 100644
  # Windows-only.
  config("compiler") {
 +  if (is_mingw) {
-+    cflags = [ "-march=native" ]
++    cflags = []
 +
 +    if (win_enable_cfg_guards && current_cpu != "arm64") {
 +      cflags += [ "-fcf-protection" ]
@@ -858,10 +858,10 @@ index b4f4f4f..e8b99c0 100644
 +    }
 +
 +    if (current_cpu == "arm64") {
-+      cflags += [ "--target=aarch64-pc-windows-gnu" ]
++      cflags += [ "-march=armv8-a", "-mcpu=native" ]
 +      ldflags = [ "-m64" ]
 +    } else if (current_cpu == "x64") {
-+      cflags += [ "-mtune=generic" ]
++      cflags += [ "-march=nocona", "-mtune=generic" ]
 +      ldflags = [ "-m64" ]
 +    } else if (current_cpu == "x86") {
 +      ldflags = [ "-m32" ]
