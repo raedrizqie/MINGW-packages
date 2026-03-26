@@ -8,7 +8,7 @@ pkgver=5.15.18
 pkgrel=1
 pkgdesc='Qt5 support for web applications using the Chromium browser project'
 arch=(any)
-mingw_arch=('clang64' 'clangarm64') #('mingw64' 'ucrt64' 'clang64' 'clangarm64')
+mingw_arch=('clangarm64') #('mingw64' 'ucrt64' 'clang64' 'clangarm64')
 msys2_references=(
   'archlinux: qt5-webengine'
 )
@@ -42,7 +42,6 @@ makedepends=("${MINGW_PACKAGE_PREFIX}-cc"
              "${MINGW_PACKAGE_PREFIX}-qt5-location"
              "${MINGW_PACKAGE_PREFIX}-qt5-tools"
              "${MINGW_PACKAGE_PREFIX}-qt5-webchannel"
-             #$([[ ${MSYSTEM} == CLANGARM64 ]] && echo "${MINGW_PACKAGE_PREFIX}-v8")
              "rsync")
 _pkgfn="${_realname/5-/}-everywhere-opensource-src-${pkgver}"
 source=("https://download.qt.io/archive/qt/${pkgver%.*}/${pkgver}/submodules/${_pkgfn}.tar.xz"
@@ -154,7 +153,6 @@ build() {
   mkdir -p build-${MSYSTEM} && cd build-${MSYSTEM}
 
   qmake-qt5 ../${_pkgfn/-opensource/} \
-    CONFIG+=exceptions \
     MOC_EXE=$(cygpath -m ${MINGW_PREFIX}/bin/moc.exe) \
     RCC_EXE=$(cygpath -m ${MINGW_PREFIX}/bin/rcc.exe) \
     -- \
