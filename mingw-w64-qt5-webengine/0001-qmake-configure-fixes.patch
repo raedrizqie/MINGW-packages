@@ -244,10 +244,12 @@ index f7b80e6..1a70842 100644
 +        pdfium_use_system_libpng=true \
 +        pdfium_use_system_zlib=true \
 +        use_dawn=false \
++        use_exceptions=true \
 +        use_glib=false \
 +        use_incremental_linking=false \
 +        use_partition_alloc=true \
 +        use_perfetto_client_library=false \
++        use_rtti=true \
 +        use_static_angle=true \
 +        use_system_freetype=true \
 +        use_system_harfbuzz=true \
@@ -267,8 +269,6 @@ index f7b80e6..1a70842 100644
 +        use_thin_lto=false \
 +        use_v8_context_snapshot=false \
 +        v8_enable_pointer_compression=false \
-+        v8_enable_shared_ro_heap=false \
-+        v8_enable_snapshot_compression=false \
 +        v8_use_external_startup_data=false
  }
  
