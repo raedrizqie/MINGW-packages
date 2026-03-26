@@ -94,8 +94,8 @@ index 2c3e81e..ff5d5bd 100644
 +#define __try try
 +#undef __except
 +#define __except(x) catch(...)
-+#undef __catch
-+#define __catch catch
++//#undef __catch
++//#define __catch catch
 +#endif
 +
  #endif  // BUILD_BUILD_CONFIG_H_
@@ -858,7 +858,7 @@ index b4f4f4f..e8b99c0 100644
 +    }
 +
 +    if (current_cpu == "arm64") {
-+      cflags += [ "-march=armv8-a+simd+crypto", "-mcpu=native" ]
++      cflags += [ "-march=armv8.5-a", "-mcpu=native" ]
 +      ldflags = [ "-m64" ]
 +    } else if (current_cpu == "x64") {
 +      cflags += [ "-march=native", "-mtune=generic" ]
