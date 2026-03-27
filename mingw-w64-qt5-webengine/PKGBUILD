@@ -156,7 +156,7 @@ build() {
   export RCC_EXE=$(cygpath -m ${MINGW_PREFIX}/bin/rcc.exe)
 
   qmake-qt5 ../${_pkgfn/-opensource/} \
-  CONFIG-='release_and_debug release_and_debug_target' \
+  CONFIG-=debug_and_release_target \
     -- \
     -no-build-qtpdf \
     -no-ffmpeg \
