@@ -858,7 +858,7 @@ index b4f4f4f..e8b99c0 100644
 +    }
 +
 +    if (current_cpu == "arm64") {
-+      cflags += [ "-march=armv8.3-a+fp16", "-mcpu=native", "--target=aarch64-pc-windows-gnu" ]
++      cflags += [ "-march=native+fp16", "-mcpu=native" ]
 +      ldflags = [ "-m64" ]
 +    } else if (current_cpu == "x64") {
 +      cflags += [ "-march=native", "-mtune=generic" ]
