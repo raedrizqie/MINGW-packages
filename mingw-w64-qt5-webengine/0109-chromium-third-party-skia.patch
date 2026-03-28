@@ -459,7 +459,7 @@ index 4abad71..86d4e0a 100644
  
  SI F from_half(U16 h) {
 -#if defined(JUMPER_IS_NEON) && defined(SK_CPU_ARM64) \
-+#if defined(JUMPER_IS_NEON) && defined(SK_CPU_ARM64)  \
++#if defined(JUMPER_IS_NEON) && defined(SK_CPU_ARM64) && !defined(__GNUC__) \
      && !defined(SK_BUILD_FOR_GOOGLE3)  // Temporary workaround for some Google3 builds.
  #if defined(SK_BUILD_FOR_MAC)
      return vcvt_f32_f16(h);
@@ -468,7 +468,7 @@ index 4abad71..86d4e0a 100644
  
  SI U16 to_half(F f) {
 -#if defined(JUMPER_IS_NEON) && defined(SK_CPU_ARM64) \
-+#if defined(JUMPER_IS_NEON) && defined(SK_CPU_ARM64)  \
++#if defined(JUMPER_IS_NEON) && defined(SK_CPU_ARM64) && !defined(__GNUC__) \
      && !defined(SK_BUILD_FOR_GOOGLE3)  // Temporary workaround for some Google3 builds.
  #if defined(SK_BUILD_FOR_MAC)
      return vcvt_f16_f32(f);
