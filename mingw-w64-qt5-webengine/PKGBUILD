@@ -8,7 +8,7 @@ pkgver=5.15.18
 pkgrel=1
 pkgdesc='Qt5 support for web applications using the Chromium browser project'
 arch=(any)
-mingw_arch=('clangarm64') #('mingw64' 'ucrt64' 'clang64' 'clangarm64')
+mingw_arch=('mingw64') #('mingw64' 'ucrt64' 'clang64' 'clangarm64')
 msys2_references=(
   'archlinux: qt5-webengine'
 )
@@ -151,8 +151,6 @@ prepare() {
 
 build() {
   mkdir -p build-${MSYSTEM} && cd build-${MSYSTEM}
-
-  #RCC_EXE=$(cygpath -m ${MINGW_PREFIX}/bin/rcc.exe)
 
   qmake-qt5 ../${_pkgfn/-opensource/} \
   CONFIG-='debug_and_release debug_and_release_target' \
