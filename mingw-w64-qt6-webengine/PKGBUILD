@@ -167,6 +167,7 @@ build() {
     -DPython3_EXECUTABLE=${MINGW_PREFIX}/bin/python \
     -DQT_FEATURE_qtpdf_build=OFF \
     -DQT_FEATURE_webengine_system_icu=ON \
+    -DQT_GENERATE_SBOM=OFF \
     -DQT_SHOW_EXTRA_IDE_SOURCES=OFF \
     -S ${_pkgfn} \
     -B build-${MSYSTEM}
