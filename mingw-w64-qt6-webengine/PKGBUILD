@@ -36,7 +36,7 @@ makedepends=("${MINGW_PACKAGE_PREFIX}-clang"
              "${MINGW_PACKAGE_PREFIX}-cmake"
              "${MINGW_PACKAGE_PREFIX}-directx-headers"
              "${MINGW_PACKAGE_PREFIX}-gperf"
-             "${MINGW_PACKAGE_PREFIX}-lld"
+             #"${MINGW_PACKAGE_PREFIX}-lld"
              "${MINGW_PACKAGE_PREFIX}-ninja"
              "${MINGW_PACKAGE_PREFIX}-nodejs"
              "${MINGW_PACKAGE_PREFIX}-pkgconf"
@@ -163,7 +163,6 @@ build() {
     -DCMAKE_INSTALL_PREFIX=${MINGW_PREFIX} \
     -DCMAKE_C_COMPILER=clang \
     -DCMAKE_CXX_COMPILER=clang++ \
-    -DCMAKE_LINKER_TYPE=LLD \
     -DPython3_EXECUTABLE=${MINGW_PREFIX}/bin/python \
     -DQT_FEATURE_qtpdf_build=OFF \
     -DQT_FEATURE_webengine_system_icu=ON \
