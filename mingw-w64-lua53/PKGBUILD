@@ -8,7 +8,7 @@ pkgbase=mingw-w64-${_realname}
 pkgname="${MINGW_PACKAGE_PREFIX}-${_realname}"
 pkgver=5.3.6
 pkgrel=7
-pkgdesc="A powerful light-weight programming language designed for extending applications. Version 5.3.x (mingw-w64)"
+pkgdesc='A powerful light-weight programming language designed for extending applications. Version 5.3.x (mingw-w64)'
 arch=('any')
 mingw_arch=('clang64')
 url="https://www.lua.org/"
@@ -42,11 +42,11 @@ prepare() {
   patch -p1 -i "${srcdir}/searchpath.patch"
   patch -p1 -i "${srcdir}/fix-fseek-on-mingw.patch"
 
-  sed -e 's|%VER%|${pkgver%.*}|g;s|%REL%|${pkgver}|g' \
-      -e 's|llua|llua5.3|g' \
-      -e 's|/include|/include/lua5.3|g' \
-      -e 's|/usr|${MINGW_PREFIX}|g' \
-      -e 's|{includedir}|{includedir}/lua5.3 -DLUA_COMPAT_5_2|g' \
+  sed -e "s|%VER%|${pkgver%.*}|g;s|%REL%|${pkgver}|g" \
+      -e "s|llua -lm|llua5.3|g" \
+      -e "s|/include|/include/lua5.3|g" \
+      -e "s|/usr|${MINGW_PREFIX}|g" \
+      -e "s|{includedir}|{includedir} -DLUA_COMPAT_5_2|g" \
       -i lua.pc
 }
 

@@ -1,0 +1,91 @@
+diff --git a/libaegisub/lua/modules.cpp b/libaegisub/lua/modules.cpp
+index 7d93c29..d3acb0f 100644
+--- a/libaegisub/lua/modules.cpp
++++ b/libaegisub/lua/modules.cpp
+@@ -29,7 +29,11 @@ namespace agi::lua {
+ int regex_init(lua_State *L);
+ 
+ int wrap_luaopen_luabins(lua_State *L) {
++#if (LUA_VERSION_NUM >= 502)
++	lua_getfield(L, LUA_REGISTRYINDEX, "aegisub");
++#else
+ 	lua_getfield(L, LUA_GLOBALSINDEX, "aegisub");
++#endif
+ 	lua_getfield(L, -1, "__raise_warning");
+ 	lua_remove(L, -2);
+ 
+diff --git a/libaegisub/lua/modules/lfs.cpp b/libaegisub/lua/modules/lfs.cpp
+index dff7e7f..e15f279 100644
+--- a/libaegisub/lua/modules/lfs.cpp
++++ b/libaegisub/lua/modules/lfs.cpp
+@@ -59,13 +59,13 @@ bool lfs_chdir(const char *dir, char **err) {
+ 	return setter(dir, err, CurrentPath);
+ }
+ 
+-char *currentdir(char **err) {
++char *lfs_currentdir(char **err) {
+ 	return wrap(err, []{
+ 		return strndup(CurrentPath().string());
+ 	});
+ }
+ 
+-bool mkdir(const char *dir, char **err) {
++bool lfs_mkdir(const char *dir, char **err) {
+ 	return setter(dir, err, &CreateDirectory);
+ }
+ 
+@@ -144,8 +144,8 @@ uintmax_t get_size(const char *path, char **err) {
+ extern "C" int luaopen_lfs_impl(lua_State *L) {
+ 	agi::lua::register_lib_table(L, {"DirectoryIterator"},
+ 		"chdir", lfs_chdir,
+-		"currentdir", currentdir,
+-		"mkdir", mkdir,
++		"currentdir", lfs_currentdir,
++		"mkdir", lfs_mkdir,
+ 		"rmdir", lfs_rmdir,
+ 		"touch", touch,
+ 		"get_mtime", get_mtime,
+diff --git a/a/libaegisub/lua/modules/lpeg.c b/b/libaegisub/lua/modules/lpeg.c
+index 5261c20..fa68864 100644
+--- a/libaegisub/lua/modules/lpeg.c
++++ b/libaegisub/lua/modules/lpeg.c
+@@ -26,7 +26,7 @@
+ /*
+ ** compatibility with Lua 5.2
+ */
+-#if (LUA_VERSION_NUM == 502)
++#if (LUA_VERSION_NUM >= 502)
+ 
+ #undef lua_equal
+ #define lua_equal(L,idx1,idx2)  lua_compare(L,(idx1),(idx2),LUA_OPEQ)
+diff --git a/subprojects/luabins/src/luabins.c b/subprojects/luabins/src/luabins.c
+index 35b1776..3254230 100644
+--- a/subprojects/luabins/src/luabins.c
++++ b/subprojects/luabins/src/luabins.c
+@@ -82,7 +82,11 @@ LUALIB_API int luaopen_luabins(lua_State * L)
+   /*
+   * Register module
+   */
++#if (LUA_VERSION_NUM >= 502)
++  luaL_newlib(L, R);
++#else
+   luaL_register(L, "luabins", R);
++#endif
+ 
+   /*
+   * Register module information
+diff --git a/subprojects/luabins/src/save.c b/subprojects/luabins/src/save.c
+index bf9b23e..6c99141 100644
+--- a/subprojects/luabins/src/save.c
++++ b/subprojects/luabins/src/save.c
+@@ -19,6 +19,10 @@
+   #define SPAM(a) (void)0
+ #endif
+ 
++#if (LUA_VERSION_NUM >= 502)
++#define lua_objlen(L,i)  lua_rawlen(L,(i))
++#endif
++
+ static int save_value(
+     lua_State * L,
+     luabins_SaveBuffer * sb,
