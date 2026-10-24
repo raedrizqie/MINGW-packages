@@ -106,9 +106,9 @@ prepare() {
 
 build() {
   # Needed by res.rc
-  export RESOURCE_BASE_VERSION=${pkgver//./, }
-  export BUILD_GIT_VERSION_NUMBER=0
-  export BUILD_GIT_VERSION_STRING=\"${pkgver}\"
+  #export RESOURCE_BASE_VERSION=${pkgver//./, }
+  #export BUILD_GIT_VERSION_NUMBER=0
+  #export BUILD_GIT_VERSION_STRING=\"${pkgver}\"
 
   CFLAGS="-D_UNICODE -Wno-unused-local-typedef" \
   CXXFLAGS="-D_UNICODE -Wno-ignored-attributes -Wno-unused" \
