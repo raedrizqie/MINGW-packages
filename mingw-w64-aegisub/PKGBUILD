@@ -125,6 +125,7 @@ build() {
       "build-${MSYSTEM}" \
       "Aegisub-${pkgver}"
 
+  cp -p ${srcdir}/Aegisub-${pkgver}/git_version.h build-${MSYSTEM}/git_version.h
   meson compile -C "build-${MSYSTEM}"
 }
 
