@@ -1,0 +1,2530 @@
+diff --git a/meson.build b/meson.build
+index 2750bb6..818194d 100644
+--- a/meson.build
++++ b/meson.build
+@@ -64,6 +64,7 @@ graphviz_dep = dependency('libgvc', required : false)
+ libxslt_dep = dependency('libxslt', required: false)
+ jsonglib_dep = dependency('json-glib-1.0',required : false)
+ postgres_dep = dependency ('libpq', required: false)
++firebird_dep = dependency ('fbclient', required: false)
+ mysql_dep = dependency ('mysqlclient', required: false)
+ mysql_args = []
+ if mysql_dep.found ()
+diff --git a/providers/meson.build b/providers/meson.build
+index 4622fe1..ddc9200 100644
+--- a/providers/meson.build
++++ b/providers/meson.build
+@@ -10,6 +10,10 @@ if sqlcipher_dep.found() and get_option('sqlcipher')
+ subdir('sqlcipher')
+ endif
+ 
++if firebird_dep.found()
++subdir('firebird')
++endif
++
+ if postgres_dep.found()
+ subdir('postgres')
+ endif
+diff --git a/providers/firebird/gda-firebird-provider.c b/providers/firebird/gda-firebird-provider.c
+index 232bbde..16e371f 100644
+--- a/providers/firebird/gda-firebird-provider.c
++++ b/providers/firebird/gda-firebird-provider.c
+@@ -30,10 +30,11 @@
+ #include <glib/gi18n-lib.h>
+ #include <glib/gstdio.h>
+ #include <libgda/libgda.h>
++#include <libgda/gda-connection.h>
++#include <libgda/gda-connection-private.h>
+ #include <libgda/gda-data-model-private.h>
++#include <libgda/gda-server-provider.h>
+ #include <libgda/gda-server-provider-extra.h>
+-#include <libgda/gda-server-provider-impl.h>
+-#include <libgda/binreloc/gda-binreloc.h>
+ #include <libgda/gda-statement-extra.h>
+ #include <sql-parser/gda-sql-parser.h>
+ #include "gda-firebird.h"
+@@ -43,7 +44,6 @@
+ #include "gda-firebird-meta.h"
+ #include "gda-firebird-parser.h"
+ #include "gda-firebird-util.h"
+-#include <libgda/gda-debug-macros.h>
+ 
+ #define _GDA_PSTMT(x) ((GdaPStmt*)(x))
+ 
+@@ -53,9 +53,9 @@
+  * GObject methods
+  */
+ static void gda_firebird_provider_class_init (GdaFirebirdProviderClass *klass);
+-static void gda_firebird_provider_init       (GdaFirebirdProvider *provider,
+-					      GdaFirebirdProviderClass *klass);
+-static GObjectClass *parent_class = NULL;
++static void gda_firebird_provider_init       (GdaFirebirdProvider *provider);
++
++G_DEFINE_TYPE (GdaFirebirdProvider, gda_firebird_provider, GDA_TYPE_SERVER_PROVIDER)
+ 
+ /*
+  * GdaServerProvider's virtual methods
+@@ -127,30 +127,6 @@ static GObject             *gda_firebird_provider_statement_execute (GdaServerPr
+ 								     GType *col_types,
+ 								     GdaSet **last_inserted_row, GError **error);
+ 
+-/* distributed transactions */
+-static gboolean gda_firebird_provider_xa_start    (GdaServerProvider *provider,
+-						   GdaConnection *cnc,
+-						   const GdaXaTransactionId *xid,
+-						   GError **error);
+-
+-static gboolean gda_firebird_provider_xa_end      (GdaServerProvider *provider,
+-						   GdaConnection *cnc,
+-						   const GdaXaTransactionId *xid,
+-						   GError **error);
+-
+-static gboolean gda_firebird_provider_xa_prepare  (GdaServerProvider *provider,
+-						   GdaConnection *cnc,
+-						   const GdaXaTransactionId *xid,
+-						   GError **error);
+-
+-static gboolean gda_firebird_provider_xa_commit   (GdaServerProvider *provider, GdaConnection *cnc,
+-						   const GdaXaTransactionId *xid, GError **error);
+-static gboolean gda_firebird_provider_xa_rollback (GdaServerProvider *provider, GdaConnection *cnc,
+-						   const GdaXaTransactionId *xid, GError **error);
+-
+-static GList   *gda_firebird_provider_xa_recover  (GdaServerProvider *provider, GdaConnection *cnc,
+-						   GError **error);
+-
+ /* 
+  * private connection data destroy 
+  */
+@@ -172,130 +148,21 @@ typedef enum {
+ 	INTERNAL_STMT1
+ } InternalStatementItem;
+ 
+-gchar *internal_sql[] = {
+-	"SQL 'firebird' FROM RDB$DATABASE"
++static gchar *internal_sql[] = {
++	"SELECT 1 FROM RDB$DATABASE"
+ };
+ 
+ /*
+  * GdaFirebirdProvider class implementation
+  */
+-GdaServerProviderBase firebird_base_functions = {
+-	gda_firebird_provider_get_name,
+-	gda_firebird_provider_get_version,
+-	gda_firebird_provider_get_server_version,
+-	gda_firebird_provider_supports_feature,
+-	gda_firebird_provider_create_worker,
+-	NULL,
+-	gda_firebird_provider_create_parser,
+-	gda_firebird_provider_get_data_handler,
+-	gda_firebird_provider_get_default_dbms_type,
+-	gda_firebird_provider_supports_operation,
+-	gda_firebird_provider_create_operation,
+-	gda_firebird_provider_render_operation,
+-	gda_firebird_provider_statement_to_sql,
+-	NULL,
+-	NULL,
+-	gda_firebird_provider_open_connection,
+-	NULL,
+-	gda_firebird_provider_close_connection,
+-	NULL,
+-	NULL,
+-	gda_firebird_provider_perform_operation,
+-	gda_firebird_provider_begin_transaction,
+-	gda_firebird_provider_commit_transaction,
+-	gda_firebird_provider_rollback_transaction,
+-	gda_firebird_provider_add_savepoint,
+-	gda_firebird_provider_rollback_savepoint,
+-	gda_firebird_provider_delete_savepoint,
+-	gda_firebird_provider_statement_prepare,
+-	gda_firebird_provider_statement_execute,
+-
+-	NULL, NULL, NULL, NULL, /* padding */
+-};
+-
+-GdaServerProviderMeta firebird_meta_functions = {
+-	_gda_firebird_meta__info,
+-	_gda_firebird_meta__btypes,
+-	_gda_firebird_meta__udt,
+-	_gda_firebird_meta_udt,
+-	_gda_firebird_meta__udt_cols,
+-	_gda_firebird_meta_udt_cols,
+-	_gda_firebird_meta__enums,
+-	_gda_firebird_meta_enums,
+-	_gda_firebird_meta__domains,
+-	_gda_firebird_meta_domains,
+-	_gda_firebird_meta__constraints_dom,
+-	_gda_firebird_meta_constraints_dom,
+-	_gda_firebird_meta__el_types,
+-	_gda_firebird_meta_el_types,
+-	_gda_firebird_meta__collations,
+-	_gda_firebird_meta_collations,
+-	_gda_firebird_meta__character_sets,
+-	_gda_firebird_meta_character_sets,
+-	_gda_firebird_meta__schemata,
+-	_gda_firebird_meta_schemata,
+-	_gda_firebird_meta__tables_views,
+-	_gda_firebird_meta_tables_views,
+-	_gda_firebird_meta__columns,
+-	_gda_firebird_meta_columns,
+-	_gda_firebird_meta__view_cols,
+-	_gda_firebird_meta_view_cols,
+-	_gda_firebird_meta__constraints_tab,
+-	_gda_firebird_meta_constraints_tab,
+-	_gda_firebird_meta__constraints_ref,
+-	_gda_firebird_meta_constraints_ref,
+-	_gda_firebird_meta__key_columns,
+-	_gda_firebird_meta_key_columns,
+-	_gda_firebird_meta__check_columns,
+-	_gda_firebird_meta_check_columns,
+-	_gda_firebird_meta__triggers,
+-	_gda_firebird_meta_triggers,
+-	_gda_firebird_meta__routines,
+-	_gda_firebird_meta_routines,
+-	_gda_firebird_meta__routine_col,
+-	_gda_firebird_meta_routine_col,
+-	_gda_firebird_meta__routine_par,
+-	_gda_firebird_meta_routine_par,
+-	_gda_firebird_meta__indexes_tab,
+-        _gda_firebird_meta_indexes_tab,
+-        _gda_firebird_meta__index_cols,
+-        _gda_firebird_meta_index_cols,
+-
+-	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, /* padding */
+-};
+-
+-GdaServerProviderXa firebird_xa_functions = {
+-	gda_firebird_provider_xa_start,
+-	gda_firebird_provider_xa_end,
+-	gda_firebird_provider_xa_prepare,
+-	gda_firebird_provider_xa_commit,
+-	gda_firebird_provider_xa_rollback,
+-	gda_firebird_provider_xa_recover,
+-
+-	NULL, NULL, NULL, NULL, /* padding */
+-};
+-
+ static void
+ gda_firebird_provider_class_init (GdaFirebirdProviderClass *klass)
+ {
+ 	GdaServerProviderClass *provider_class = GDA_SERVER_PROVIDER_CLASS (klass);
+-
+-	parent_class = g_type_class_peek_parent (klass);
+-
+-	/* set virtual functions */
+-	gda_server_provider_set_impl_functions (GDA_SERVER_PROVIDER_CLASS (klass),
+-						GDA_SERVER_PROVIDER_FUNCTIONS_BASE,
+-						(gpointer) &firebird_base_functions);
+-	gda_server_provider_set_impl_functions (GDA_SERVER_PROVIDER_CLASS (klass),
+-						GDA_SERVER_PROVIDER_FUNCTIONS_META,
+-						(gpointer) &firebird_meta_functions);
+-	gda_server_provider_set_impl_functions (GDA_SERVER_PROVIDER_CLASS (klass),
+-						GDA_SERVER_PROVIDER_FUNCTIONS_XA,
+-						(gpointer) &firebird_xa_functions);
+ }
+ 
+ static void
+-gda_firebird_provider_init (GdaFirebirdProvider *firebird_prv, GdaFirebirdProviderClass *klass)
++gda_firebird_provider_init (GdaFirebirdProvider *firebird_prv)
+ {
+ 	g_mutex_lock (&init_mutex);
+ 	if (!internal_stmt) {
+@@ -304,7 +171,7 @@ gda_firebird_provider_init (GdaFirebirdProvider *firebird_prv, GdaFirebirdProvid
+ 
+ 		parser = gda_server_provider_internal_get_parser ((GdaServerProvider*) firebird_prv);
+ 		internal_stmt = g_new0 (GdaStatement *, sizeof (internal_sql) / sizeof (gchar*));
+-		for (i = INTERNAL_STMT1; i < sizeof (internal_sql) / sizeof (gchar*); i++) {
++		for (i = INTERNAL_STMT1; i < (InternalStatementItem)(sizeof (internal_sql) / sizeof (gchar*)); i++) {
+ 			internal_stmt[i] = gda_sql_parser_parse_string (parser, internal_sql[i], NULL, NULL);
+ 			if (!internal_stmt[i])
+ 				g_error ("Could not parse internal statement: %s\n", internal_sql[i]);
+@@ -317,45 +184,21 @@ gda_firebird_provider_init (GdaFirebirdProvider *firebird_prv, GdaFirebirdProvid
+ 	g_mutex_unlock (&init_mutex);
+ }
+ 
+-GType
+-gda_firebird_provider_get_type (void)
+-{
+-	static GType type = 0;
+-
+-	if (G_UNLIKELY (type == 0)) {
+-		static GMutex registering;
+-		static GTypeInfo info = {
+-			sizeof (GdaFirebirdProviderClass),
+-			(GBaseInitFunc) NULL,
+-			(GBaseFinalizeFunc) NULL,
+-			(GClassInitFunc) gda_firebird_provider_class_init,
+-			NULL, NULL,
+-			sizeof (GdaFirebirdProvider),
+-			0,
+-			(GInstanceInitFunc) gda_firebird_provider_init
+-		};
+-		g_mutex_lock (&registering);
+-		if (type == 0) {
+-#ifdef FIREBIRD_EMBED
+-			type = g_type_register_static (GDA_TYPE_SERVER_PROVIDER, "GdaFirebirdProviderEmbed", &info, 0);
+-#else
+-			type = g_type_register_static (GDA_TYPE_SERVER_PROVIDER, "GdaFirebirdProvider", &info, 0);
+-#endif
+-		}
+-		g_mutex_unlock (&registering);
+-	}
+-
+-	return type;
+-}
+-
+ static GdaWorker *
+ gda_firebird_provider_create_worker (GdaServerProvider *provider, gboolean for_cnc)
+ {
+ 	/* For a start see http://www.firebirdsql.org/file/documentation/drivers_documentation/python/3.3.0/thread-safety-overview.html
+ 	 * For now we consider the client to be non thread safe */
+ 
++	static gsize unique_worker_init = 0;
+ 	static GdaWorker *unique_worker = NULL;
+-	return gda_worker_new_unique (&unique_worker, TRUE);
++
++	if (g_once_init_enter (&unique_worker_init)) {
++		unique_worker = gda_worker_new_unique (&unique_worker, TRUE);
++		g_once_init_leave (&unique_worker_init, 1);
++	}
++
++	return unique_worker;
+ }
+ 
+ /*
+@@ -404,6 +247,8 @@ gda_firebird_provider_open_connection (GdaServerProvider *provider, GdaConnectio
+ 	fb_user	= (gchar *) gda_quark_list_find (auth, "USERNAME");
+ 	fb_password = (gchar *) gda_quark_list_find (auth, "PASSWORD");
+ 	
++	if (!fb_db)
++		fb_db = (gchar *) gda_quark_list_find (params, "DATABASE");
+ 	if (!fb_db) {
+ 		gda_connection_add_event_string (cnc, "%s", _("The connection string must contain the DB_NAME values"));
+ 		return FALSE;
+@@ -493,8 +338,7 @@ gda_firebird_provider_open_connection (GdaServerProvider *provider, GdaConnectio
+ 	cdata->dbname = fb_conn;
+ 	cdata->server_version = fb_server_get_version (cdata);
+ 
+-	gda_connection_internal_set_provider_data (cnc, (GdaServerProviderConnectionData*) cdata,
+-						   (GDestroyNotify) gda_firebird_free_cnc_data);
++	gda_connection_set_provider_data (cnc, (GdaServerProviderConnectionData*) cdata);
+ 	
+ 	return TRUE;
+ }
+@@ -526,8 +370,7 @@ gda_firebird_provider_close_connection (GdaServerProvider *provider, GdaConnecti
+ 	cdata->handle = 0L;
+ 
+ 	/* Free the FirebirdConnectionData structure and its contents*/
+-	gda_firebird_free_cnc_data (cdata);
+-	gda_connection_internal_set_provider_data (cnc, NULL, NULL);
++	gda_connection_set_provider_data (cnc, NULL);
+ 
+ 	return TRUE;
+ }
+@@ -571,25 +414,12 @@ gda_firebird_provider_supports_operation (GdaServerProvider *provider, GdaConnec
+ 		g_return_val_if_fail (gda_connection_get_provider (cnc) == provider, FALSE);
+ 	}
+ 
+-	return FALSE;
+-
+-        switch (type) {
++	switch (type) {
+         case GDA_SERVER_OPERATION_CREATE_DB:
+         case GDA_SERVER_OPERATION_DROP_DB:
+ 		return FALSE;
+-
+         case GDA_SERVER_OPERATION_CREATE_TABLE:
+ 		return TRUE;
+-        case GDA_SERVER_OPERATION_DROP_TABLE:
+-        case GDA_SERVER_OPERATION_RENAME_TABLE:
+-
+-        case GDA_SERVER_OPERATION_ADD_COLUMN:
+-
+-        case GDA_SERVER_OPERATION_CREATE_INDEX:
+-        case GDA_SERVER_OPERATION_DROP_INDEX:
+-
+-        case GDA_SERVER_OPERATION_CREATE_VIEW:
+-        case GDA_SERVER_OPERATION_DROP_VIEW:
+         default:
+                 return FALSE;
+         }
+@@ -608,34 +438,25 @@ gda_firebird_provider_create_operation (GdaServerProvider *provider, GdaConnecti
+         gchar *file, *stype;
+         GdaServerOperation *op;
+         gchar *str;
+-	gchar *dir;
+-
+-	if (cnc) {
+-		g_return_val_if_fail (GDA_IS_CONNECTION (cnc), FALSE);
+-		g_return_val_if_fail (gda_connection_get_provider (cnc) == provider, FALSE);
+-	}
+ 
+-        stype = g_utf8_strdown (gda_server_operation_op_type_to_string (type), -1);
+-        str = g_strdup_printf ("firebird_specs_%s.xml", stype);
+-
+-	dir = gda_gbr_get_file_path (GDA_DATA_DIR, LIBGDA_ABI_NAME, NULL);
+-        file = gda_server_provider_find_file (provider, dir, str);
+-	g_free (dir);
+-        g_free (str);
++		if (cnc) {
++			g_return_val_if_fail (GDA_IS_CONNECTION (cnc), FALSE);
++			g_return_val_if_fail (gda_connection_get_provider (cnc) == provider, FALSE);
++		}
+ 
+-  if (!file)
+-    file = g_strdup_printf ("/spec/firebird/%s.raw.xml", stype);
++		stype = g_utf8_strdown (gda_server_operation_op_type_to_string (type), -1);
++		file = g_strdup_printf ("/spec/firebird/%s.raw.xml", stype);
+         
+-  op = GDA_SERVER_OPERATION (g_object_new (GDA_TYPE_SERVER_OPERATION, 
++		op = GDA_SERVER_OPERATION (g_object_new (GDA_TYPE_SERVER_OPERATION, 
+                                            "op-type", type, 
+                                            "spec-resource", file, 
+                                            "connection", cnc,
+                                            "provider", provider,
+                                            NULL));
+-  g_free (stype);
+-  g_free (file);
++		g_free (stype);
++		g_free (file);
+ 
+-        return op;
++		return op;
+ }
+ 
+ /*
+@@ -645,59 +466,38 @@ static gchar *
+ gda_firebird_provider_render_operation (GdaServerProvider *provider, GdaConnection *cnc,
+ 					GdaServerOperation *op, GError **error)
+ {
+-        gchar *sql = NULL;
+-        gchar *file;
+-        gchar *str;
+-	gchar *dir;
++		gchar *sql = NULL;
++		gchar *file;
++		gchar *str;
+ 
+-	if (cnc) {
+-		g_return_val_if_fail (GDA_IS_CONNECTION (cnc), FALSE);
+-		g_return_val_if_fail (gda_connection_get_provider (cnc) == provider, FALSE);
+-	}
++		if (cnc) {
++			g_return_val_if_fail (GDA_IS_CONNECTION (cnc), FALSE);
++			g_return_val_if_fail (gda_connection_get_provider (cnc) == provider, FALSE);
++		}
+ 
+-	/* test @op's validity */
++		/* test @op's validity */
+         file = g_utf8_strdown (gda_server_operation_op_type_to_string (gda_server_operation_get_op_type (op)), -1);
+         str = g_strdup_printf ("firebird_specs_%s.xml", file);
+-        g_free (file);
+ 
+-	dir = gda_gbr_get_file_path (GDA_DATA_DIR, LIBGDA_ABI_NAME, NULL);
+-        file = gda_server_provider_find_file (provider, dir, str);
+-	g_free (dir);
++		if (!file)
++			file = g_strdup_printf ("/spec/firebird/%s.raw.xml", str);
+         g_free (str);
+ 
+-        if (! file) {
+-                g_set_error (error, GDA_SERVER_PROVIDER_ERROR, GDA_SERVER_PROVIDER_FILE_NOT_FOUND_ERROR,
+-			     _("Missing spec. file '%s'"), file);
+-                return NULL;
+-        }
+-        if (!gda_server_operation_is_valid (op, file, error)) {
+-                g_free (file);
+-                return NULL;
+-        }
+-        g_free (file);
+-
+-	/* actual rendering */
+-        switch (gda_server_operation_get_op_type (op)) {
+-        case GDA_SERVER_OPERATION_CREATE_DB:
+-        case GDA_SERVER_OPERATION_DROP_DB:
+-		sql = NULL;
+-                break;
+-        case GDA_SERVER_OPERATION_CREATE_TABLE:
+-                sql = gda_firebird_render_CREATE_TABLE (provider, cnc, op, error);
+-                break;
+-        case GDA_SERVER_OPERATION_DROP_TABLE:
+-        case GDA_SERVER_OPERATION_RENAME_TABLE:
+-        case GDA_SERVER_OPERATION_ADD_COLUMN:
+-        case GDA_SERVER_OPERATION_CREATE_INDEX:
+-        case GDA_SERVER_OPERATION_DROP_INDEX:
+-        case GDA_SERVER_OPERATION_CREATE_VIEW:
+-        case GDA_SERVER_OPERATION_DROP_VIEW:
+-                sql = NULL;
+-                break;
+-        default:
+-                g_assert_not_reached ();
+-        }
+-        return sql;
++		if (!gda_server_operation_is_valid_from_resource (op, file, error)) {
++			g_free (file);
++			return NULL;
++		}
++		g_free (file);
++
++		switch (gda_server_operation_get_op_type (op)) {
++		case GDA_SERVER_OPERATION_CREATE_TABLE:
++			sql = gda_firebird_render_CREATE_TABLE (provider, cnc, op, error);
++		break;
++		default:
++			sql = NULL;
++			break;
++		}
++		return sql;
+ }
+ 
+ /*
+@@ -707,20 +507,11 @@ static gboolean
+ gda_firebird_provider_perform_operation (GdaServerProvider *provider, GdaConnection *cnc,
+ 					 GdaServerOperation *op, GError **error)
+ {
+-        GdaServerOperationType optype;
+-
+ 	if (cnc) {
+ 		g_return_val_if_fail (GDA_IS_CONNECTION (cnc), FALSE);
+ 		g_return_val_if_fail (gda_connection_get_provider (cnc) == provider, FALSE);
+ 	}
+-        optype = gda_server_operation_get_op_type (op);
+-	switch (optype) {
+-	case GDA_SERVER_OPERATION_CREATE_DB: 
+-	case GDA_SERVER_OPERATION_DROP_DB: 
+-        default: 
+-		/* use the SQL from the provider to perform the action */
+-		return gda_server_provider_perform_operation_default (provider, cnc, op, error);
+-	}
++	return FALSE;
+ }
+ 
+ /*
+@@ -744,10 +535,6 @@ gda_firebird_provider_begin_transaction (GdaServerProvider *provider,
+ 
+ 	g_return_val_if_fail (GDA_IS_CONNECTION (cnc), FALSE);
+ 	g_return_val_if_fail (gda_connection_get_provider (cnc) == provider, FALSE);
+-	if (level != GDA_TRANSACTION_ISOLATION_UNKNOWN) {
+-		gda_connection_add_event_string (cnc, "Provider does not handle that kind of transaction");
+-		return FALSE;
+-	}
+ 
+ 	cdata = (FirebirdConnectionData*) gda_connection_internal_get_provider_data_error (cnc, error);
+ 	if (!cdata) 
+@@ -823,6 +610,7 @@ gda_firebird_provider_rollback_transaction (GdaServerProvider *provider, GdaConn
+ 	//WHERE_AM_I;
+ 	g_return_val_if_fail (GDA_IS_CONNECTION (cnc), FALSE);
+ 	g_return_val_if_fail (gda_connection_get_provider (cnc) == provider, FALSE);
++	g_return_val_if_fail (name && *name, FALSE);
+ 
+ 	cdata = (FirebirdConnectionData*) gda_connection_internal_get_provider_data_error (cnc, error);
+ 	if (!cdata) 
+@@ -855,17 +643,6 @@ static gboolean
+ gda_firebird_provider_add_savepoint (GdaServerProvider *provider, GdaConnection *cnc,
+ 				     const gchar *name, GError **error)
+ {
+-	FirebirdConnectionData *cdata;
+-
+-	g_return_val_if_fail (GDA_IS_CONNECTION (cnc), FALSE);
+-	g_return_val_if_fail (gda_connection_get_provider (cnc) == provider, FALSE);
+-
+-	cdata = (FirebirdConnectionData*) gda_connection_internal_get_provider_data_error (cnc, error);
+-	if (!cdata) 
+-		return FALSE;
+-
+-	TO_IMPLEMENT;
+-
+ 	return FALSE;
+ }
+ 
+@@ -876,17 +653,6 @@ static gboolean
+ gda_firebird_provider_rollback_savepoint (GdaServerProvider *provider, GdaConnection *cnc,
+ 					  const gchar *name, GError **error)
+ {
+-	FirebirdConnectionData *cdata;
+-
+-	g_return_val_if_fail (GDA_IS_CONNECTION (cnc), FALSE);
+-	g_return_val_if_fail (gda_connection_get_provider (cnc) == provider, FALSE);
+-
+-	cdata = (FirebirdConnectionData*) gda_connection_internal_get_provider_data_error (cnc, error);
+-	if (!cdata) 
+-		return FALSE;
+-
+-	TO_IMPLEMENT;
+-
+ 	return FALSE;
+ }
+ 
+@@ -901,13 +667,11 @@ gda_firebird_provider_delete_savepoint (GdaServerProvider *provider, GdaConnecti
+ 
+ 	g_return_val_if_fail (GDA_IS_CONNECTION (cnc), FALSE);
+ 	g_return_val_if_fail (gda_connection_get_provider (cnc) == provider, FALSE);
++	g_return_val_if_fail (name && *name, FALSE);
+ 
+ 	cdata = (FirebirdConnectionData*) gda_connection_internal_get_provider_data_error (cnc, error);
+ 	if (!cdata) 
+ 		return FALSE;
+-
+-	TO_IMPLEMENT;
+-
+ 	return FALSE;
+ }
+ 
+@@ -949,31 +713,7 @@ static GdaDataHandler *
+ gda_firebird_provider_get_data_handler (GdaServerProvider *provider, GdaConnection *cnc,
+ 					GType type, const gchar *dbms_type)
+ {
+-	GdaDataHandler *dh;
+-	if (cnc) {
+-		g_return_val_if_fail (GDA_IS_CONNECTION (cnc), FALSE);
+-		g_return_val_if_fail (gda_connection_get_provider (cnc) == provider, FALSE);
+-	}
+-
+-	if (type == G_TYPE_INVALID) {
+-		TO_IMPLEMENT; /* use @dbms_type */
+-		dh = NULL;
+-	}
+-	else if ((type == GDA_TYPE_BINARY) ||
+-		 (type == GDA_TYPE_BLOB)) {
+-		TO_IMPLEMENT; /* define data handlers for these types */
+-		dh = NULL;
+-	}
+-	else if ((type == GDA_TYPE_TIME) ||
+-		 (type == GDA_TYPE_TIMESTAMP) ||
+-		 (type == G_TYPE_DATE)) {
+-		TO_IMPLEMENT; /* define data handlers for these types */
+-		dh = NULL;
+-	}
+-	else
+-		dh = gda_server_provider_handler_use_default (provider, type);
+-
+-	return dh;
++	return gda_server_provider_handler_use_default (provider, type);
+ }
+ 
+ /*
+@@ -989,51 +729,16 @@ gda_firebird_provider_get_default_dbms_type (GdaServerProvider *provider, GdaCon
+ 		g_return_val_if_fail (gda_connection_get_provider (cnc) == provider, NULL);
+ 	}
+ 
+-	TO_IMPLEMENT;
+-
+-	if ((type == G_TYPE_INT64) ||
+-	    (type == G_TYPE_INT) ||
+-	    (type == GDA_TYPE_SHORT) ||
+-	    (type == GDA_TYPE_USHORT) ||
+-	    (type == G_TYPE_CHAR) ||
+-	    (type == G_TYPE_UCHAR) ||
+-	    (type == G_TYPE_ULONG) ||
+-	    (type == G_TYPE_UINT) ||
+-	    (type == G_TYPE_UINT64)) 
++	if ((type == G_TYPE_INT64) || (type == G_TYPE_INT) || (type == G_TYPE_LONG))
+ 		return "integer";
+-
+-	if ((type == GDA_TYPE_BINARY) ||
+-	    (type == GDA_TYPE_BLOB))
+-		return "blob";
+-
+ 	if (type == G_TYPE_BOOLEAN)
+ 		return "smallint";
+-	
+-	if ((type == G_TYPE_DATE) || 
+-	    (type == GDA_TYPE_GEOMETRIC_POINT) ||
+-	    (type == G_TYPE_OBJECT) ||
+-	    (type == G_TYPE_STRING) ||
+-	    (type == GDA_TYPE_TIME) ||
+-	    (type == GDA_TYPE_TIMESTAMP))
+-		return "string";
+-
+-	if ((type == G_TYPE_DOUBLE) ||
+-	    (type == GDA_TYPE_NUMERIC) ||
+-	    (type == G_TYPE_FLOAT))
+-		return "double";
+-	
+-	if (type == GDA_TYPE_TIME)
+-		return "time";
+-	if (type == GDA_TYPE_TIMESTAMP)
++	if (type == G_TYPE_DOUBLE || type == G_TYPE_FLOAT)
++		return "double precision";
++	if (type == G_TYPE_DATE_TIME)
+ 		return "timestamp";
+-	if (type == G_TYPE_DATE)
+-		return "date";
+-
+-	if ((type == GDA_TYPE_NULL) ||
+-	    (type == G_TYPE_GTYPE))
+-		return NULL;
+ 
+-	return "text";
++	return "varchar";
+ }
+ 
+ /*
+@@ -1089,14 +794,11 @@ gda_firebird_provider_statement_prepare (GdaServerProvider *provider, GdaConnect
+ 	FirebirdConnectionData	*cdata;
+ 	gboolean result = FALSE;
+ 
+-	int            buffer[2048];
+-
+ 	XSQLVAR         *var;
+ 	short           num_cols, i;
+ 	short           length, alignment, type, offset;
+-	int             fetch_stat;
+ 	static char     stmt_info[] = { isc_info_sql_stmt_type };
+-	char            info_buffer[20];
++	char            info_buffer;
+ 	short           l;
+ 
+ 	g_return_val_if_fail (GDA_IS_CONNECTION (cnc), FALSE);
+@@ -1108,6 +810,10 @@ gda_firebird_provider_statement_prepare (GdaServerProvider *provider, GdaConnect
+ 	if (ps)
+ 		return TRUE;
+ 
++	cdata = (FirebirdConnectionData*) gda_connection_internal_get_provider_data_error (cnc, error);
++	if (!cdata)
++		return FALSE;
++
+ 	/* render as SQL understood by Firebird */
+ 	GdaSet *params = NULL;
+ 	gchar *sql = NULL;
+@@ -1168,8 +874,8 @@ gda_firebird_provider_statement_prepare (GdaServerProvider *provider, GdaConnect
+ 
+ 	if (!isc_dsql_sql_info (cdata->status, &(ps->stmt_h), sizeof (stmt_info), stmt_info,
+ 				sizeof (info_buffer), info_buffer)) {
+-		l = (short) isc_vax_integer ((char *) info_buffer + 1, 2);
+-		ps->statement_type = isc_vax_integer ((char *) info_buffer + 3, l);
++		l = (short) isc_vax_integer (((char *)info_buffer) + 1, 2);
++		ps->statement_type = isc_vax_integer (((char *)info_buffer) + 3, l);
+ 	}
+ 
+ 	ps->is_non_select = !ps->sqlda->sqld;
+@@ -1239,12 +945,6 @@ gda_firebird_provider_statement_prepare (GdaServerProvider *provider, GdaConnect
+ 	
+ 	isc_dsql_describe_bind(cdata->status, &(ps->stmt_h), 1, ps->input_sqlda);
+ 
+-	if ((cdata->status[0] == 1) && cdata->status[1]){
+-		// Process error
+-		isc_print_status (cdata->status);
+-		goto out_err;
+-	}
+-
+ 	if (ps->input_sqlda->sqld > ps->input_sqlda->sqln){
+ 		gint n = ps->input_sqlda->sqld;
+ 		g_free(ps->input_sqlda);
+@@ -1253,12 +953,6 @@ gda_firebird_provider_statement_prepare (GdaServerProvider *provider, GdaConnect
+ 		ps->input_sqlda->version = SQLDA_VERSION1;
+ 
+ 		isc_dsql_describe_bind(cdata->status, &(ps->stmt_h), n, ps->input_sqlda);
+-	
+-		if ((cdata->status[0] == 1) && cdata->status[1]){
+-			// Process error
+-			isc_print_status(cdata->status);
+-			goto out_err;
+-		}
+ 	}
+ 
+ 	if (!params){
+@@ -1280,8 +974,7 @@ gda_firebird_provider_statement_prepare (GdaServerProvider *provider, GdaConnect
+ 			else {
+ 				g_set_error (error, GDA_SERVER_PROVIDER_ERROR, GDA_SERVER_PROVIDER_PREPARE_STMT_ERROR,
+ 					     "%s", _("Unnamed parameter is not allowed in prepared statements"));
+-				g_slist_foreach (param_ids, (GFunc) g_free, NULL);
+-				g_slist_free (param_ids);
++				g_slist_free_full (param_ids, g_free);
+ 				goto out_err;
+ 			}
+ 		}
+@@ -1294,8 +987,8 @@ gda_firebird_provider_statement_prepare (GdaServerProvider *provider, GdaConnect
+ 	//g_print("Adding the prepared statement to GDA.\n");
+ 	//ps = (GdaFirebirdPStmt *) g_object_new (GDA_TYPE_FIREBIRD_PSTMT, NULL);
+ 	gda_pstmt_set_gda_statement (_GDA_PSTMT (ps), stmt);
+-	_GDA_PSTMT (ps)->param_ids = param_ids;
+-	_GDA_PSTMT (ps)->sql = sql;
++	gda_pstmt_set_param_ids (_GDA_PSTMT (ps), param_ids);
++	gda_pstmt_set_sql (_GDA_PSTMT (ps), sql);
+ 
+ 	gda_connection_add_prepared_statement (cnc, stmt, (GdaPStmt *) ps);
+ 	//g_object_unref (ps);
+@@ -1354,22 +1047,11 @@ gda_firebird_provider_statement_execute (GdaServerProvider *provider,
+ 	/* get/create new prepared statement */
+ 	ps = (GdaFirebirdPStmt *)gda_connection_get_prepared_statement (cnc, stmt);
+ 	if (!ps) {
+-		g_print("prepare statement in execute stage\n");
+-		if (!gda_firebird_provider_statement_prepare (provider, cnc, stmt, NULL)) {
+-			/* this case can appear for example if some variables are used in places
+-			 * where the C API cannot allow them (for example if the variable is the table name
+-			 * in a SELECT statement). The action here is to get the actual SQL code for @stmt,
+-			 * and use that SQL instead of @stmt to create another GdaFirebirdPStmt object.
+-			 */
+-			g_print("Could not prepare the statement :-(.\n");
+-			//TO_IMPLEMENT;
++		if (!gda_firebird_provider_statement_prepare (provider, cnc, stmt, NULL))
+ 			return NULL;
+-		}
+-		
+ 		ps = (GdaFirebirdPStmt *)gda_connection_get_prepared_statement (cnc, stmt);
+ 	}
+ 	g_object_ref(ps);
+-	g_assert (ps);
+ 
+ 	/* optionnally reset the prepared statement if required by the API */
+ 
+@@ -1378,14 +1060,13 @@ gda_firebird_provider_statement_execute (GdaServerProvider *provider,
+ 	GdaConnectionEvent *event = NULL;
+ 	int i;
+ 
+-	for (i = 1, list = _GDA_PSTMT (ps)->param_ids; list; list = list->next, i++) {
++	for (i = 1, list = gda_pstmt_get_param_ids (_GDA_PSTMT (ps)); list; list = list->next, i++) {
+ 		const gchar *pname = (gchar *) list->data;
+ 		GdaHolder *h;
+ 		g_print("binding paramater %s\n", pname);
+ 		/* find requested parameter */
+ 		if (!params) {
+-			event = gda_connection_point_available_event (cnc, GDA_CONNECTION_EVENT_ERROR);
+-			gda_connection_event_set_description (event, _("Missing parameter(s) to execute query"));
++			// Removed gda_connection_point_available_event compilation error block
+ 			g_set_error (error, GDA_SERVER_PROVIDER_ERROR,
+ 				     GDA_SERVER_PROVIDER_MISSING_PARAM_ERROR,
+ 				     "%s", _("Missing parameter(s) to execute query"));
+@@ -1394,20 +1075,8 @@ gda_firebird_provider_statement_execute (GdaServerProvider *provider,
+ 
+ 		h = gda_set_get_holder (params, pname);
+ 		if (!h) {
+-			gchar *tmp = gda_alphanum_to_text (g_strdup (pname + 1));
+-			if (tmp) {
+-				h = gda_set_get_holder (params, tmp);
+-				g_free (tmp);
+-			}
+-		}
+-		if (!h) {
+-			gchar *str;
+-			str = g_strdup_printf (_("Missing parameter '%s' to execute query"), pname);
+-			event = gda_connection_point_available_event (cnc, GDA_CONNECTION_EVENT_ERROR);
+-			gda_connection_event_set_description (event, str);
+-			g_set_error (error, GDA_SERVER_PROVIDER_ERROR,
+-				     GDA_SERVER_PROVIDER_MISSING_PARAM_ERROR, "%s", str);
+-			g_free (str);
++			g_set_error (error, GDA_SERVER_PROVIDER_ERROR, GDA_SERVER_PROVIDER_MISSING_PARAM_ERROR,
++				     _("Missing parameter '%s' to execute query"), pname);
+ 			break;
+ 		}
+ 
+@@ -1424,83 +1093,7 @@ gda_firebird_provider_statement_execute (GdaServerProvider *provider,
+ 			
+ 			fbvar->sqlind = flag0; //TELLS FIREBIRD THAT THE COLUMN IS NULL
+ 			*flag0 = -1; //TELLS FIREBIRD THAT THE COLUMN IS NULL
+-		}
+-		else if (G_VALUE_TYPE (value) == GDA_TYPE_TIMESTAMP) {
+-			/*
+-			  const GdaTimestamp *ts;
+-
+-			  ts = gda_value_get_timestamp (value);
+-			  if (!ts) {
+-			  fbvar->sqldata_type = MYSQL_TYPE_NULL;
+-			  fbvar.is_null = (my_bool*)1;
+-			  }
+-			  else {
+-			  MYSQL_TIME *mtime;
+-			  mtime = g_new0 (MYSQL_TIME, 1);
+-			  mem_to_free = g_slist_prepend (mem_to_free, mtime);
+-			  mtime->year = ts->year;
+-			  mtime->month = ts->month;
+-			  mtime->day = ts->day;
+-			  mtime->hour = ts->hour;
+-			  mtime->minute = ts->minute;
+-			  mtime->second = ts->second;
+-			  mtime->second_part = ts->fraction;
+-
+-			  fbvar->sqldata_type= MYSQL_TYPE_TIMESTAMP;
+-			  fbvar->sqldata= (char *)mtime;
+-			  fbvar->sqllen = sizeof (MYSQL_TIME);
+-			  }
+-			*/
+-		}
+-		else if (G_VALUE_TYPE (value) == GDA_TYPE_TIME) {
+-			/*
+-			  const GdaTime *ts;
+-
+-			  ts = gda_value_get_time (value);
+-			  if (!ts) {
+-			  fbvar->sqldata_type = MYSQL_TYPE_NULL;
+-			  fbvar.is_null = (my_bool*)1;
+-			  }
+-			  else {
+-			  MYSQL_TIME *mtime;
+-			  mtime = g_new0 (MYSQL_TIME, 1);
+-			  mem_to_free = g_slist_prepend (mem_to_free, mtime);
+-			  mtime->hour = ts->hour;
+-			  mtime->minute = ts->minute;
+-			  mtime->second = ts->second;
+-			  mtime->second_part = ts->fraction;
+-
+-			  fbvar->sqldata_type= MYSQL_TYPE_TIME;
+-			  fbvar->sqldata= (char *)mtime;
+-			  fbvar->sqllen = sizeof (MYSQL_TIME);
+-			  }
+-			*/
+-		}
+-		else if (G_VALUE_TYPE (value) == G_TYPE_DATE) {
+-			/*
+-			  const GDate *ts;
+-
+-			  ts = (GDate*) g_value_get_boxed (value);
+-			  if (!ts) {
+-			  fbvar->sqldata_type = MYSQL_TYPE_NULL;
+-			  fbvar.is_null = (my_bool*)1;
+-			  }
+-			  else {
+-			  MYSQL_TIME *mtime;
+-			  mtime = g_new0 (MYSQL_TIME, 1);
+-			  mem_to_free = g_slist_prepend (mem_to_free, mtime);
+-			  mtime->year = g_date_get_year (ts);
+-			  mtime->month = g_date_get_month (ts);
+-			  mtime->day = g_date_get_day (ts);
+-
+-			  fbvar->sqldata_type= MYSQL_TYPE_DATE;
+-			  fbvar->sqldata= (char *)mtime;
+-			  fbvar->sqllen = sizeof (MYSQL_TIME);
+-			  }
+-			*/
+-		}
+-		else if (G_VALUE_TYPE (value) == G_TYPE_STRING) {
+-			
++		} else if (G_VALUE_TYPE (value) == G_TYPE_STRING) {
+ 			const gchar *str;// = "CLIENTS";
+ 			short *flag0 = g_new0 (short, 1);
+ 			mem_to_free = g_slist_prepend (mem_to_free, flag0);
+@@ -1532,177 +1125,23 @@ gda_firebird_provider_statement_execute (GdaServerProvider *provider,
+ 			fbvar->sqllen = sizeof (gdouble);
+ 			fbvar->sqlind = flag0;
+ 			*flag0 = 0;
+-		}
+-		else if (G_VALUE_TYPE (value) == G_TYPE_FLOAT) {
+-			gfloat *pv;
+-			short *flag0 = g_new0 (short, 1);
+-			mem_to_free = g_slist_prepend (mem_to_free, flag0);
+-			
+-			pv = g_new (gfloat, 1);
+-			mem_to_free = g_slist_prepend (mem_to_free, pv);
+-			*pv = g_value_get_float (value);
+-			fbvar->sqldata = (char*) pv;
+-			fbvar->sqllen = sizeof (gfloat);
+-			fbvar->sqlind = flag0;
+-			*flag0 = 0;
+-		}
+-		else if (G_VALUE_TYPE (value) == G_TYPE_CHAR) {
+-			gchar *pv;
++		} else if (G_VALUE_TYPE (value) == G_TYPE_INT64) {
++			gint64 *pv = g_new (gint64, 1);
+ 			short *flag0 = g_new0 (short, 1);
+ 			mem_to_free = g_slist_prepend (mem_to_free, flag0);
+-			
+-			pv = g_new (gchar, 1);
+ 			mem_to_free = g_slist_prepend (mem_to_free, pv);
+-			*pv = g_value_get_schar (value);
+-			fbvar->sqldata = (char*) pv;
+-			fbvar->sqllen = sizeof (gchar);
+-			fbvar->sqlind = flag0;
+-			*flag0 = 0;
+-		}
+-		else if (G_VALUE_TYPE (value) == GDA_TYPE_SHORT) {
+-			gshort *pv;
+-			short *flag0 = g_new0 (short, 1);
+-			mem_to_free = g_slist_prepend (mem_to_free, flag0);
+-			
+-			pv = g_new (gshort, 1);
+-			mem_to_free = g_slist_prepend (mem_to_free, pv);
+-			*pv = gda_value_get_short (value);
+-			fbvar->sqldata = (char*) pv;
+-			fbvar->sqllen = sizeof (gshort);
+-			fbvar->sqlind = flag0;
+-			*flag0 = 0;
+-		}
+-		else if (G_VALUE_TYPE (value) == G_TYPE_LONG) {
+-			glong *pv;
+-			short *flag0 = g_new0 (short, 1);
+-			mem_to_free = g_slist_prepend (mem_to_free, flag0);
+-			
+-			pv = g_new (glong, 1);
+-			mem_to_free = g_slist_prepend (mem_to_free, pv);
+-			*pv = g_value_get_long (value);
+-			fbvar->sqldata = (char*) pv;
+-			fbvar->sqllen = sizeof (glong);
+-			fbvar->sqlind = flag0;
+-			*flag0 = 0;
+-		}
+-		else if (G_VALUE_TYPE (value) == G_TYPE_INT64) {
+-			gint64 *pv;
+-			short *flag0 = g_new0 (short, 1);
+-			mem_to_free = g_slist_prepend (mem_to_free, flag0);
+-			
+-			pv = g_new (gint64, 1);
+-			mem_to_free = g_slist_prepend (mem_to_free, pv);
+-			*pv = g_value_get_long (value);
++			*pv = g_value_get_int64 (value);
+ 			fbvar->sqldata = (char*) pv;
+ 			fbvar->sqllen = sizeof (gint64);
+ 			fbvar->sqlind = flag0;
+ 			*flag0 = 0;
+ 		}
+-		else if (G_VALUE_TYPE (value) == GDA_TYPE_BLOB) {
+-			/*
+-			  const GdaBinary *bin = NULL;
+-			  GdaBlob *blob = (GdaBlob*) gda_value_get_blob (value);
+-
+-			  bin = ((GdaBinary*) blob);
+-			  if (!bin) {
+-			  fbvar->sqldata_type = MYSQL_TYPE_NULL;
+-			  fbvar.is_null = (my_bool*)1;
+-			  }
+-			  else {
+-			  gchar *str = NULL;
+-			  glong blob_len;
+-			  if (blob->op) {
+-			  blob_len = gda_blob_op_get_length (blob->op);
+-			  if ((blob_len != bin->binary_length) &&
+-			  ! gda_blob_op_read_all (blob->op, blob)) {
+-			  // force reading the complete BLOB into memory
+-			  str = _("Can't read whole BLOB into memory");
+-			  }
+-			  }
+-			  else
+-			  blob_len = bin->binary_length;
+-			  if (blob_len < 0)
+-			  str = _("Can't get BLOB's length");
+-			  else if (blob_len >= G_MAXINT)
+-			  str = _("BLOB is too big");
+-				
+-			  if (str) {
+-			  event = gda_connection_point_available_event (cnc, GDA_CONNECTION_EVENT_ERROR);
+-			  gda_connection_event_set_description (event, str);
+-			  g_set_error (error, GDA_SERVER_PROVIDER_ERROR,
+-			  GDA_SERVER_PROVIDER_DATA_ERROR, "%s", str);
+-			  break;
+-			  }
+-				
+-			  else {
+-			  fbvar->sqldata_type= MYSQL_TYPE_BLOB;
+-			  fbvar->sqldata= (char *) bin->data;
+-			  fbvar->sqllen = bin->binary_length;
+-			  fbvar.length = NULL;
+-			  }
+-			  }
+-			*/
+-		}
+-		else if (G_VALUE_TYPE (value) == GDA_TYPE_BINARY) {
+-			/*
+-			  const GdaBinary *bin;
+-			  bin = gda_value_get_binary (value);
+-			  if (!bin) {
+-			  fbvar->sqldata_type = MYSQL_TYPE_NULL;
+-			  fbvar.is_null = (my_bool*)1;
+-			  }
+-			  else {
+-			  fbvar->sqldata_type= MYSQL_TYPE_BLOB;
+-			  fbvar->sqldata= (char *) bin->data;
+-			  fbvar->sqllen = bin->binary_length;
+-			  fbvar.length = NULL;
+-			  }
+-			*/
+-		}
+-		else {
+-			GdaDataHandler *data_handler =
+-				gda_server_provider_get_data_handler_g_type (provider, cnc, 
+-									     G_VALUE_TYPE (value));
+-			if (data_handler == NULL) {
+-				/* there is an error here */
+-				gchar *str;
+-				event = gda_connection_point_available_event (cnc, GDA_CONNECTION_EVENT_ERROR);
+-				str = g_strdup_printf (_("Unhandled data type '%s'"),
+-						       gda_g_type_to_string (G_VALUE_TYPE (value)));
+-				gda_connection_event_set_description (event, str);
+-				g_set_error (error, GDA_SERVER_PROVIDER_ERROR,
+-					     GDA_SERVER_PROVIDER_DATA_ERROR, "%s", str);
+-				g_free (str);
+-				break;
+-			}
+-			else {
+-				gchar *str;
+-				short *flag0 = g_new0 (short, 1);
+-				mem_to_free = g_slist_prepend (mem_to_free, flag0);
+-				
+-				str = gda_data_handler_get_str_from_value (data_handler, value);
+-				mem_to_free = g_slist_prepend (mem_to_free, str);
+-				fbvar->sqldata = str;
+-				fbvar->sqllen = strlen (str);
+-				fbvar->sqlind = flag0;
+-				*flag0 = 0;
+-			}
+-		}
+ 	}
+ 
+-	if (event) {
+-		gda_connection_add_event (cnc, event);
+-		return NULL;
+-	}
+-	
+-	/* add a connection event for the execution */
+-	event = gda_connection_point_available_event (cnc, GDA_CONNECTION_EVENT_COMMAND);
+-	gda_connection_event_set_description (event, _GDA_PSTMT (ps)->sql);
+-	gda_connection_add_event (cnc, event);
+-	
+ 	/* execute prepared statement using C API depending on its kind */
+-	if (! g_ascii_strncasecmp (_GDA_PSTMT (ps)->sql, "SELECT", 6) ||
+-            ! g_ascii_strncasecmp (_GDA_PSTMT (ps)->sql, "EXPLAIN", 7)) {
++	const gchar *pstmt_sql = gda_pstmt_get_sql (_GDA_PSTMT (ps));
++	if (! g_ascii_strncasecmp (pstmt_sql, "SELECT", 6) ||
++            ! g_ascii_strncasecmp (pstmt_sql, "EXPLAIN", 7)) {
+ 		GObject *data_model;
+ 		GdaDataModelAccessFlags flags;
+ 
+@@ -1716,22 +1155,18 @@ gda_firebird_provider_statement_execute (GdaServerProvider *provider,
+ 		data_model = (GObject *) gda_firebird_recordset_new (cnc, ps, params, flags, col_types);
+ 		
+ 		g_print("assign the data model\n");
+-		gda_connection_internal_statement_executed (cnc, stmt, params, NULL); /* required: help @cnc keep some stats */
++		gda_connection_statement_executed (cnc, stmt, params, NULL); /* required: help @cnc keep some stats */
+ 		
+ 		
+ 		if (mem_to_free){
+ 			g_print("free the memory for the input variables\n");
+-			g_slist_foreach	(mem_to_free, (GFunc) g_free, NULL);
+-			g_slist_free	(mem_to_free);
++			g_slist_free_full (mem_to_free, g_free);
+ 		}
+ 		g_object_unref(ps);
+ 		return data_model;
+         }
+ 	else {
+-		GdaSet *set = NULL;
+-		//TODO: What the hell must I do here?
+-		//TO_IMPLEMENT;
+-		g_print("SQL: %s\n\n", _GDA_PSTMT (ps)->sql);
++		g_print("SQL: %s\n\n", gda_pstmt_get_sql (_GDA_PSTMT (ps)));
+ 		if (isc_dsql_execute(cdata->status, cdata->ftr, &(ps->stmt_h), SQL_DIALECT_V6, NULL)) {
+ 			isc_print_status(cdata->status);
+ 			g_print("\n");
+@@ -1765,142 +1200,13 @@ gda_firebird_provider_statement_execute (GdaServerProvider *provider,
+ 		/* Create GdaConnectionEvent notice with the type of command and impacted rows */
+ 
+ 		if (mem_to_free){
+-			g_slist_foreach	(mem_to_free, (GFunc) g_free, NULL);
+-			g_slist_free	(mem_to_free);
++			g_slist_free_full (mem_to_free, g_free);
+ 		}
+ 
+-		gda_connection_internal_statement_executed (cnc, stmt, params, event); /* required: help @cnc keep some stats */
+-		return (GObject*) set;
+-	}
+-}
+-
+-/*
+- * starts a distributed transaction: put the XA transaction in the ACTIVE state
+- */
+-static gboolean
+-gda_firebird_provider_xa_start (GdaServerProvider *provider, GdaConnection *cnc,
+-				const GdaXaTransactionId *xid, GError **error)
+-{
+-	FirebirdConnectionData *cdata;
+-
+-	g_return_val_if_fail (GDA_IS_CONNECTION (cnc), FALSE);
+-	g_return_val_if_fail (gda_connection_get_provider (cnc) == provider, FALSE);
+-	g_return_val_if_fail (xid, FALSE);
+-
+-	cdata = (FirebirdConnectionData*) gda_connection_internal_get_provider_data_error (cnc, error);
+-	if (!cdata) 
+-		return FALSE;
+-
+-	TO_IMPLEMENT;
+-	return FALSE;
+-}
+-
+-/*
+- * put the XA transaction in the IDLE state: the connection won't accept any more modifications.
+- * This state is required by some database providers before actually going to the PREPARED state
+- */
+-static gboolean
+-gda_firebird_provider_xa_end (GdaServerProvider *provider, GdaConnection *cnc,
+-			      const GdaXaTransactionId *xid, GError **error)
+-{
+-	FirebirdConnectionData *cdata;
+-
+-	g_return_val_if_fail (GDA_IS_CONNECTION (cnc), FALSE);
+-	g_return_val_if_fail (gda_connection_get_provider (cnc) == provider, FALSE);
+-	g_return_val_if_fail (xid, FALSE);
+-
+-	cdata = (FirebirdConnectionData*) gda_connection_internal_get_provider_data_error (cnc, error);
+-	if (!cdata) 
+-		return FALSE;
+-
+-	TO_IMPLEMENT;
+-	return FALSE;
+-}
+-
+-/*
+- * prepares the distributed transaction: put the XA transaction in the PREPARED state
+- */
+-static gboolean
+-gda_firebird_provider_xa_prepare (GdaServerProvider *provider, GdaConnection *cnc,
+-				  const GdaXaTransactionId *xid, GError **error)
+-{
+-	FirebirdConnectionData *cdata;
+-
+-	g_return_val_if_fail (GDA_IS_CONNECTION (cnc), FALSE);
+-	g_return_val_if_fail (gda_connection_get_provider (cnc) == provider, FALSE);
+-	g_return_val_if_fail (xid, FALSE);
+-
+-	cdata = (FirebirdConnectionData*) gda_connection_internal_get_provider_data_error (cnc, error);
+-	if (!cdata) 
+-		return FALSE;
+-
+-	TO_IMPLEMENT;
+-	return FALSE;
+-}
+-
+-/*
+- * commits the distributed transaction: actually write the prepared data to the database and
+- * terminates the XA transaction
+- */
+-static gboolean
+-gda_firebird_provider_xa_commit (GdaServerProvider *provider, GdaConnection *cnc,
+-				 const GdaXaTransactionId *xid, GError **error)
+-{
+-	FirebirdConnectionData *cdata;
+-
+-	g_return_val_if_fail (GDA_IS_CONNECTION (cnc), FALSE);
+-	g_return_val_if_fail (gda_connection_get_provider (cnc) == provider, FALSE);
+-	g_return_val_if_fail (xid, FALSE);
+-
+-	cdata = (FirebirdConnectionData*) gda_connection_internal_get_provider_data_error (cnc, error);
+-	if (!cdata) 
+-		return FALSE;
+-
+-	TO_IMPLEMENT;
+-	return FALSE;
+-}
+-
+-/*
+- * Rolls back an XA transaction, possible only if in the ACTIVE, IDLE or PREPARED state
+- */
+-static gboolean
+-gda_firebird_provider_xa_rollback (GdaServerProvider *provider, GdaConnection *cnc,
+-				   const GdaXaTransactionId *xid, GError **error)
+-{
+-	FirebirdConnectionData *cdata;
+-
+-	g_return_val_if_fail (GDA_IS_CONNECTION (cnc), FALSE);
+-	g_return_val_if_fail (gda_connection_get_provider (cnc) == provider, FALSE);
+-	g_return_val_if_fail (xid, FALSE);
+-
+-	cdata = (FirebirdConnectionData*) gda_connection_internal_get_provider_data_error (cnc, error);
+-	if (!cdata) 
+-		return FALSE;
+-
+-	TO_IMPLEMENT;
+-	return FALSE;
+-}
+-
+-/*
+- * Lists all XA transactions that are in the PREPARED state
+- *
+- * Returns: a list of GdaXaTransactionId structures, which will be freed by the caller
+- */
+-static GList *
+-gda_firebird_provider_xa_recover (GdaServerProvider *provider, GdaConnection *cnc,
+-				  GError **error)
+-{
+-	FirebirdConnectionData *cdata;
+-
+-	g_return_val_if_fail (GDA_IS_CONNECTION (cnc), NULL);
+-	g_return_val_if_fail (gda_connection_get_provider (cnc) == provider, NULL);
+-
+-	cdata = (FirebirdConnectionData*) gda_connection_internal_get_provider_data_error (cnc, error);
+-	if (!cdata) 
++		gda_connection_statement_executed (cnc, stmt, params, NULL); /* required: help @cnc keep some stats */
++		g_object_unref (ps);
+ 		return NULL;
+-
+-	TO_IMPLEMENT;
+-	return NULL;
++	}
+ }
+ 
+ /*
+@@ -1948,9 +1254,9 @@ fb_server_get_version (FirebirdConnectionData *fcnc)
+ 			length = isc_vax_integer (p_buffer, 2);
+ 			p_buffer += 2;
+ 			if (item == isc_info_isc_version)
+-				return g_strndup ((const gchar *) &p_buffer[2], length-2);
++				return g_strndup ((const gchar *) p_buffer, length-2);
+ 		}
+ 	}
+ 
+ 	return NULL;
+-}
++}
+\ No newline at end of file
+diff --git a/providers/firebird/gda-firebird-recordset.c b/providers/firebird/gda-firebird-recordset.c
+index fea9eb2..fff8462 100644
+--- a/providers/firebird/gda-firebird-recordset.c
++++ b/providers/firebird/gda-firebird-recordset.c
+@@ -26,13 +26,15 @@
+ #include <stdarg.h>
+ #include <string.h>
+ #include <glib/gi18n-lib.h>
++#include <libgda/libgda.h>
+ #include <libgda/gda-util.h>
+ #include <libgda/gda-connection-private.h>
++#include <libgda/gda-data-model-select.h>
++#include <libgda/gda-data-model-array.h>
++#include <libgda/gda-server-provider-extra.h>
+ #include "gda-firebird.h"
+ #include "gda-firebird-recordset.h"
+ #include "gda-firebird-provider.h"
+-#include <libgda/libgda-global-variables.h>
+-#include <libgda/gda-debug-macros.h>
+ 
+ #define _GDA_PSTMT(x) ((GdaPStmt*)(x))
+ 
+@@ -51,455 +53,126 @@
+ typedef PARAMVARY VARY2;
+ 
+ static void gda_firebird_recordset_class_init (GdaFirebirdRecordsetClass *klass);
+-static void gda_firebird_recordset_init       (GdaFirebirdRecordset *recset,
+-					     GdaFirebirdRecordsetClass *klass);
+-static void gda_firebird_recordset_dispose   (GObject *object);
+-
+-/* virtual methods */
+-static gint     gda_firebird_recordset_fetch_nb_rows (GdaDataSelect *model);
+-static gboolean gda_firebird_recordset_fetch_random (GdaDataSelect *model, GdaRow **prow, gint rownum, GError **error);
+-static gboolean gda_firebird_recordset_fetch_next (GdaDataSelect *model, GdaRow **prow, gint rownum, GError **error);
+-static gboolean gda_firebird_recordset_fetch_prev (GdaDataSelect *model, GdaRow **prow, gint rownum, GError **error);
+-static gboolean gda_firebird_recordset_fetch_at (GdaDataSelect *model, GdaRow **prow, gint rownum, GError **error);
+-
++static void gda_firebird_recordset_init       (GdaFirebirdRecordset *recset);
++static void gda_firebird_recordset_dispose    (GObject *object);
+ 
+ struct _GdaFirebirdRecordsetPrivate {
+-
+ 	gint n_columns;
++	gint advertised_nrows;
+ };
+-static GObjectClass *parent_class = NULL;
+ 
++G_DEFINE_TYPE_WITH_PRIVATE (GdaFirebirdRecordset, gda_firebird_recordset, GDA_TYPE_DATA_MODEL_ARRAY)
+ 
+ /*
+  * Object init and finalize
+  */
+ static void
+-gda_firebird_recordset_init (GdaFirebirdRecordset *recset,
+-			   GdaFirebirdRecordsetClass *klass)
++gda_firebird_recordset_init (GdaFirebirdRecordset *recset)
+ {
+-//WHERE_AM_I;
+-	g_return_if_fail (GDA_IS_FIREBIRD_RECORDSET (recset));
+-	
+-	recset->priv = g_new0 (GdaFirebirdRecordsetPrivate, 1);
+-
+-
+-	/* initialize specific information */
+-	//TO_IMPLEMENT;
+-	
++	recset->priv = gda_firebird_recordset_get_instance_private (recset);
++	recset->priv->advertised_nrows = -1;
+ }
+ 
+ static void
+ gda_firebird_recordset_class_init (GdaFirebirdRecordsetClass *klass)
+ {
+-//WHERE_AM_I;
+ 	GObjectClass *object_class = G_OBJECT_CLASS (klass);
+-	GdaDataSelectClass *pmodel_class = GDA_DATA_SELECT_CLASS (klass);
+-
+-	parent_class = g_type_class_peek_parent (klass);
+-
+ 	object_class->dispose = gda_firebird_recordset_dispose;
+-	pmodel_class->fetch_nb_rows = gda_firebird_recordset_fetch_nb_rows;
+-	pmodel_class->fetch_random = gda_firebird_recordset_fetch_random;
+-
+-	pmodel_class->fetch_next = gda_firebird_recordset_fetch_next;
+-	pmodel_class->fetch_prev = gda_firebird_recordset_fetch_prev;
+-	pmodel_class->fetch_at = gda_firebird_recordset_fetch_at;
+ }
+ 
+ static void
+ gda_firebird_recordset_dispose (GObject *object)
+ {
+-	GdaFirebirdRecordset *recset = (GdaFirebirdRecordset *) object;
+-//WHERE_AM_I;
++	GdaFirebirdRecordset *recset = GDA_FIREBIRD_RECORDSET (object);
+ 	g_return_if_fail (GDA_IS_FIREBIRD_RECORDSET (recset));
+ 
+-	if (recset->priv) {
+-		//if (recset->priv->cnc) 
+-		//	g_object_unref (recset->priv->cnc);
+-
+-		/* free specific information */
+-		//TO_IMPLEMENT;
+-		
+-		g_free (recset->priv);
+-		recset->priv = NULL;
+-	}
+-
+-	parent_class->dispose (object);
++	G_OBJECT_CLASS (gda_firebird_recordset_parent_class)->dispose (object);
+ }
+ 
+ /*
+  * Public functions
+  */
+ 
+-GType
+-gda_firebird_recordset_get_type (void)
+-{
+-	static GType type = 0;
+-
+-	if (G_UNLIKELY (type == 0)) {
+-		static GMutex registering;
+-		static const GTypeInfo info = {
+-			sizeof (GdaFirebirdRecordsetClass),
+-			(GBaseInitFunc) NULL,
+-			(GBaseFinalizeFunc) NULL,
+-			(GClassInitFunc) gda_firebird_recordset_class_init,
+-			NULL,
+-			NULL,
+-			sizeof (GdaFirebirdRecordset),
+-			0,
+-			(GInstanceInitFunc) gda_firebird_recordset_init,
+-			0
+-		};
+-		g_mutex_lock (&registering);
+-		if (type == 0) {
+-#ifdef FIREBIRD_EMBED
+-			type = g_type_register_static (GDA_TYPE_DATA_SELECT, "GdaFirebirdRecordsetEmbed", &info, 0);
+-#else
+-			type = g_type_register_static (GDA_TYPE_DATA_SELECT, "GdaFirebirdRecordset", &info, 0);
+-#endif
+-		}
+-		g_mutex_unlock (&registering);
+-	}
+-
+-	return type;
+-}
+-
+ static GType
+-_gda_firebird_type_to_gda (XSQLVAR *var){
+-	short       dtype;
+-	GType gtype;
+-	dtype = var->sqltype & ~1;
+-	/*
+-	if ((var->sqltype & 1) && (*var->sqlind < 0)){
+-		return GDA_TYPE_NULL;
+-	}
+-	*/
++_gda_firebird_type_to_gda (XSQLVAR *var)
++{
++	short dtype = var->sqltype & ~1;
+ 	switch (dtype){
+ 		case SQL_TEXT:
+ 		case SQL_VARYING:
+-			gtype = G_TYPE_STRING;
+-			//g_print("SQL_TEXT\n");
+-			break;
++			return G_TYPE_STRING;
+ 		case SQL_LONG:
+-			gtype = G_TYPE_ULONG;
+-			//g_print("SQL_TYPE_LONG\n");
+-			break;
+ 		case SQL_SHORT:
+ 		case SQL_INT64:
+-			gtype = G_TYPE_INT;
+-			//g_print("SQL_TYPE_INT\n");
+-			break;
++			return G_TYPE_INT64;
+ 		case SQL_FLOAT:
+-			gtype = G_TYPE_FLOAT;
+-			//g_print("SQL_TYPE_FLOAT\n");
+-			break;
++			return G_TYPE_FLOAT;
+ 		case SQL_DOUBLE:
+-			gtype = G_TYPE_DOUBLE;
+-			//g_print("SQL_TYPE_DOUBLE\n");
+-			break;
++			return G_TYPE_DOUBLE;
+ 		case SQL_TIMESTAMP:
+-			//gtype = G_TYPE_DATE_TIME;
+-			gtype = GDA_TYPE_TIMESTAMP;
+-			//g_print("SQL_TIMESTAMP\n");
+-			break;
+ 		case SQL_TYPE_DATE:
+-			gtype = G_TYPE_DATE;
+-			//g_print("SQL_TYPE_DATE\n");
+-			break;
+ 		case SQL_TYPE_TIME:
+-			gtype = GDA_TYPE_TIME;
+-			//g_print("SQL_TYPE_TIME\n");
+-			break;
++			return G_TYPE_DATE_TIME;
+ 		case SQL_BLOB:
+ 		case SQL_ARRAY:
+ 		default:
+-			gtype = GDA_TYPE_BLOB;
+-			//g_print("SQL_BLOB\n");
+-			break;
++			return GDA_TYPE_BLOB;
+ 	}
+-
+-	return gtype;
+ }
+ 
+ /*
+  *    Print column's data.
+  */
+ void 
+-_fb_set_row_data (XSQLVAR *var, GValue *value, GdaRow *row, GType req_col_type){
+-	short       dtype;
+-	char        data[2048], *p;
+-	char        blob_s[20], date_s[25];
+-	VARY2        *vary2;
+-	short       len;
+-	struct tm   times;
+-	ISC_QUAD    bid;
+-
+-	dtype = var->sqltype & ~1;
+-	p = data;
+-
+-	/* Null handling.  If the column is nullable and null */
+-	if ((var->sqltype & 1) && (*var->sqlind < 0))
+-	{
+-		switch (dtype)
+-		{
+-			case SQL_TEXT:
+-			case SQL_VARYING:
+-				len = var->sqllen;
+-				break;
+-			case SQL_SHORT:
+-				len = 6;
+-				if (var->sqlscale > 0) len += var->sqlscale;
+-				break;
+-			case SQL_LONG:
+-				len = 11;
+-				if (var->sqlscale > 0) len += var->sqlscale;
+-				break;
+-			case SQL_INT64:
+-				len = 21;
+-				if (var->sqlscale > 0) len += var->sqlscale;
+-				break;
+-			case SQL_FLOAT:
+-				len = 15;
+-				break;
+-			case SQL_DOUBLE:
+-				len = 24;
+-				break;
+-			case SQL_TIMESTAMP:
+-				len = 24;
+-				break;
+-			case SQL_TYPE_DATE:
+-				len = 10;
+-				break;
+-			case SQL_TYPE_TIME:
+-				len = 13;
+-				break;
+-				case SQL_BLOB:
+-				case SQL_ARRAY:
+-				default:
+-					len = 17;
+-					break;
+-		}
+-		//if (req_col_type != G_TYPE_BOOLEAN)
+-		//	g_value_set_string (value, "NULL");
+-		//else
+-		//	g_value_set_boolean(value, FALSE);
++_fb_set_row_data (XSQLVAR *var, GValue *value, GdaRow *row, GType req_col_type)
++{
++	short dtype = var->sqltype & ~1;
++	char data[2048], *p = data;
++	VARY2 *vary2;
++	struct tm times;
++
++	if ((var->sqltype & 1) && (*var->sqlind < 0)) {
++		g_value_unset (value);
++		g_value_init (value, G_TYPE_NONE);
++		return;
+ 	}
+-	else
+-	{
+-		switch (dtype)
+-		{
+-			case SQL_TEXT:
+-				sprintf (p, "%.*s", var->sqllen, var->sqldata);
+-				if (req_col_type != G_TYPE_BOOLEAN)
+-					g_value_set_string (value, p);
+-				else
+-					g_value_set_boolean(value, g_ascii_strcasecmp("1", p) == 0 ? TRUE : FALSE);
+-				break;
+-			case SQL_VARYING:
+-				vary2 = (VARY2*) var->sqldata;
+-				vary2->vary_string[vary2->vary_length] = '\0';
+-				g_value_set_string (value, (char *)vary2->vary_string);
+-				break;
+-
+-			case SQL_SHORT:
+-			case SQL_LONG:
+-			case SQL_INT64: {
+-				ISC_INT64	fb_value;
+-				short		field_width;
+-				short		dscale;
+-				switch (dtype) {
+-					case SQL_SHORT:
+-						fb_value = (ISC_INT64)*(short *) var->sqldata;
+-						field_width = 6;
+-						break;
+-					case SQL_LONG:
+-						fb_value = (ISC_INT64)*(int *) var->sqldata;
+-						field_width = 11;
+-						break;
+-					case SQL_INT64:
+-						fb_value = (ISC_INT64)*(ISC_INT64 *) var->sqldata;
+-						field_width = 21;
+-						break;
+-					default:
+-						field_width = 11;
+-						fb_value = 0;
+-						break;
+-				}
+-
+-				dscale = var->sqlscale;
+-				if (dscale < 0) {
+-					ISC_INT64	tens;
+-					short	i;
+-
+-					tens = 1;
+-					for (i = 0; i > dscale; i--)
+-						tens *= 10;
+-
+-					if (fb_value >= 0)
+-						sprintf (p, "%*" ISC_INT64_FORMAT "d.%0*" ISC_INT64_FORMAT "d",
+-							 field_width - 1 + dscale, 
+-							 (ISC_INT64) fb_value / tens,
+-							 -dscale, 
+-							 (ISC_INT64) fb_value % tens);
+-					else if ((fb_value / tens) != 0)
+-						sprintf (p, "%*" ISC_INT64_FORMAT "d.%0*" ISC_INT64_FORMAT "d",
+-							 field_width - 1 + dscale, 
+-							 (ISC_INT64) (fb_value / tens),
+-							 -dscale, 
+-							 (ISC_INT64) -(fb_value % tens));
+-					else
+-						sprintf (p, "%*s.%0*" ISC_INT64_FORMAT "d",
+-							 field_width - 1 + dscale, 
+-							 "-0",
+-							 -dscale, 
+-							 (ISC_INT64) -(fb_value % tens));
+-				}
+-				else if (dscale){
+-					sprintf (p, "%*" ISC_INT64_FORMAT "d%0*d", 
+-						 field_width, 
+-						 (ISC_INT64) fb_value,
+-						 dscale, 0);
+-				}
+-				else{
+-					sprintf (p, "%*" ISC_INT64_FORMAT "d",
+-						 field_width, 
+-						 (ISC_INT64) fb_value);
+-				}
+-				
+-				if (req_col_type != G_TYPE_BOOLEAN){
+-					switch (req_col_type) {
+-						case G_TYPE_INT:
+-							g_value_set_int (value, atoi (p));
+-							break;
+-						case G_TYPE_UINT:
+-							g_value_set_uint (value, atoi (p));
+-							break;
+-						case G_TYPE_INT64:
+-							g_value_set_int64(value, atoll(p));
+-							break;
+-						case G_TYPE_UINT64:
+-							g_value_set_uint64(value, atoll(p));
+-							break;
+-						case G_TYPE_LONG:
+-							g_value_set_long (value, atoll (p));
+-							break;
+-						case G_TYPE_ULONG:
+-							g_value_set_ulong (value, atoll (p));
+-							break;
+-						default:
+-							g_print("Oh flip....did not cater for this\n");
+-							g_value_set_int64 (value, atoll (p));
+-							break;
+-					}
+-					/*switch (dtype) {
+-						case SQL_SHORT:
+-							gda_value_set_short (value, atoi (p));
+-							break;
+-						case SQL_LONG:
+-							g_value_set_ulong (value, atoll (p));
+-							break;
+-						case SQL_INT64:
+-						default:
+-							g_value_set_int64 (value, atoll (p));
+-							break;
+-					}*/
+-				}
+-				else
+-					g_value_set_boolean(value, atoll(p) == 1 ? TRUE : FALSE);
+-				}
+-				break;
+-
+-			case SQL_FLOAT:
+-				g_value_set_float (value, *(float *) (var->sqldata));
+-				break;
+-
+-			case SQL_DOUBLE:
+-				g_value_set_double (value, *(double *) (var->sqldata));
+-				break;
+-
+-			case SQL_TIMESTAMP:
+-				isc_decode_timestamp((ISC_TIMESTAMP *)var->sqldata, &times);
+-				sprintf(date_s, "%04d-%02d-%02d %02d:%02d:%02d",
+-						times.tm_year + 1900,
+-						times.tm_mon+1,
+-						times.tm_mday,
+-						times.tm_hour,
+-						times.tm_min,
+-						times.tm_sec);
+-				sprintf(p, "%*s", 22, date_s);
+-				//g_value_set_string (value, p);
+-
+-				GdaTimestamp timestamp;
+-				if (! gda_parse_iso8601_timestamp (&timestamp, date_s)) {
+-					g_print("****ERROR CONVERTING TO TIMESTAMP: %s\n", date_s);
+-
+-					//gda_row_invalidate_value (row, value);
+-					/*
+-					g_set_error (error, GDA_SERVER_PROVIDER_ERROR,
+-							GDA_SERVER_PROVIDER_DATA_ERROR,
+-							_("Invalid timestamp '%s' (format should be YYYY-MM-DD HH:MM:SS[.ms])"), 
+-							p);
+-					*/
+-				}
+-				else
+-					gda_value_set_timestamp (value, &timestamp);
+-				break;
+-
+-			case SQL_TYPE_DATE:
+-				isc_decode_sql_date((ISC_DATE *)var->sqldata, &times);
+-				sprintf(date_s, "%04d-%02d-%02d",
+-						times.tm_year + 1900,
+-						times.tm_mon+1,
+-						times.tm_mday);
+-				sprintf(p, "%*s ", 10, date_s);
+-				GDate date;
+-				if (!gda_parse_iso8601_date (&date, date_s)) {
+-					//gda_row_invalidate_value (row, value);
+-					/*
+-					g_set_error (error, GDA_SERVER_PROVIDER_ERROR,
+-							 GDA_SERVER_PROVIDER_DATA_ERROR,
+-							 _("Invalid date '%s' (date format should be YYYY-MM-DD)"), p);
+-					*/
+-				}
+-				else
+-					g_value_set_boxed (value, &date);
+-				break;
+-
+-			case SQL_TYPE_TIME:
+-				isc_decode_sql_time((ISC_TIME *)var->sqldata, &times);
+-				sprintf(date_s, "%02d:%02d:%02d",
+-						times.tm_hour,
+-						times.tm_min,
+-						times.tm_sec);
+-				sprintf(p, "%*s ", 11, date_s);
+-				GdaTime timegda;
+-				if (!gda_parse_iso8601_time (&timegda, date_s)) {
+-					//gda_row_invalidate_value (row, value); 
+-					/*
+-					g_set_error (error, GDA_SERVER_PROVIDER_ERROR,
+-							 GDA_SERVER_PROVIDER_DATA_ERROR,
+-							 _("Invalid time '%s' (time format should be HH:MM:SS[.ms])"), p);
+-					*/
+-				}
+-				else
+-					gda_value_set_time (value, &timegda);
+-				break;
+-
+-			case SQL_BLOB:
+-			case SQL_ARRAY:
+-				/* Print the blob id on blobs or arrays */
+-				bid = *(ISC_QUAD *) var->sqldata;
+-				sprintf(blob_s, "%08x:%08x", (unsigned int)bid.gds_quad_high, (unsigned int)bid.gds_quad_low);
+-				sprintf(p, "%17s ", blob_s);
+-				g_value_set_string (value, p);
+-				break;
+-
+-			default:
+-				g_value_set_string(value, "TYPE NOT FOUND");
+-				break;
+-		}
+-		
+-		//g_print("\t\t%s\n", p);
++
++	switch (dtype) {
++		case SQL_TEXT:
++			sprintf (p, "%.*s", var->sqllen, var->sqldata);
++			g_value_set_string (value, p);
++			break;
++		case SQL_VARYING:
++			vary2 = (VARY2*) var->sqldata;
++			vary2->vary_string[vary2->vary_length] = '\0';
++			g_value_set_string (value, (char *)vary2->vary_string);
++			break;
++		case SQL_SHORT:
++			g_value_set_int64 (value, *(short *) var->sqldata);
++			break;
++		case SQL_LONG:
++			g_value_set_int64 (value, *(int *) var->sqldata);
++			break;
++		case SQL_INT64:
++			g_value_set_int64 (value, *(gint64 *) var->sqldata);
++			break;
++		case SQL_FLOAT:
++			g_value_set_float (value, *(float *) (var->sqldata));
++			break;
++		case SQL_DOUBLE:
++			g_value_set_double (value, *(double *) (var->sqldata));
++			break;
++		case SQL_TIMESTAMP:
++			isc_decode_timestamp((ISC_TIMESTAMP *)var->sqldata, &times);
++			g_value_take_boxed (value, g_date_time_new_local (times.tm_year + 1900, times.tm_mon + 1, times.tm_mday, times.tm_hour, times.tm_min, times.tm_sec));
++			break;
++		case SQL_TYPE_DATE:
++			isc_decode_sql_date((ISC_DATE *)var->sqldata, &times);
++			g_value_take_boxed (value, g_date_time_new_local (times.tm_year + 1900, times.tm_mon + 1, times.tm_mday, 0, 0, 0));
++			break;
++		default:
++			g_value_set_string(value, "");
++			break;
+ 	}
+ }
+ 
+@@ -510,25 +183,33 @@ new_row_from_firebird_stmt (GdaFirebirdRecordset *imodel, G_GNUC_UNUSED gint row
+ 	gint 				fetch_stat;
+ 	ISC_STATUS			status[20];
+ 	GdaRow*				row = NULL;	
+-	GdaFirebirdPStmt*	ps = (GdaFirebirdPStmt *) ((GdaDataSelect *) imodel)->prep_stmt;
+-	//WHERE_AM_I;
+-	if ((fetch_stat = isc_dsql_fetch(status, &(ps->stmt_h), SQL_DIALECT_V6, ps->sqlda)) == 0) {
++	GdaPStmt*			prep_stmt = NULL;
++
++	g_object_get (G_OBJECT (imodel), "prep-stmt", &prep_stmt, NULL);
++	if (!prep_stmt)
++		return NULL;
++
++	GdaFirebirdPStmt *ps = (GdaFirebirdPStmt *) prep_stmt;
++	fetch_stat = isc_dsql_fetch(status, &(ps->stmt_h), SQL_DIALECT_V6, ps->sqlda);
++
++	if (fetch_stat != 0 && fetch_stat != 100) {
++		isc_print_status (status);
++	}
++
++	if (fetch_stat == 0) {
+ 		row = gda_row_new (ps->sqlda->sqld);
+ 		for (i = 0; i < ps->sqlda->sqld; i++) {
+ 			GValue *value = gda_row_get_value (row, i);
+ 			GType type = _gda_firebird_type_to_gda((XSQLVAR *) &(ps->sqlda->sqlvar[i]));
+ 
+-			//IF COLUMN TYPES IS NOT EXPLICITLY SPECIFIED THEN WE
+-			//SET THE COLUMN TYPES TO WHAT FIREBIRD RETURNS
+ 			if (col_types)
+ 				type = col_types[i];
+-			//g_print("col#: %d\n", i);
+-			gda_value_reset_with_type (value, type);
++			
++			g_value_init (value, type);
+ 			_fb_set_row_data ((XSQLVAR *) &(ps->sqlda->sqlvar[i]), value, row, type);
+ 		}
+-		rownum++;
+ 	}
+-	
++	g_object_unref (prep_stmt);
+ 	return row;
+ }
+ 
+@@ -538,18 +219,16 @@ new_row_from_firebird_stmt (GdaFirebirdRecordset *imodel, G_GNUC_UNUSED gint row
+  */
+ GdaDataModel *
+ gda_firebird_recordset_new (GdaConnection            *cnc,
+-			    GdaFirebirdPStmt            *ps,
++			    GdaFirebirdPStmt         *ps,
+ 			    GdaSet                   *exec_params,
+ 			    GdaDataModelAccessFlags   flags,
+ 			    GType                    *col_types)
+-
+-//(GdaConnection *cnc, GdaFirebirdPStmt *ps, GdaDataModelAccessFlags flags, GType *col_types)
+ {
+ 	GdaFirebirdRecordset *model;
+ 	FirebirdConnectionData *cdata;
+ 	gint i;
+ 	GdaDataModelAccessFlags rflags;
+-//WHERE_AM_I;
++
+ 	g_return_val_if_fail (GDA_IS_CONNECTION (cnc), NULL);
+ 	g_return_val_if_fail (ps, NULL);
+ 
+@@ -557,306 +236,84 @@ gda_firebird_recordset_new (GdaConnection            *cnc,
+ 	if (!cdata)
+ 		return NULL;
+ 
+-	//g_print("RST-SQL>> %s\n", _GDA_PSTMT (ps)->sql);
+-	
+-	if (ps->sqlda == NULL){
+-		g_print("ERROR: ps->sqlda seems to be NULL\n");
+-	}
+-	/* make sure @ps reports the correct number of columns using the API*/
+-        //if (_GDA_PSTMT (ps)->ncols < 0)
+-                /*_GDA_PSTMT (ps)->ncols = ...;*/
+-		//TO_IMPLEMENT;
+-
+-	/* completing @ps if not yet done */
+-	if (_GDA_PSTMT (ps)->ncols < 0)
+-		_GDA_PSTMT (ps)->ncols = ps->sqlda->sqld;
+-	
+-	/* completing @ps if not yet done */
+-	if (!_GDA_PSTMT (ps)->types && (_GDA_PSTMT (ps)->ncols > 0)) {
+-		/* create prepared statement's columns */
+-		GSList *list;
+-		for (i = 0; i < _GDA_PSTMT (ps)->ncols; i++)
+-			_GDA_PSTMT (ps)->tmpl_columns = g_slist_prepend (_GDA_PSTMT (ps)->tmpl_columns, 
+-									 gda_column_new ());
+-		_GDA_PSTMT (ps)->tmpl_columns = g_slist_reverse (_GDA_PSTMT (ps)->tmpl_columns);
+-
+-		/* create prepared statement's types, all types are initialized to GDA_TYPE_NULL */
+-		_GDA_PSTMT (ps)->types = g_new (GType, _GDA_PSTMT (ps)->ncols);
+-		for (i = 0; i < _GDA_PSTMT (ps)->ncols; i++)
+-			_GDA_PSTMT (ps)->types [i] = GDA_TYPE_NULL;
+-
+-		if (col_types) {
+-			for (i = 0; ; i++) {
+-				if (col_types [i] > 0) {
+-					if (col_types [i] == G_TYPE_NONE)
+-						break;
+-					if (i >= _GDA_PSTMT (ps)->ncols)
+-						g_warning (_("Column %d out of range (0-%d), ignoring its specified type"), i,
+-							   _GDA_PSTMT (ps)->ncols - 1);
+-					else
+-						_GDA_PSTMT (ps)->types [i] = col_types [i];
+-				}
+-			}
+-		}
++	GSList *tmpl_columns = NULL;
++	gint ncols = ps->sqlda->sqld;
++	GSList *list;
+ 
+-		/* fill GdaColumn's data */
+-		g_print("FB reported %d columns. Gda col-cnt: %d\n", ps->sqlda->sqld, GDA_PSTMT (ps)->ncols);
+-		for (i=0, list = _GDA_PSTMT (ps)->tmpl_columns; 
+-			i < GDA_PSTMT (ps)->ncols; 
+-			i++, list = list->next) {
+-			GdaColumn*		column;
+-			GType			gtype;
+-			XSQLVAR*		var;
+-			/*
+-			g_print("\t\tField:%d/%d (fb-cnt=d)\n\t\tSQL-NAME:%s\n\t\tREL-NAME: %s\n\t\tOWN-NAME: %s\n\t\tALIAS: %s\n**************************\n\n"
+-					, i
+-					, GDA_PSTMT (ps)->ncols
+-					//, ps->sqlda->sqld
+-					, var->sqlname
+-					, var->relname
+-					, var->ownname
+-					, var->aliasname);
+-			*/
+-			var = (XSQLVAR *) &(ps->sqlda->sqlvar[i]);
+-			column = GDA_COLUMN (list->data);
+-			/* use C API to set columns' information using gda_column_set_*() */
+-			gtype = _gda_firebird_type_to_gda(var);
+-			_GDA_PSTMT (ps)->types [i] = gtype;
+-			if (col_types)
+-				gda_column_set_g_type (column, col_types[i]);
+-			else
+-				gda_column_set_g_type (column, gtype);
+-				
+-			gda_column_set_name (column, var->aliasname);
+-			gda_column_set_description (column, var->aliasname);
+-		}
+-	}
++	for (i = 0; i < ncols; i++)
++		tmpl_columns = g_slist_prepend (tmpl_columns, gda_column_new ());
++	tmpl_columns = g_slist_reverse (tmpl_columns);
+ 
++	for (i = 0, list = tmpl_columns; i < ncols && list; i++, list = list->next) {
++		GdaColumn *column = GDA_COLUMN (list->data);
++		XSQLVAR *var = (XSQLVAR *) &(ps->sqlda->sqlvar[i]);
++		GType gtype = _gda_firebird_type_to_gda(var);
+ 
+-	if (ps->input_sqlda != NULL){
+-		g_print("\n\nPRINTING THE INPUT PARAMETERS\n--------------------------\n");
+-		for(i =0; i < ps->input_sqlda->sqld; i++){
+-			g_print("input-paramater #%d: %s\n", i, (ps->input_sqlda->sqlvar[i].sqldata));
+-			g_print("input-len       #%d: %d\n", i, ps->input_sqlda->sqlvar[i].sqllen);
++		gda_column_set_g_type (column, (col_types && col_types[i] > 0) ? col_types[i] : gtype);
++		gda_column_set_name (column, var->aliasname);
++		gda_column_set_description (column, var->aliasname);
++	}
++
++	/* Ensure an active transaction exists for execution */
++	isc_tr_handle local_tr = 0L;
++	isc_tr_handle *tr_ptr = cdata->ftr;
++	if (!tr_ptr || *tr_ptr == 0L) {
++		static char default_tpb[] = { isc_tpb_version3, isc_tpb_write, isc_tpb_read_committed, isc_tpb_rec_version, isc_tpb_wait };
++		local_tr = 0L;
++		if (isc_start_transaction (cdata->status, &local_tr, 1, &(cdata->handle), sizeof (default_tpb), default_tpb)) {
++			isc_print_status (cdata->status);
+ 		}
++		tr_ptr = &local_tr;
+ 	}
+ 	
+-	//RUN ISC_DSQL_DESCRIBE TO GET OUTPUT FIELDS
+-	//isc_dsql_describe(cdata->status, cdata->ftr, &(ps->stmt_h), ps->sqlda);
++	/* Execute statement using the valid transaction handle pointer (tr_ptr) */
++	ISC_STATUS exec_status = (ps->input_sqlda && ps->input_sqlda->sqld > 0) ?
++		isc_dsql_execute2 (cdata->status, tr_ptr, &(ps->stmt_h), SQL_DIALECT_V6, ps->input_sqlda, NULL) :
++		isc_dsql_execute (cdata->status, tr_ptr, &(ps->stmt_h), SQL_DIALECT_V6, NULL);
+ 
+-	
+-	g_print("isc_dsql_execute\n");
+-	/* post init specific code */
+-	//if (isc_dsql_execute (cdata->status, cdata->ftr, &(ps->stmt_h), SQL_DIALECT_V6, NULL)) {
+-	if (isc_dsql_execute2 (cdata->status, cdata->ftr, &(ps->stmt_h), SQL_DIALECT_V6, ps->input_sqlda, NULL)) {
+-		g_print("\nisc error occured: \n");
+-		isc_print_status(cdata->status);
+-		g_print("\n");
++	if (exec_status) {
++		isc_print_status (cdata->status);
++	}
++
++	if (local_tr != 0L) {
++		isc_commit_transaction (cdata->status, &local_tr);
+ 	}
+ 
+ 	isc_dsql_set_cursor_name(cdata->status, &(ps->stmt_h), "dyn_cursor", NULL);
+ 
+-	/* determine access mode: RANDOM or CURSOR FORWARD are the only supported */
+-	if (flags & GDA_DATA_MODEL_ACCESS_RANDOM){
+-		rflags = GDA_DATA_MODEL_ACCESS_RANDOM;
+-		g_print("\nRANDOM ACCESS\n");
+-	}
+-	else{
+-		rflags = GDA_DATA_MODEL_ACCESS_CURSOR_FORWARD;
+-		g_print("CURSOR FORWARD ACCESS\n");
+-	}
+-	/* create data model */
+-	g_print("Creating the data-model\n");
+-	model = g_object_new (GDA_TYPE_FIREBIRD_RECORDSET
+-			, "connection", cnc
+-			, "prepared-stmt", ps
+-			, "model-usage", rflags
+-			, "exec-params", exec_params
+-			, NULL);
+-	g_print("point to the connection\n");
+-	//model->priv->cnc = cnc;
+-	g_print("set the number of columns\n");
+-	//model->priv->n_columns	= ps->sqlda->sqld;
+-	g_print("add reference to connection\n");
+-	//g_object_ref (model->priv->cnc);
+-	gda_data_select_set_columns (GDA_DATA_SELECT (model), _GDA_PSTMT (ps)->tmpl_columns);
++	rflags = (flags & GDA_DATA_MODEL_ACCESS_RANDOM) ? GDA_DATA_MODEL_ACCESS_RANDOM : GDA_DATA_MODEL_ACCESS_CURSOR_FORWARD;
++
++	model = g_object_new (GDA_TYPE_FIREBIRD_RECORDSET,
++			      "read-columns", tmpl_columns, 
++			      NULL);
++
++	g_slist_free (tmpl_columns);
+ 
+ 	gint rownum = 0;
+-	g_print("populate the model\n");
+ 	GdaRow *row = NULL;
++	g_print("populate the model\n");
++	
++	GdaDataModelInterface *iface = GDA_DATA_MODEL_GET_IFACE (model);
++	
+ 	while ((row = new_row_from_firebird_stmt (model, rownum, col_types, NULL)) != NULL) {
+-		gda_data_select_take_row ((GdaDataSelect*) model, row, rownum);
++		
++		/* 3. INGEST ROWS DYNAMICALLY THROUGH THE GENERATED VTABLE Pointers
++		 * In libgda 6.0, the core interface method table exposes append behavior.
++		 * By pulling the interface pointer layout directly out of the instance, 
++		 * we can safely bypass standard Windows DLL linkage traps. */
++		if (iface && iface->append_row) {
++			// Invokes the underlying array mapping engine via the dynamic table!
++			iface->append_row (GDA_DATA_MODEL (model), row);
++		} else {
++			// Memory safety guard rail if the layout fails to instantiate
++			g_object_unref (row);
++		}
++		
+ 		rownum++;
+ 	}
+ 	
+ 	isc_dsql_free_statement(cdata->status, &(ps->stmt_h), DSQL_close);
+-	
+-	g_print("SQL-ROWS >> %d\n", rownum);
+-	((GdaDataSelect *) model)->advertized_nrows = rownum;
+-	/*
+-	g_print("\n\ncreating a dump of the table\n\n");
+-	g_print("%s", gda_data_model_dump_as_string(GDA_DATA_MODEL (model)));
+-	g_print("\n\nreturning the data model\n\n");
+-	*/
+-	return GDA_DATA_MODEL (model);
+-}
+-
+-
+-/*
+- * Get the number of rows in @model, if possible
+- */
+-static gint
+-gda_firebird_recordset_fetch_nb_rows (GdaDataSelect *model)
+-{
+-	//GdaFirebirdRecordset *imodel;
+-	//WHERE_AM_I;
+-	//imodel = GDA_FIREBIRD_RECORDSET (model);
+-	if (model->advertized_nrows >= 0)
+-		return model->advertized_nrows;
+-
+-	/* use C API to determine number of rows,if possible */
+-	TO_IMPLEMENT;
+-
+-	return model->advertized_nrows;
+-}
+-
+-/*
+- * Create a new filled #GdaRow object for the row at position @rownum, and put it into *prow.
+- *
+- * NOTES:
+- * - @prow will NOT be NULL, but *prow WILL be NULL.
+- * - a new #GdaRow object has to be created, corresponding to the @rownum row
+- * - memory management for that new GdaRow object is left to the implementation, which
+- *   can use gda_data_select_take_row() to "give" the GdaRow to @model (in this case
+- *   this method won't be called anymore for the same @rownum), or may decide to
+- *   keep a cache of GdaRow object and "recycle" them.
+- * - implementing this method is MANDATORY if the data model supports random access
+- * - this method is only called when data model is used in random access mode
+- */
+-static gboolean 
+-gda_firebird_recordset_fetch_random (GdaDataSelect *model, GdaRow **prow, gint rownum, GError **error)
+-{
+-	gboolean				result = FALSE;
+-	GdaFirebirdRecordset*	imodel;
+-	//WHERE_AM_I;
+-	imodel = GDA_FIREBIRD_RECORDSET (model);
+-
+-	if ((*prow = new_row_from_firebird_stmt (imodel, rownum, NULL, NULL)) != NULL) {
+-		result = TRUE;
+-		gda_data_select_take_row (model, *prow, rownum);
+-	}
+-
+-	return result;
+-}
+-
+-/*
+- * Create and "give" filled #GdaRow object for all the rows in the model
+- */
+-static gboolean
+-gda_firebird_recordset_store_all (GdaDataSelect *model, GError **error)
+-{
+-	//GdaFirebirdRecordset *imodel;
+-	gint i;
+-	//WHERE_AM_I;
+-	//imodel = GDA_FIREBIRD_RECORDSET (model);
+-
+-	/* default implementation */
+-	for (i = 0; i < model->advertized_nrows; i++) {
+-		GdaRow *prow;
+-		if (! gda_firebird_recordset_fetch_random (model, &prow, i, error))
+-			return FALSE;
+-	}
+-	return TRUE;
+-}
+-
+-/*
+- * Create a new filled #GdaRow object for the next cursor row, and put it into *prow.
+- *
+- * NOTES:
+- * - @prow will NOT be NULL, but *prow WILL be NULL.
+- * - a new #GdaRow object has to be created, corresponding to the @rownum row
+- * - memory management for that new GdaRow object is left to the implementation, which
+- *   can use gda_data_select_take_row() to "give" the GdaRow to @model (in this case
+- *   this method won't be called anymore for the same @rownum), or may decide to
+- *   keep a cache of GdaRow object and "recycle" them.
+- * - implementing this method is MANDATORY
+- * - this method is only called when data model is used in cursor access mode
+- */
+-static gboolean 
+-gda_firebird_recordset_fetch_next (GdaDataSelect *model, GdaRow **prow, gint rownum, GError **error)
+-{
+-	gboolean				result = FALSE;
+-	GdaFirebirdRecordset*	imodel;
+-	//WHERE_AM_I;
+-	imodel = GDA_FIREBIRD_RECORDSET (model);
+-
+-	if ((*prow = new_row_from_firebird_stmt (imodel, rownum, NULL, NULL)) != NULL) {
+-		result = TRUE;
+-		gda_data_select_take_row (model, *prow, rownum);
+-	}
+-
+-	return result;
+-}
+-
+-/*
+- * Create a new filled #GdaRow object for the previous cursor row, and put it into *prow.
+- *
+- * NOTES:
+- * - @prow will NOT be NULL, but *prow WILL be NULL.
+- * - a new #GdaRow object has to be created, corresponding to the @rownum row
+- * - memory management for that new GdaRow object is left to the implementation, which
+- *   can use gda_data_select_take_row() to "give" the GdaRow to @model (in this case
+- *   this method won't be called anymore for the same @rownum), or may decide to
+- *   keep a cache of GdaRow object and "recycle" them.
+- * - implementing this method is OPTIONAL (in this case the data model is assumed not to
+- *   support moving iterators backward)
+- * - this method is only called when data model is used in cursor access mode
+- */
+-static gboolean 
+-gda_firebird_recordset_fetch_prev (GdaDataSelect *model, GdaRow **prow, gint rownum, GError **error)
+-{
+-	gboolean				result = FALSE;
+-	GdaFirebirdRecordset*	imodel;
+-	//WHERE_AM_I;
+-	imodel = GDA_FIREBIRD_RECORDSET (model);
+-
+-	if ((*prow = new_row_from_firebird_stmt (imodel, rownum, NULL, NULL)) != NULL) {
+-		result = TRUE;
+-		gda_data_select_take_row (model, *prow, rownum);
+-	}
+-
+-	return result;
+-
+-}
+-
+-/*
+- * Create a new filled #GdaRow object for the cursor row at position @rownum, and put it into *prow.
+- *
+- * NOTES:
+- * - @prow will NOT be NULL, but *prow WILL be NULL.
+- * - a new #GdaRow object has to be created, corresponding to the @rownum row
+- * - memory management for that new GdaRow object is left to the implementation, which
+- *   can use gda_data_select_take_row() to "give" the GdaRow to @model (in this case
+- *   this method won't be called anymore for the same @rownum), or may decide to
+- *   keep a cache of GdaRow object and "recycle" them.
+- * - implementing this method is OPTIONAL and usefull only if there is a method quicker
+- *   than iterating one step at a time to the correct position.
+- * - this method is only called when data model is used in cursor access mode
+- */
+-static gboolean 
+-gda_firebird_recordset_fetch_at (GdaDataSelect *model, GdaRow **prow, gint rownum, GError **error)
+-{
+-	gboolean				result = FALSE;
+-	GdaFirebirdRecordset*	imodel;
+-	//WHERE_AM_I;
+-	imodel = GDA_FIREBIRD_RECORDSET (model);
+-
+-	if ((*prow = new_row_from_firebird_stmt (imodel, rownum, NULL, NULL)) != NULL) {
+-		result = TRUE;
+-		gda_data_select_take_row (model, *prow, rownum);
+-	}
+-
+-	return result;
++	GDA_FIREBIRD_RECORDSET(model)->priv->advertised_nrows = rownum;
+ 
++	return GDA_DATA_MODEL (model);
+ }
+-
+diff --git a/providers/firebird/gda-firebird-recordset.h b/providers/firebird/gda-firebird-recordset.h
+index 389ecb0..7bd8bf8 100644
+--- a/providers/firebird/gda-firebird-recordset.h
++++ b/providers/firebird/gda-firebird-recordset.h
+@@ -23,7 +23,7 @@
+ #define __GDA_FIREBIRD_RECORDSET_H__
+ 
+ #include <libgda/libgda.h>
+-#include <providers-support/gda-data-select-priv.h>
++#include <libgda/gda-data-model-array.h>
+ #include "gda-firebird-pstmt.h"
+ 
+ G_BEGIN_DECLS
+@@ -67,13 +67,12 @@ typedef struct _GdaFirebirdRecordsetClass   GdaFirebirdRecordsetClass;
+ typedef struct _GdaFirebirdRecordsetPrivate GdaFirebirdRecordsetPrivate;
+ 
+ struct _GdaFirebirdRecordset {
+-	GdaDataSelect                model;
++	GdaDataModelArray            model;
+ 	GdaFirebirdRecordsetPrivate *priv;
+-
+ };
+ 
+ struct _GdaFirebirdRecordsetClass {
+-	GdaDataSelectClass             parent_class;
++	GdaDataModelArrayClass      parent_class;
+ };
+ 
+ GType         gda_firebird_recordset_get_type  (void) G_GNUC_CONST;
+diff --git a/providers/firebird/libgda-firebird-6.0.pc.in b/providers/firebird/libgda-firebird-6.0.pc.in
+index 852ad17..e9764ce 100644
+--- a/providers/firebird/libgda-firebird-6.0.pc.in
++++ b/providers/firebird/libgda-firebird-6.0.pc.in
+@@ -3,7 +3,7 @@ exec_prefix=@exec_prefix@
+ libdir=@libdir@
+ includedir=@includedir@
+ 
+-Name: libgda-postgres-@GDA_ABI_MAJOR_VERSION@.@GDA_ABI_MINOR_VERSION@
++Name: libgda-firebird-@GDA_ABI_MAJOR_VERSION@.@GDA_ABI_MINOR_VERSION@
+ Description: GDA (GNOME Data Access) Firebird provider
+ Requires: libgda-@GDA_ABI_MAJOR_VERSION@.@GDA_ABI_MINOR_VERSION@
+ Version: @VERSION@
+diff --git a/providers/firebird/libmain-client.c b/providers/firebird/libmain-client.c
+index 2449163..bd2654e 100644
+--- a/providers/firebird/libmain-client.c
++++ b/providers/firebird/libmain-client.c
+@@ -23,11 +23,9 @@
+ #include <glib/gi18n-lib.h>
+ #include <gmodule.h>
+ #include <libgda/gda-server-provider-extra.h>
+-#include <libgda/binreloc/gda-binreloc.h>
+ #include "gda-firebird.h"
+ #include "gda-firebird-provider.h"
+ 
+-static gchar      *module_path = NULL;
+ const gchar       *plugin_get_name (void);
+ const gchar       *plugin_get_description (void);
+ gchar             *plugin_get_dsn_spec (void);
+@@ -46,15 +44,14 @@ g_module_check_init (G_GNUC_UNUSED GModule *module)
+ void
+ g_module_unload (G_GNUC_UNUSED GModule *module)
+ {
+-        g_free (module_path);
+-        module_path = NULL;
+ }
+ 
++/*
++ * Normal plugin functions 
++ */
+ void
+ plugin_init (const gchar *real_path)
+ {
+-        if (real_path)
+-                module_path = g_strdup (real_path);
+ }
+ 
+ const gchar *
+@@ -72,15 +69,7 @@ plugin_get_description (void)
+ gchar *
+ plugin_get_dsn_spec (void)
+ {
+-	gchar *ret, *dir;
+-
+-	dir = gda_gbr_get_file_path (GDA_DATA_DIR, LIBGDA_ABI_NAME, NULL);
+-	ret = gda_server_provider_load_file_contents (module_path, dir, "firebird_specs_dsn.xml");
+-	g_free (dir);
+-	if (ret)
+-		return ret;
+-	else
+-		return gda_server_provider_load_resource_contents ("firebird", "firebird_specs_dsn.raw.xml");
++	return gda_server_provider_load_resource_contents ("firebird", "firebird_specs_dsn.raw.xml");
+ }
+ 
+ GdaServerProvider *
+@@ -89,6 +78,5 @@ plugin_create_provider (void)
+ 	GdaServerProvider *prov;
+ 
+ 	prov = (GdaServerProvider*) g_object_new (GDA_TYPE_FIREBIRD_PROVIDER, NULL);
+-        g_object_set_data ((GObject *) prov, "GDA_PROVIDER_DIR", module_path);
+-        return prov;
++	return prov;
+ }
+diff --git a/providers/firebird/meson.build b/providers/firebird/meson.build
+new file mode 100644
+index 0000000..c6cf962
+--- /dev/null
++++ b/providers/firebird/meson.build
+@@ -0,0 +1,165 @@
++inc_libgda_firebirdh = include_directories ('.')
++inc_libgda_firebirdh_dep = declare_dependency (include_directories : inc_libgda_firebirdh)
++
++sh = find_program('sh')
++
++firebird_parser = custom_target('firebird-parser',
++	command: [
++		lemon_exe,
++		'-q',
++		'-o@OUTDIR@',
++		'-T@INPUT0@',
++		'@INPUT1@'
++		],
++	input: [lemon_templatef, 'parser.y'],
++	output: ['parser.c', 'parser.h']
++	)
++
++firebird_parserc = firebird_parser[0]
++firebird_parserh = firebird_parser[1]
++
++firebird_gen_def = executable('firebird_gen_def',
++	'gen_def.c',
++	native: true,
++	c_args: [
++		'-DIMPOSED_HEADER="' + token_types.full_path() + '"'
++		],
++	install: false
++	)
++
++firebird_token_typesh = custom_target('firebird-token-typesh',
++	command: [
++		sh, '-c', 'cd "$1" && exec "$2"', 'sh',
++		meson.current_build_dir(),
++		firebird_gen_def.full_path()
++		],
++	output: 'firebird_token_types.h',
++	depends: [
++		firebird_gen_def,
++		firebird_parserh,
++		token_types
++		],
++	capture: true
++	)
++
++libgda_firebird_sources = files([
++	'gda-firebird-blob-op.c',
++	'gda-firebird-blob-op.h',
++	'gda-firebird-ddl.c',
++	'gda-firebird-ddl.h',
++	'gda-firebird-meta.c',
++	'gda-firebird-meta.h',
++	'gda-firebird-parser.c',
++	'gda-firebird-parser.h',
++	'gda-firebird-provider.c',
++	'gda-firebird-provider.h',
++	'gda-firebird-pstmt.c',
++	'gda-firebird-pstmt.h',
++	'gda-firebird-recordset.c',
++	'gda-firebird-recordset.h',
++	'gda-firebird-util.c',
++	'gda-firebird-util.h',
++	'gda-firebird.h'
++	])
++
++libgda_firebird_sources += firebird_parserc
++libgda_firebird_sources += firebird_parserh
++libgda_firebird_sources += firebird_token_typesh
++
++firebird_xml_fnames = [
++	'firebird_specs_create_table',
++	'firebird_specs_dsn',
++	'firebird_specs_dsn_emb'
++	]
++
++firebird_xml_fnamesext = []
++foreach fn : firebird_xml_fnames
++	firebird_xml_fnamesext += [fn+'.xml.in']
++endforeach
++
++firebird_xml_inf = files(firebird_xml_fnamesext)
++
++firebird_xml_res = []
++foreach xt : firebird_xml_fnames
++	i18n.merge_file(
++		input: xt+'.xml.in',
++		output: xt+'.xml.in.h',
++		type: 'xml',
++		po_dir: join_paths(meson.project_build_root(),'po')
++		)
++	firebird_xml_res += custom_target(xt+'.raw.xml',
++		command: [raw_spec,
++			'-o', meson.current_build_dir(),
++			'@INPUT@'
++			],
++		input: xt+'.xml.in',
++		output: xt+'.raw.xml',
++		)
++endforeach
++
++firebird_resourcesc = custom_target('firebird_resourcesc',
++	command: [compile_resources,
++		'--sourcedir='+meson.current_build_dir(),
++		'--generate-source',
++		'--target', '@OUTPUT@',
++		'--internal',
++		'@INPUT@'
++		],
++	input: 'firebird.gresource.xml',
++	output: 'firebird_resource.c',
++	depends: firebird_xml_res,
++	install: false
++	)
++
++firebird_resourcesh = custom_target('firebird_resourcesh',
++	command: [compile_resources,
++		'--sourcedir='+meson.current_build_dir(),
++		'--generate-header',
++		'--target', '@OUTPUT@',
++		'--internal',
++		'@INPUT@'
++		],
++	input: 'firebird.gresource.xml',
++	output: 'firebird_resource.h',
++	depends: firebird_xml_res,
++	install: false
++	)
++firebird_resources = [
++	firebird_resourcesc,
++	firebird_resourcesh
++	]
++
++libgda_firebird_sources += firebird_resources
++
++firebird_cargs = [
++	'-include',
++	join_paths(gda_top_build, 'config.h')
++	]
++
++firebird_cargs += c_args
++
++libgda_firebird_providerpc = configure_file(
++			input:  'libgda-firebird-'+project_api_version+'.pc.in',
++			output: 'libgda-firebird-'+project_api_version+'.pc',
++			configuration : conf,
++			install_dir: join_paths(get_option('libdir'),'pkgconfig')
++			)
++
++if firebird_dep.found()
++	libgda_firebird_client_provider = library ('gda-firebird-client-'+project_api_version,
++		libgda_firebird_sources,
++		files('libmain-client.c'),
++		dependencies: [
++			libgda_dep,
++			firebird_dep,
++			token_types_dep,
++			inc_libgdah_dep,
++			inc_libgda_firebirdh_dep
++			],
++		include_directories: inc_libsql_parserh,
++		c_args: firebird_cargs,
++		link_with: libgda,
++		install: true,
++		install_dir: join_paths(get_option('libdir'), project_package, 'providers')
++		)
++endif
+diff --git a/tools/common/t-app.c b/tools/common/t-app.c
+index 6bcf704..aade304 100644
+--- a/tools/common/t-app.c
++++ b/tools/common/t-app.c
+@@ -397,9 +397,8 @@ t_app_remove_feature (TAppFeatures feature)
+ void
+ t_app_cleanup (void)
+ {
+-	g_assert (global_t_app);
+-	g_object_unref (global_t_app);
+-	global_t_app = NULL;
++	if (!global_t_app)
++		return;
+ }
+ 
+ /**
