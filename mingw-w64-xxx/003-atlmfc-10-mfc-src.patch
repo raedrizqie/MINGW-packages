@@ -1,0 +1,2452 @@
+diff --git a/src/mfc/ThemeHelper.cpp b/src/mfc/ThemeHelper.cpp
+index 00590fd..13b38ae 100644
+--- a/src/mfc/ThemeHelper.cpp
++++ b/src/mfc/ThemeHelper.cpp
+@@ -21,7 +21,7 @@ void* CThemeHelper::GetProc(LPCSTR szProc, void* pfnFail)
+ 	void* pRet = pfnFail;
+ 	if (hThemeDll != NULL)
+ 	{
+-		void *pFunc = GetProcAddress(hThemeDll, szProc);
++		void *pFunc = (PVOID)GetProcAddress(hThemeDll, szProc);
+ 		if(pFunc!=NULL)
+ 		{
+ 			pRet=pFunc;
+@@ -77,19 +77,19 @@ BOOL CThemeHelper::IsThemePartDefinedFail(HTHEME , int , int )
+ 
+ BOOL CThemeHelper::IsAppThemed()
+ {
+-	static PFNISAPPTHEMED pfnIsAppThemed = (PFNISAPPTHEMED)GetProc("IsAppThemed", IsAppThemedFail);
++	static PFNISAPPTHEMED pfnIsAppThemed = (PFNISAPPTHEMED)GetProc("IsAppThemed", (PVOID)IsAppThemedFail);
+ 	return (*pfnIsAppThemed)();
+ }
+ 
+ HTHEME CThemeHelper::OpenThemeData(HWND hwnd, LPCWSTR pszClassList)
+ {
+-	static PFNOPENTHEMEDATA pfnOpenThemeData = (PFNOPENTHEMEDATA)GetProc("OpenThemeData", OpenThemeDataFail);
++	static PFNOPENTHEMEDATA pfnOpenThemeData = (PFNOPENTHEMEDATA)GetProc("OpenThemeData", (PVOID)OpenThemeDataFail);
+ 	return (*pfnOpenThemeData)(hwnd, pszClassList);
+ }
+ 
+ HRESULT CThemeHelper::CloseThemeData(HTHEME hTheme)
+ {
+-	static PFNCLOSETHEMEDATA pfnCloseThemeData = (PFNCLOSETHEMEDATA)GetProc("CloseThemeData", CloseThemeDataFail);
++	static PFNCLOSETHEMEDATA pfnCloseThemeData = (PFNCLOSETHEMEDATA)GetProc("CloseThemeData", (PVOID)CloseThemeDataFail);
+ 	return (*pfnCloseThemeData)(hTheme);
+ }
+ 
+@@ -97,7 +97,7 @@ HRESULT CThemeHelper::DrawThemeBackground(HTHEME hTheme, HDC hdc,
+ 	int nPartId, int nStateId, const RECT *pRect, const RECT *pClipRect)
+ {
+ 	static PFNDRAWTHEMEBACKGROUND pfnDrawThemeBackground = 
+-		(PFNDRAWTHEMEBACKGROUND)GetProc("DrawThemeBackground", DrawThemeBackgroundFail);
++		(PFNDRAWTHEMEBACKGROUND)GetProc("DrawThemeBackground", (PVOID)DrawThemeBackgroundFail);
+ 	return (*pfnDrawThemeBackground)(hTheme, hdc, nPartId, nStateId, pRect, pClipRect);
+ }
+ 
+@@ -105,7 +105,7 @@ HRESULT CThemeHelper::GetThemePartSize(HTHEME hTheme, HDC hdc,
+ 	int nPartId, int nStateId, RECT * pRect, enum THEMESIZE eSize, SIZE *psz)
+ {
+ 	static PFNGETTHEMEPARTSIZE pfnGetThemePartSize = 
+-		(PFNGETTHEMEPARTSIZE)GetProc("GetThemePartSize", GetThemePartSizeFail);
++		(PFNGETTHEMEPARTSIZE)GetProc("GetThemePartSize", (PVOID)GetThemePartSizeFail);
+ 	return (*pfnGetThemePartSize)(hTheme, hdc, nPartId, nStateId, pRect, eSize, psz);
+ }
+ 
+@@ -113,20 +113,20 @@ BOOL CThemeHelper::IsThemeBackgroundPartiallyTransparent(HTHEME hTheme, int nPar
+ {
+ 	static PFNISTHEMEBACKGROUNDPARTIALLYTRANSPARENT pfnIsThemeBackgroundPartiallyTransparent =
+ 		(PFNISTHEMEBACKGROUNDPARTIALLYTRANSPARENT)GetProc("IsThemeBackgroundPartiallyTransparent", 
+-															IsThemeBackgroundPartiallyTransparentFail);
++															(PVOID)IsThemeBackgroundPartiallyTransparentFail);
+ 	return (*pfnIsThemeBackgroundPartiallyTransparent)(hTheme, nPartId, nStateId);
+ }
+ 
+ HRESULT CThemeHelper::DrawThemeParentBackground(HWND hwnd, HDC hdc, RECT *prc)
+ {
+ 	static PFNDRAWTHEMEPARENTBACKGROUND pfnDrawThemeParentBackground =
+-		(PFNDRAWTHEMEPARENTBACKGROUND)GetProc("DrawThemeParentBackground", DrawThemeParentBackgroundFail);
++		(PFNDRAWTHEMEPARENTBACKGROUND)GetProc("DrawThemeParentBackground", (PVOID)DrawThemeParentBackgroundFail);
+ 	return (*pfnDrawThemeParentBackground)(hwnd, hdc, prc);
+ }
+ 
+ BOOL CThemeHelper::IsThemePartDefined(HTHEME hTheme, int nPartId, int nStateId)
+ {
+ 	static PFNISTHEMEPARTDEFINED pfnIsThemePartDefined =
+-		(PFNISTHEMEPARTDEFINED)GetProc("IsThemePartDefined", IsThemePartDefinedFail);
++		(PFNISTHEMEPARTDEFINED)GetProc("IsThemePartDefined", (PVOID)IsThemePartDefinedFail);
+ 	return (*pfnIsThemePartDefined)(hTheme, nPartId, nStateId);
+ }
+diff --git a/src/mfc/afxasert.cpp b/src/mfc/afxasert.cpp
+index db396ea..e462d8e 100644
+--- a/src/mfc/afxasert.cpp
++++ b/src/mfc/afxasert.cpp
+@@ -17,6 +17,7 @@
+ 
+ BOOL AFXAPI AfxAssertFailedLine(LPCSTR lpszFileName, int nLine)
+ {
++#ifdef _MSC_VER
+ #ifndef _AFX_NO_DEBUG_CRT
+ 	// we remove WM_QUIT because if it is in the queue then the message box
+ 	// won't display
+@@ -30,5 +31,8 @@ BOOL AFXAPI AfxAssertFailedLine(LPCSTR lpszFileName, int nLine)
+ 	// Not supported.
+ #error _AFX_NO_DEBUG_CRT is not supported.
+ #endif // _AFX_NO_DEBUG_CRT
++#else
++	return NULL;
++#endif
+ }
+ #endif // _DEBUG
+diff --git a/src/mfc/afxbasepane.cpp b/src/mfc/afxbasepane.cpp
+index 8777c98..a15ad88 100644
+--- a/src/mfc/afxbasepane.cpp
++++ b/src/mfc/afxbasepane.cpp
+@@ -162,7 +162,7 @@ BOOL CBasePane::CreateEx(DWORD dwStyleEx, LPCTSTR lpszClassName, LPCTSTR lpszWin
+ 		}
+ 
+ #pragma warning (disable : 4311)
+-		SetClassLongPtr(m_hWnd, GCLP_HBRBACKGROUND, (long) ::GetSysColorBrush(COLOR_BTNFACE));
++		SetClassLongPtr(m_hWnd, GCLP_HBRBACKGROUND, (LONG_PTR) ::GetSysColorBrush(COLOR_BTNFACE));
+ #pragma warning (default : 4311)
+ 
+ 		SetDlgCtrlID(nID);
+diff --git a/src/mfc/afxcmdusagecount.cpp b/src/mfc/afxcmdusagecount.cpp
+index ff49043..76b328d 100644
+--- a/src/mfc/afxcmdusagecount.cpp
++++ b/src/mfc/afxcmdusagecount.cpp
+@@ -80,7 +80,7 @@ UINT CMFCCmdUsageCount::GetCount(UINT uiCmd) const
+ 	return uiCount;
+ }
+ 
+-BOOL CMFCCmdUsageCount::IsFreqeuntlyUsedCmd(UINT uiCmd) const
++BOOL CMFCCmdUsageCount::IsFrequentlyUsedCmd(UINT uiCmd) const
+ {
+ 	// I say, that the specific command is frequently used,
+ 	// if the command usage percentage is more than 20%
+diff --git a/src/mfc/afxdatarecovery.cpp b/src/mfc/afxdatarecovery.cpp
+index 34b3877..648f008 100644
+--- a/src/mfc/afxdatarecovery.cpp
++++ b/src/mfc/afxdatarecovery.cpp
+@@ -712,7 +712,7 @@ CString CDataRecoveryHandler::GetRecoveredDocumentTitle(_In_ const CString &strD
+ 	CString strFormat, strRecoveredTitle;
+ 	BOOL bRet = strFormat.LoadString(AFX_IDS_AUTOSAVE_RECOVERED);
+ 	ASSERT(bRet);
+-	strRecoveredTitle.Format(strFormat, strDocumentTitle);
++	strRecoveredTitle.Format(strFormat, (LPCTSTR)strDocumentTitle);
+ 	return strRecoveredTitle;
+ }
+ 
+diff --git a/src/mfc/afxdockablepane.cpp b/src/mfc/afxdockablepane.cpp
+index 2e20639..b002570 100644
+--- a/src/mfc/afxdockablepane.cpp
++++ b/src/mfc/afxdockablepane.cpp
+@@ -292,7 +292,7 @@ void CDockablePane::OnBeforeChangeParent(CWnd* pWndNewParent, BOOL bDelay)
+ 	}
+ }
+ 
+-void CDockablePane::RemoveFromDefaultPaneDividier()
++void CDockablePane::RemoveFromDefaultPaneDivider()
+ {
+ 	ASSERT_VALID(this);
+ 
+@@ -1043,7 +1043,7 @@ void CDockablePane::OnPressCloseButton()
+ 
+ 	if (pParentFrame != NULL)
+ 	{
+-		if (pParentFrame->SendMessage(AFX_WM_ON_PRESS_CLOSE_BUTTON, NULL, (LPARAM)(LPVOID) this))
++		if (pParentFrame->SendMessage(AFX_WM_ON_PRESS_CLOSE_BUTTON, 0, (LPARAM)(LPVOID) this))
+ 		{
+ 			return;
+ 		}
+@@ -1166,7 +1166,7 @@ void CDockablePane::UnSetAutoHideMode(CDockablePane* pFirstBarInGroup)
+ 
+ 	m_pAutoHideBar->RemoveAutoHideWindow(this);
+ 
+-	RemoveFromDefaultPaneDividier();
++	RemoveFromDefaultPaneDivider();
+ 	// unset autohide mode - make it docked back
+ 	if (pFirstBarInGroup == NULL)
+ 	{
+@@ -2558,7 +2558,7 @@ void CDockablePane::UndockPane(BOOL bDelay)
+ 
+ 	if (pMiniFrame == NULL)
+ 	{
+-		RemoveFromDefaultPaneDividier();
++		RemoveFromDefaultPaneDivider();
+ 		// remove from dock site
+ 		RemovePaneFromDockManager(this, FALSE, !bDelay);
+ 
+diff --git a/src/mfc/afxdockingmanager.cpp b/src/mfc/afxdockingmanager.cpp
+index e2731b2..a4c5a1b 100644
+--- a/src/mfc/afxdockingmanager.cpp
++++ b/src/mfc/afxdockingmanager.cpp
+@@ -3069,7 +3069,11 @@ void CDockingManager::LockUpdate(BOOL bLock)
+ 
+ 	m_bLockUpdate = bLock;
+ 
+-	bLock ? m_pParentWnd->LockWindowUpdate() : m_pParentWnd->UnlockWindowUpdate();
++	if (bLock) {
++		m_pParentWnd->LockWindowUpdate();
++	} else {
++		m_pParentWnd->UnlockWindowUpdate();
++	}
+ 
+ 	POSITION pos = NULL;
+ 
+@@ -3081,7 +3085,12 @@ void CDockingManager::LockUpdate(BOOL bLock)
+ 		pWnd->UpdateWindow();
+ 
+ 		ASSERT_VALID(pWnd);
+-		bLock ? pWnd->LockWindowUpdate() : pWnd->UnlockWindowUpdate();
++
++		if (bLock) {
++			pWnd->LockWindowUpdate();
++		} else {
++			pWnd->UnlockWindowUpdate();
++		}
+ 	}
+ 
+ 	for (pos = m_lstControlBars.GetHeadPosition(); pos != NULL;)
+@@ -3092,7 +3101,11 @@ void CDockingManager::LockUpdate(BOOL bLock)
+ 		pWnd->ValidateRect(NULL);
+ 		pWnd->UpdateWindow();
+ 
+-		bLock ? pWnd->LockWindowUpdate() : pWnd->UnlockWindowUpdate();
++		if (bLock) {
++			pWnd->LockWindowUpdate();
++		} else {
++			pWnd->UnlockWindowUpdate();
++		}
+ 	}
+ }
+ 
+diff --git a/src/mfc/afxdrawmanager.cpp b/src/mfc/afxdrawmanager.cpp
+index c6cef50..545ff1b 100644
+--- a/src/mfc/afxdrawmanager.cpp
++++ b/src/mfc/afxdrawmanager.cpp
+@@ -2021,7 +2021,7 @@ COLORREF __stdcall CDrawingManager::HLStoRGB_TWO( double H, double L, double S)
+ 
+ 	if (S == 0.0)
+ 	{
+-		R = G = B = unsigned char(L * 255.0);
++		R = G = B = UCHAR (L * 255.0);
+ 	}
+ 	else
+ 	{
+diff --git a/src/mfc/afxeditbrowsectrl.cpp b/src/mfc/afxeditbrowsectrl.cpp
+index 8d85957..3c226cd 100644
+--- a/src/mfc/afxeditbrowsectrl.cpp
++++ b/src/mfc/afxeditbrowsectrl.cpp
+@@ -377,7 +377,7 @@ BOOL CMFCEditBrowseCtrl::OnIllegalFileName(CString& strFileName)
+ 	strError.LoadString(AFX_IDP_INVALID_FILENAME);
+ 
+ 	CString strMessage;
+-	strMessage.Format(_T("%s\r\n%s"), strFileName, strError);
++	strMessage.Format(_T("%s\r\n%s"), (LPCTSTR)strFileName, (LPCTSTR)strError);
+ 
+ 	MessageBox(strMessage, NULL, MB_OK | MB_ICONEXCLAMATION);
+ 	return FALSE;
+diff --git a/src/mfc/afxframeimpl.cpp b/src/mfc/afxframeimpl.cpp
+index 1f3e926..9eaf7cc 100644
+--- a/src/mfc/afxframeimpl.cpp
++++ b/src/mfc/afxframeimpl.cpp
+@@ -322,7 +322,14 @@ void CFrameImpl::InitUserToolbars( LPCTSTR lpszRegEntry, UINT uiUserToolbarFirst
+ 	// Get Path automatically from CWinAppEx if needed
+ 	CWinAppEx* pApp = DYNAMIC_DOWNCAST(CWinAppEx, AfxGetApp());
+ 
+-	m_strControlBarRegEntry = (lpszRegEntry == NULL) ? (pApp != NULL ? pApp->GetRegSectionPath() : _T("") ) : lpszRegEntry;
++	if (lpszRegEntry == NULL) {
++		if (pApp != NULL)
++			m_strControlBarRegEntry = pApp->GetRegSectionPath();
++		else
++			m_strControlBarRegEntry = _T("");
++	} else {
++		m_strControlBarRegEntry = lpszRegEntry;
++	}
+ }
+ 
+ UINT __stdcall CFrameImpl::GetFreeCtrlBarID(UINT uiFirstID, UINT uiLastID, const CObList& lstCtrlBars)
+diff --git a/src/mfc/afxframewndex.cpp b/src/mfc/afxframewndex.cpp
+index 830c8d8..d9339fe 100644
+--- a/src/mfc/afxframewndex.cpp
++++ b/src/mfc/afxframewndex.cpp
+@@ -84,7 +84,7 @@ BEGIN_MESSAGE_MAP(CFrameWndEx, CFrameWnd)
+ 	ON_REGISTERED_MESSAGE(AFX_WM_POSTSETPREVIEWFRAME, &CFrameWndEx::OnPostPreviewFrame)
+ 	ON_REGISTERED_MESSAGE(AFX_WM_CREATETOOLBAR, &CFrameWndEx::OnToolbarCreateNew)
+ 	ON_REGISTERED_MESSAGE(AFX_WM_DELETETOOLBAR, &CFrameWndEx::OnToolbarDelete)
+-	ON_MESSAGE(WM_POWERBROADCAST, &OnPowerBroadcast)
++	ON_MESSAGE(WM_POWERBROADCAST, &CFrameWndEx::OnPowerBroadcast)
+ 	ON_MESSAGE(WM_EXITSIZEMOVE, &CFrameWndEx::OnExitSizeMove)
+ END_MESSAGE_MAP()
+ //}}AFX_MSG_MAP
+diff --git a/src/mfc/afxglobals.cpp b/src/mfc/afxglobals.cpp
+index 1e58fc9..8f671df 100644
+--- a/src/mfc/afxglobals.cpp
++++ b/src/mfc/afxglobals.cpp
+@@ -155,7 +155,7 @@ CMemDC::~CMemDC()
+ 	}
+ }
+ 
+-static int CALLBACK FontFamalyProcFonts(const LOGFONT FAR* lplf, const TEXTMETRIC FAR* /*lptm*/, ULONG /*ulFontType*/, LPARAM lParam)
++static int CALLBACK FontFamilyProcFonts(const LOGFONT FAR* lplf, const TEXTMETRIC FAR* /*lptm*/, ULONG /*ulFontType*/, LPARAM lParam)
+ {
+ 	ENSURE(lplf != NULL);
+ 	ENSURE(lParam != NULL);
+@@ -406,13 +406,13 @@ void AFX_GLOBAL_DATA::UpdateFonts()
+ 	if (!fUseSystemFont)
+ 	{
+ 		// Check for "Segoe UI" or "Tahoma" font existance:
+-		if (::EnumFontFamilies(dc.GetSafeHdc(), NULL, FontFamalyProcFonts, (LPARAM)(LPCTSTR) strOffice2007FontName) == 0)
++		if (::EnumFontFamilies(dc.GetSafeHdc(), NULL, FontFamilyProcFonts, (LPARAM)(LPCTSTR) strOffice2007FontName) == 0)
+ 		{
+ 			// Found! Use MS Office 2007 font!
+ 			lstrcpy(lf.lfFaceName, strOffice2007FontName);
+ 			lf.lfQuality = 5 /*CLEARTYPE_QUALITY*/;
+ 		}
+-		else if (::EnumFontFamilies(dc.GetSafeHdc(), NULL, FontFamalyProcFonts, (LPARAM)(LPCTSTR) strOfficeFontName) == 0)
++		else if (::EnumFontFamilies(dc.GetSafeHdc(), NULL, FontFamilyProcFonts, (LPARAM)(LPCTSTR) strOfficeFontName) == 0)
+ 		{
+ 			// Found! Use MS Office font!
+ 			lstrcpy(lf.lfFaceName, strOfficeFontName);
+@@ -1314,7 +1314,7 @@ HCURSOR AFX_GLOBAL_DATA::GetHandCursor()
+ {
+ 	if (m_hcurHand == NULL)
+ 	{
+-		m_hcurHand = ::LoadCursorW(NULL, MAKEINTRESOURCEW(IDC_HAND));
++		m_hcurHand = ::LoadCursorW(NULL, MAKEINTRESOURCEW((DWORD_PTR)IDC_HAND));
+ 	}
+ 
+ 	return m_hcurHand;
+diff --git a/src/mfc/afxjumplist.cpp b/src/mfc/afxjumplist.cpp
+index 9f8815c..3dd4075 100644
+--- a/src/mfc/afxjumplist.cpp
++++ b/src/mfc/afxjumplist.cpp
+@@ -186,7 +186,7 @@ BOOL CJumpList::AddTask(LPCTSTR strTargetExecutablePath, LPCTSTR strCommandLineA
+ 	shellLinkPtr->SetArguments(strCommandLineArgs);
+ 	shellLinkPtr->SetIconLocation(strIconPath, iIconIndex);
+ 
+-	CComQIPtr<IPropertyStore> propPtr = shellLinkPtr;
++	CComQIPtr<IPropertyStore> propPtr(shellLinkPtr.p);
+ 
+ 	if (propPtr != NULL)
+ 	{
+@@ -235,7 +235,7 @@ BOOL CJumpList::AddTaskSeparator()
+ 		return FALSE;
+ 	}
+ 
+-	CComQIPtr<IPropertyStore> propPtr = shellLinkPtr;
++	CComQIPtr<IPropertyStore> propPtr(shellLinkPtr.p);
+ 	PROPVARIANT var;
+ 	var.vt = VT_BOOL;
+ 	var.boolVal = VARIANT_TRUE;
+@@ -466,7 +466,7 @@ BOOL CJumpList::CommitList()
+ 		ASSERT(pFinalCollection != NULL);
+ 		if (pFinalCollection == NULL)
+ 		{
+-			TRACE1("A final collection for Category \"%s\" is NULL. This category is not committed. \n", strCategory);
++			TRACE1("A final collection for Category \"%s\" is NULL. This category is not committed. \n", strCategory.GetString());
+ 			continue;
+ 		}
+ 
+@@ -475,7 +475,7 @@ BOOL CJumpList::CommitList()
+ 
+ 		if (nDocCount == 0)
+ 		{
+-			TRACE1("WARNING: A final collection for Category \"%s\" is empty. \n", strCategory);
++			TRACE1("WARNING: A final collection for Category \"%s\" is empty. \n", strCategory.GetString());
+ 		}
+ 
+ #ifdef UNICODE
+@@ -487,7 +487,7 @@ BOOL CJumpList::CommitList()
+ #endif
+ 		if(FAILED(hr))
+ 		{
+-			TRACE2("Append category %s failed , HRESULT: %x.\n", strCategory, hr);
++			TRACE2("Append category %s failed , HRESULT: %x.\n", strCategory.GetString(), hr);
+ 		}
+ 
+ 		ReleaseObjectArray(pFinalCollection);
+diff --git a/src/mfc/afxlinkctrl.cpp b/src/mfc/afxlinkctrl.cpp
+index 0b8c4c6..85d6ff8 100644
+--- a/src/mfc/afxlinkctrl.cpp
++++ b/src/mfc/afxlinkctrl.cpp
+@@ -113,7 +113,7 @@ BOOL CMFCLinkCtrl::OnClicked()
+ 
+ 	if (::ShellExecute(NULL, NULL, m_strPrefix + strURL, NULL, NULL, SW_SHOWNORMAL) <(HINSTANCE) 32)
+ 	{
+-		TRACE(_T("Can't open URL: %s\n"), strURL);
++		TRACE(_T("Can't open URL: %s\n"), strURL.GetString());
+ 	}
+ 
+ 	m_bVisited = TRUE;
+diff --git a/src/mfc/afxmdiframewndex.cpp b/src/mfc/afxmdiframewndex.cpp
+index 5b506f7..ced4f41 100644
+--- a/src/mfc/afxmdiframewndex.cpp
++++ b/src/mfc/afxmdiframewndex.cpp
+@@ -115,7 +115,7 @@ BEGIN_MESSAGE_MAP(CMDIFrameWndEx, CMDIFrameWnd)
+ 	ON_REGISTERED_MESSAGE(AFX_WM_POSTSETPREVIEWFRAME, &CMDIFrameWndEx::OnPostPreviewFrame)
+ 	ON_REGISTERED_MESSAGE(AFX_WM_CREATETOOLBAR, &CMDIFrameWndEx::OnToolbarCreateNew)
+ 	ON_REGISTERED_MESSAGE(AFX_WM_DELETETOOLBAR, &CMDIFrameWndEx::OnToolbarDelete)
+-	ON_MESSAGE(WM_POWERBROADCAST, &OnPowerBroadcast)
++	ON_MESSAGE(WM_POWERBROADCAST, &CMDIFrameWndEx::OnPowerBroadcast)
+ END_MESSAGE_MAP()
+ //}}AFX_MSG_MAP
+ 
+@@ -1592,7 +1592,7 @@ void CMDIFrameWndEx::UpdateMDITabbedBarsIcons()
+ 			ASSERT_VALID(pBar);
+ 
+ #pragma warning(disable : 4311)
+-			SetClassLongPtr(hwndMDIChild, GCLP_HICONSM, (long) pBar->GetIcon(FALSE));
++			SetClassLongPtr(hwndMDIChild, GCLP_HICONSM, (LONG_PTR) pBar->GetIcon(FALSE));
+ #pragma warning(default : 4311)
+ 		}
+ 
+diff --git a/src/mfc/afxmem.cpp b/src/mfc/afxmem.cpp
+index 3ae1509..9811203 100644
+--- a/src/mfc/afxmem.cpp
++++ b/src/mfc/afxmem.cpp
+@@ -341,7 +341,7 @@ void* __cdecl operator new(size_t nSize)
+ 	return pResult;
+ }
+ 
+-void __cdecl operator delete(void* p)
++void __cdecl operator delete(void* p) noexcept
+ {
+ #if !defined(_AFX_NO_DEBUG_CRT) && defined(_DEBUG)
+ 		_free_dbg(p, _NORMAL_BLOCK);
+@@ -355,7 +355,7 @@ void* __cdecl operator new[](size_t nSize)
+ 	return ::operator new(nSize);
+ }
+ 
+-void __cdecl operator delete[](void* p)
++void __cdecl operator delete[](void* p) noexcept
+ {
+ 	::operator delete(p);
+ }
+diff --git a/src/mfc/afxmenutearoffmanager.cpp b/src/mfc/afxmenutearoffmanager.cpp
+index 572eb5d..543623e 100644
+--- a/src/mfc/afxmenutearoffmanager.cpp
++++ b/src/mfc/afxmenutearoffmanager.cpp
+@@ -52,7 +52,14 @@ BOOL CMenuTearOffManager::Initialize( LPCTSTR lpszRegEntry, UINT uiTearOffMenuFi
+ 
+ 	CWinAppEx* pApp = DYNAMIC_DOWNCAST(CWinAppEx, AfxGetApp());
+ 
+-	m_strTearOffBarRegEntry = (lpszRegEntry == NULL) ? ( pApp ? pApp->GetRegSectionPath() : _T("")) : lpszRegEntry;
++	if (lpszRegEntry == NULL) {
++		if (pApp != NULL)
++			m_strTearOffBarRegEntry = pApp->GetRegSectionPath();
++		else
++			m_strTearOffBarRegEntry = _T("");
++	} else {
++		m_strTearOffBarRegEntry = lpszRegEntry;
++	}
+ 
+ 	int nCount = uiTearOffMenuLast - uiTearOffMenuFirst + 1;
+ 	m_arTearOffIDsUsage.SetSize(nCount);
+diff --git a/src/mfc/afxmousemanager.cpp b/src/mfc/afxmousemanager.cpp
+index 528e968..dfed470 100644
+--- a/src/mfc/afxmousemanager.cpp
++++ b/src/mfc/afxmousemanager.cpp
+@@ -118,13 +118,13 @@ BOOL CMouseManager::LoadState(LPCTSTR lpszProfileName)
+ 
+ 	if (!reg.Open(strProfileName))
+ 	{
+-		TRACE(_T("CMouseManager::LoadState: Can't open registry %s!\n"), strProfileName);
++		TRACE(_T("CMouseManager::LoadState: Can't open registry %s!\n"), strProfileName.GetString());
+ 		return FALSE;
+ 	}
+ 
+ 	if (!reg.Read(strRegEntryName, &lpbData, &uiDataSize))
+ 	{
+-		TRACE(_T("CMouseManager::LoadState: Can't load registry data %s!\n"), strProfileName);
++		TRACE(_T("CMouseManager::LoadState: Can't load registry data %s!\n"), strProfileName.GetString());
+ 		return FALSE;
+ 	}
+ 
+diff --git a/src/mfc/afxpaneframewnd.cpp b/src/mfc/afxpaneframewnd.cpp
+index a8648e5..6b8c2f4 100644
+--- a/src/mfc/afxpaneframewnd.cpp
++++ b/src/mfc/afxpaneframewnd.cpp
+@@ -981,7 +981,11 @@ BOOL __stdcall CPaneFrameWnd::AddRemovePaneFromGlobalList(CBasePane* pWnd, BOOL
+ 
+ 	if (nID != -1)
+ 	{
+-		bAdd ? m_mapFloatingBars.SetAt(nID, pWnd->GetSafeHwnd()) : m_mapFloatingBars.RemoveKey(nID);
++		if (bAdd) {
++			m_mapFloatingBars.SetAt(nID, pWnd->GetSafeHwnd());
++		} else {
++			m_mapFloatingBars.RemoveKey(nID);
++		}
+ 	}
+ 	else if (pWnd->IsKindOf(RUNTIME_CLASS(CBaseTabbedPane)))
+ 	{
+@@ -1003,7 +1007,11 @@ BOOL __stdcall CPaneFrameWnd::AddRemovePaneFromGlobalList(CBasePane* pWnd, BOOL
+ 			}
+ 			else
+ 			{
+-				bAdd ?  m_mapFloatingBars.SetAt(nBarID, pNextWnd->GetSafeHwnd()) : m_mapFloatingBars.RemoveKey(nBarID);
++				if (bAdd) {
++					m_mapFloatingBars.SetAt(nBarID, pNextWnd->GetSafeHwnd());
++				} else {
++					m_mapFloatingBars.RemoveKey(nBarID);
++				}
+ 			}
+ 		}
+ 	}
+diff --git a/src/mfc/afxpropertygridctrl.cpp b/src/mfc/afxpropertygridctrl.cpp
+index 25301c4..653bb23 100644
+--- a/src/mfc/afxpropertygridctrl.cpp
++++ b/src/mfc/afxpropertygridctrl.cpp
+@@ -1180,12 +1180,12 @@ BOOL CMFCPropertyGridProperty::TextToVar(const CString& strText)
+ 		return TRUE;
+ 
+ 	case VT_UI2:
+-		m_varValue.uiVal = unsigned short(_ttoi(strVal));
++		m_varValue.uiVal = USHORT (_ttoi(strVal));
+ 		return TRUE;
+ 
+ 	case VT_UINT:
+ 	case VT_UI4:
+-		m_varValue.ulVal = unsigned long(_ttol(strVal));
++		m_varValue.ulVal = ULONG (_ttol(strVal));
+ 		return TRUE;
+ 
+ 	case VT_R4:
+@@ -2608,12 +2608,12 @@ void CMFCPropertyGridCtrl::Init()
+ 	HDITEM hdItem;
+ 	hdItem.mask = HDI_TEXT | HDI_FORMAT;
+ 	hdItem.fmt = HDF_LEFT;
+-	hdItem.pszText = _T("Property");
++	hdItem.pszText = LPTSTR ("Property");
+ 	hdItem.cchTextMax = 100;
+ 
+ 	GetHeaderCtrl().InsertItem(0, &hdItem);
+ 
+-	hdItem.pszText = _T("Value");
++	hdItem.pszText = LPTSTR ("Value");
+ 	hdItem.cchTextMax = 100;
+ 
+ 	GetHeaderCtrl().InsertItem(1, &hdItem);
+diff --git a/src/mfc/afxpropertysheet.cpp b/src/mfc/afxpropertysheet.cpp
+index bfd2259..a0ffcc8 100644
+--- a/src/mfc/afxpropertysheet.cpp
++++ b/src/mfc/afxpropertysheet.cpp
+@@ -92,28 +92,28 @@ void CMFCOutlookBarPaneList::EnsureVisible(int iButton)
+ }
+ 
+ /////////////////////////////////////////////////////////////////////////////
+-// CMFCProperySheetListBox
++// CMFCPropertySheetListBox
+ 
+-CMFCProperySheetListBox::CMFCProperySheetListBox()
++CMFCPropertySheetListBox::CMFCPropertySheetListBox()
+ {
+ 	m_nHighlightedItem = -1;
+ 	m_bTracked = FALSE;
+ 	m_pParent = NULL;
+ }
+ 
+-BEGIN_MESSAGE_MAP(CMFCProperySheetListBox, CListBox)
++BEGIN_MESSAGE_MAP(CMFCPropertySheetListBox, CListBox)
+ 	ON_WM_DRAWITEM_REFLECT()
+ 	ON_WM_MEASUREITEM_REFLECT()
+ 	ON_WM_MOUSEMOVE()
+-	ON_MESSAGE(WM_MOUSELEAVE, &CMFCProperySheetListBox::OnMouseLeave)
++	ON_MESSAGE(WM_MOUSELEAVE, &CMFCPropertySheetListBox::OnMouseLeave)
+ END_MESSAGE_MAP()
+ 
+-void CMFCProperySheetListBox::MeasureItem(LPMEASUREITEMSTRUCT lpMeasureItemStruct)
++void CMFCPropertySheetListBox::MeasureItem(LPMEASUREITEMSTRUCT lpMeasureItemStruct)
+ {
+ 	lpMeasureItemStruct->itemHeight = afxGlobalData.GetTextHeight() + 12;
+ }
+ 
+-void CMFCProperySheetListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
++void CMFCPropertySheetListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
+ {
+ 	ASSERT_VALID(m_pParent);
+ 
+@@ -166,7 +166,7 @@ void CMFCProperySheetListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
+ 	pDC->SelectObject(pOldFont);
+ }
+ 
+-void CMFCProperySheetListBox::OnMouseMove(UINT nFlags, CPoint point)
++void CMFCPropertySheetListBox::OnMouseMove(UINT nFlags, CPoint point)
+ {
+ 	CListBox::OnMouseMove(nFlags, point);
+ 
+@@ -219,7 +219,7 @@ void CMFCProperySheetListBox::OnMouseMove(UINT nFlags, CPoint point)
+ 	}
+ }
+ 
+-LRESULT CMFCProperySheetListBox::OnMouseLeave(WPARAM,LPARAM)
++LRESULT CMFCPropertySheetListBox::OnMouseLeave(WPARAM,LPARAM)
+ {
+ 	m_bTracked = FALSE;
+ 
+diff --git a/src/mfc/afxribboncolorbutton.cpp b/src/mfc/afxribboncolorbutton.cpp
+index 496dfd4..204c7d1 100644
+--- a/src/mfc/afxribboncolorbutton.cpp
++++ b/src/mfc/afxribboncolorbutton.cpp
+@@ -318,7 +318,11 @@ void CMFCRibbonColorButton::EnableAutomaticButton(LPCTSTR lpszLabel, COLORREF co
+ 	ASSERT_VALID(this);
+ 
+ 	m_strAutomaticButtonLabel = (bEnable && lpszLabel == NULL) ? _T("") : lpszLabel;
+-	m_strAutomaticButtonToolTip = (lpszToolTip == NULL) ? m_strAutomaticButtonLabel : lpszToolTip;
++	if (lpszToolTip == NULL) {
++		m_strAutomaticButtonToolTip = m_strAutomaticButtonLabel;
++	} else {
++		m_strAutomaticButtonToolTip = lpszToolTip;
++	}
+ 	m_strAutomaticButtonToolTip.Remove(_T('&'));
+ 	m_ColorAutomatic = colorAutomatic;
+ 	m_bIsAutomaticButton = bEnable;
+@@ -332,7 +336,11 @@ void CMFCRibbonColorButton::EnableOtherButton(LPCTSTR lpszLabel, LPCTSTR lpszToo
+ 
+ 	m_bIsOtherButton = (lpszLabel != NULL);
+ 	m_strOtherButtonLabel = (lpszLabel == NULL) ? _T("") : lpszLabel;
+-	m_strOtherButtonToolTip = (lpszToolTip == NULL) ? m_strOtherButtonLabel : lpszToolTip;
++	if (lpszToolTip == NULL) {
++		m_strOtherButtonToolTip = m_strOtherButtonLabel;
++	} else {
++		m_strOtherButtonToolTip = lpszToolTip;
++	}
+ 	m_strOtherButtonToolTip.Remove(_T('&'));
+ }
+ 
+diff --git a/src/mfc/afxribboncustomizedialog.cpp b/src/mfc/afxribboncustomizedialog.cpp
+index dcd0f8f..bda1072 100644
+--- a/src/mfc/afxribboncustomizedialog.cpp
++++ b/src/mfc/afxribboncustomizedialog.cpp
+@@ -210,7 +210,7 @@ void CMFCRibbonCustomizePropertyPage::OnToolbarReset()
+ 	CString strPrompt;
+ 
+ 	CString strCaption;
+-	strPrompt.Format(IDS_AFXBARRES_RESET_TOOLBAR_FMT, strCaption);
++	strPrompt.Format(IDS_AFXBARRES_RESET_TOOLBAR_FMT, (LPCTSTR)strCaption);
+ 
+ 	strPrompt.Remove(_T('\''));
+ 	strPrompt.Remove(_T('\''));
+diff --git a/src/mfc/afxshelllistctrl.cpp b/src/mfc/afxshelllistctrl.cpp
+index 15fee30..8cf6a5e 100644
+--- a/src/mfc/afxshelllistctrl.cpp
++++ b/src/mfc/afxshelllistctrl.cpp
+@@ -298,7 +298,7 @@ HRESULT CMFCShellListCtrl::EnumObjects(LPSHELLFOLDER pParentFolder, LPITEMIDLIST
+ 			pItem->pParentFolder = pParentFolder;
+ 			lvItem.lParam = (LPARAM)pItem;
+ 
+-			lvItem.pszText = _T("");
++			lvItem.pszText = LPTSTR ("");
+ 			lvItem.iImage = OnGetItemIcon(GetItemCount(), pItem);
+ 
+ 			//determine if the item is shared
+diff --git a/src/mfc/afxshowallbutton.cpp b/src/mfc/afxshowallbutton.cpp
+index 2bd589d..79b160f 100644
+--- a/src/mfc/afxshowallbutton.cpp
++++ b/src/mfc/afxshowallbutton.cpp
+@@ -130,7 +130,7 @@ BOOL CMFCShowAllButton::OnToolHitTest(const CWnd* /*pWnd*/, TOOLINFO* pTI)
+ 	helper.Format(strKey);
+ 
+ 	CString strText;
+-	strText.Format(IDS_AFXBARRES_EXPAND_FMT, strKey);
++	strText.Format(IDS_AFXBARRES_EXPAND_FMT, (LPCTSTR)strKey);
+ 
+ 	pTI->lpszText = (LPTSTR) ::calloc((strText.GetLength() + 1), sizeof(TCHAR));
+ 	if (pTI->lpszText == NULL)
+diff --git a/src/mfc/afxsound.cpp b/src/mfc/afxsound.cpp
+index 7b9aab1..2939c03 100644
+--- a/src/mfc/afxsound.cpp
++++ b/src/mfc/afxsound.cpp
+@@ -24,7 +24,7 @@ static const int nThreadDelay = 5;
+ 
+ #pragma comment(lib, "winmm.lib")
+ 
+-void _cdecl AFXSoundThreadProc(LPVOID)
++void __cdecl AFXSoundThreadProc(LPVOID)
+ {
+ 	const DWORD dwFlags = (SND_SYNC | SND_NODEFAULT | SND_ALIAS | SND_NOWAIT);
+ 
+@@ -71,7 +71,7 @@ void AFXPlaySystemSound(int nSound)
+ 
+ 		// Initialize sound thread:
+ 		g_hThreadSound = (HANDLE) ::_beginthread(AFXSoundThreadProc, 0, NULL);
+-		if (g_hThreadSound > 0 && g_hThreadSound != (HANDLE) -1)
++		if (g_hThreadSound != NULL && g_hThreadSound != (HANDLE) -1)
+ 		{
+ 			::SetThreadPriority(g_hThreadSound, THREAD_PRIORITY_BELOW_NORMAL);
+ 			g_nSoundState = nSound;
+diff --git a/src/mfc/afxspinbuttonctrl.cpp b/src/mfc/afxspinbuttonctrl.cpp
+index 6d609a4..f6aa1bb 100644
+--- a/src/mfc/afxspinbuttonctrl.cpp
++++ b/src/mfc/afxspinbuttonctrl.cpp
+@@ -32,8 +32,8 @@ CMFCSpinButtonCtrl::CMFCSpinButtonCtrl()
+ 	m_bIsButtonPressedUp = FALSE;
+ 	m_bIsButtonPressedDown = FALSE;
+ 
+-	m_bIsButtonHighligtedUp = FALSE;
+-	m_bIsButtonHighligtedDown = FALSE;
++	m_bIsButtonHighlightedUp = FALSE;
++	m_bIsButtonHighlightedDown = FALSE;
+ }
+ 
+ CMFCSpinButtonCtrl::~CMFCSpinButtonCtrl()
+@@ -93,12 +93,12 @@ void CMFCSpinButtonCtrl::OnDraw(CDC* pDC)
+ 		nState |= AFX_SPIN_PRESSEDDOWN;
+ 	}
+ 
+-	if (m_bIsButtonHighligtedUp)
++	if (m_bIsButtonHighlightedUp)
+ 	{
+ 		nState |= AFX_SPIN_HIGHLIGHTEDUP;
+ 	}
+ 
+-	if (m_bIsButtonHighligtedDown)
++	if (m_bIsButtonHighlightedDown)
+ 	{
+ 		nState |= AFX_SPIN_HIGHLIGHTEDDOWN;
+ 	}
+@@ -133,8 +133,8 @@ void CMFCSpinButtonCtrl::OnLButtonUp(UINT nFlags, CPoint point)
+ 	m_bIsButtonPressedUp = FALSE;
+ 	m_bIsButtonPressedDown = FALSE;
+ 
+-	m_bIsButtonHighligtedUp = FALSE;
+-	m_bIsButtonHighligtedDown = FALSE;
++	m_bIsButtonHighlightedUp = FALSE;
++	m_bIsButtonHighlightedDown = FALSE;
+ 
+ 	CSpinButtonCtrl::OnLButtonUp(nFlags, point);
+ }
+@@ -146,14 +146,14 @@ void CMFCSpinButtonCtrl::OnCancelMode()
+ 	m_bIsButtonPressedUp = FALSE;
+ 	m_bIsButtonPressedDown = FALSE;
+ 
+-	m_bIsButtonHighligtedUp = FALSE;
+-	m_bIsButtonHighligtedDown = FALSE;
++	m_bIsButtonHighlightedUp = FALSE;
++	m_bIsButtonHighlightedDown = FALSE;
+ }
+ 
+ void CMFCSpinButtonCtrl::OnMouseMove(UINT nFlags, CPoint point)
+ {
+-	BOOL bIsButtonHighligtedUp = m_bIsButtonHighligtedUp;
+-	BOOL bIsButtonHighligtedDown = m_bIsButtonHighligtedDown;
++	BOOL bIsButtonHighlightedUp = m_bIsButtonHighlightedUp;
++	BOOL bIsButtonHighlightedDown = m_bIsButtonHighlightedDown;
+ 
+ 	CRect rect;
+ 	GetClientRect(rect);
+@@ -164,18 +164,18 @@ void CMFCSpinButtonCtrl::OnMouseMove(UINT nFlags, CPoint point)
+ 	CRect rectDown = rect;
+ 	rectDown.top = rectUp.bottom;
+ 
+-	m_bIsButtonHighligtedUp = rectUp.PtInRect(point);
+-	m_bIsButtonHighligtedDown = rectDown.PtInRect(point);
++	m_bIsButtonHighlightedUp = rectUp.PtInRect(point);
++	m_bIsButtonHighlightedDown = rectDown.PtInRect(point);
+ 
+ 	if (nFlags & MK_LBUTTON)
+ 	{
+-		m_bIsButtonPressedUp = m_bIsButtonHighligtedUp;
+-		m_bIsButtonPressedDown = m_bIsButtonHighligtedDown;
++		m_bIsButtonPressedUp = m_bIsButtonHighlightedUp;
++		m_bIsButtonPressedDown = m_bIsButtonHighlightedDown;
+ 	}
+ 
+ 	CSpinButtonCtrl::OnMouseMove(nFlags, point);
+ 
+-	if (bIsButtonHighligtedUp != m_bIsButtonHighligtedUp || bIsButtonHighligtedDown != m_bIsButtonHighligtedDown)
++	if ((bIsButtonHighlightedUp != m_bIsButtonHighlightedUp) || (bIsButtonHighlightedDown != m_bIsButtonHighlightedDown))
+ 	{
+ 		RedrawWindow();
+ 	}
+@@ -197,10 +197,10 @@ LRESULT CMFCSpinButtonCtrl::OnMouseLeave(WPARAM,LPARAM)
+ {
+ 	m_bTracked = FALSE;
+ 
+-	if (m_bIsButtonPressedUp || m_bIsButtonPressedDown || m_bIsButtonHighligtedUp || m_bIsButtonHighligtedDown)
++	if (m_bIsButtonPressedUp || m_bIsButtonPressedDown || m_bIsButtonHighlightedUp || m_bIsButtonHighlightedDown)
+ 	{
+-		m_bIsButtonHighligtedUp = FALSE;
+-		m_bIsButtonHighligtedDown = FALSE;
++		m_bIsButtonHighlightedUp = FALSE;
++		m_bIsButtonHighlightedDown = FALSE;
+ 
+ 		RedrawWindow();
+ 	}
+diff --git a/src/mfc/afxstate.cpp b/src/mfc/afxstate.cpp
+index 952c9c0..967a89b 100644
+--- a/src/mfc/afxstate.cpp
++++ b/src/mfc/afxstate.cpp
+@@ -50,7 +50,7 @@ AFX_MODULE_STATE* AFXAPI AfxSetModuleState(AFX_MODULE_STATE* pNewState) throw()
+ 
+ // AFX_MAINTAIN_STATE functions
+ 
+-AFX_MAINTAIN_STATE::AFX_MAINTAIN_STATE(AFX_MODULE_STATE* pNewState)
++AFX_MAINTAIN_STATE::AFX_MAINTAIN_STATE(AFX_MODULE_STATE* pNewState) noexcept
+ {
+ 	m_pPrevModuleState = AfxSetModuleState(pNewState);
+ }
+@@ -278,17 +278,17 @@ void AFX_MODULE_STATE::CreateActivationContext()
+ 	actCtx.cbSize = sizeof(actCtx);
+ 	actCtx.dwFlags = ACTCTX_FLAG_RESOURCE_NAME_VALID | ACTCTX_FLAG_HMODULE_VALID;
+ 	actCtx.lpSource = rgchFullModulePath;
+-	actCtx.lpResourceName =  MAKEINTRESOURCEW(ISOLATIONAWARE_MANIFEST_RESOURCE_ID);
++	actCtx.lpResourceName =  MAKEINTRESOURCEW((INT_PTR)ISOLATIONAWARE_MANIFEST_RESOURCE_ID);
+ 	actCtx.hModule = hModule;
+ 	m_hActCtx = CreateActCtxW(&actCtx);
+ 	if (m_hActCtx == INVALID_HANDLE_VALUE)
+ 	{		
+-		actCtx.lpResourceName =  MAKEINTRESOURCEW(ISOLATIONAWARE_NOSTATICIMPORT_MANIFEST_RESOURCE_ID);
++		actCtx.lpResourceName =  MAKEINTRESOURCEW((INT_PTR)ISOLATIONAWARE_NOSTATICIMPORT_MANIFEST_RESOURCE_ID);
+ 		m_hActCtx = CreateActCtxW(&actCtx);
+ 	}
+ 	if (m_hActCtx == INVALID_HANDLE_VALUE)
+ 	{		
+-		actCtx.lpResourceName =  MAKEINTRESOURCEW(CREATEPROCESS_MANIFEST_RESOURCE_ID);
++		actCtx.lpResourceName =  MAKEINTRESOURCEW((INT_PTR)CREATEPROCESS_MANIFEST_RESOURCE_ID);
+ 		m_hActCtx = CreateActCtxW(&actCtx);
+ 	}
+ 	if (m_hActCtx == INVALID_HANDLE_VALUE)
+@@ -382,7 +382,7 @@ AFX_MODULE_THREAD_STATE::~AFX_MODULE_THREAD_STATE()
+ 	// cleanup socket notification list
+ 	if (m_plistSocketNotifications != NULL)
+ 		while (!m_plistSocketNotifications->IsEmpty())
+-			delete m_plistSocketNotifications->RemoveHead();
++			delete (CPtrList*)m_plistSocketNotifications->RemoveHead();
+ #ifndef _AFXDLL
+ 	// cleanup dynamically allocated socket maps
+ 	delete m_pmapSocketHandle;
+diff --git a/src/mfc/afxstatusbar.cpp b/src/mfc/afxstatusbar.cpp
+index 561dba6..1d51474 100644
+--- a/src/mfc/afxstatusbar.cpp
++++ b/src/mfc/afxstatusbar.cpp
+@@ -1080,7 +1080,7 @@ LRESULT CMFCStatusBar::OnNcHitTest(CPoint point)
+ 
+ void CMFCStatusBar::OnSysCommand(UINT nID, LPARAM lParam)
+ {
+-	if (!m_cxSizeBox != 0 &&(nID & 0xFFF0) == SC_SIZE)
++	if (m_cxSizeBox == 0 && (nID & 0xFFF0) == SC_SIZE)
+ 	{
+ 		CFrameWnd* pFrameWnd = AFXGetParentFrame(this);
+ 		if (pFrameWnd != NULL)
+diff --git a/src/mfc/afxtagmanager.cpp b/src/mfc/afxtagmanager.cpp
+index 00e4f1f..deb845e 100644
+--- a/src/mfc/afxtagmanager.cpp
++++ b/src/mfc/afxtagmanager.cpp
+@@ -193,7 +193,7 @@ BOOL CTagManager::LoadFromFile(LPCTSTR lpszFileName)
+ 		CStdioFile file;
+ 		if (!file.Open(strPath, CFile::modeRead))
+ 		{
+-			TRACE(_T("CTagManager::LoadFromFile: File not found: %s"), strFileName);
++			TRACE(_T("CTagManager::LoadFromFile: File not found: %s"), strFileName.GetString());
+ 			return FALSE;
+ 		}
+ 
+diff --git a/src/mfc/afxtoolbar.cpp b/src/mfc/afxtoolbar.cpp
+index 16dea09..cd56fc8 100644
+--- a/src/mfc/afxtoolbar.cpp
++++ b/src/mfc/afxtoolbar.cpp
+@@ -6392,7 +6392,7 @@ BOOL __stdcall CMFCToolBar::IsCommandRarelyUsed(UINT uiCmd)
+ 		return FALSE;
+ 	}
+ 
+-	return !IsBasicCommand(uiCmd) && !m_UsageCount.IsFreqeuntlyUsedCmd(uiCmd);
++	return !IsBasicCommand(uiCmd) && !m_UsageCount.IsFrequentlyUsedCmd(uiCmd);
+ }
+ 
+ BOOL __stdcall CMFCToolBar::SetCommandUsageOptions(UINT nStartCount, UINT nMinUsagePercentage)
+@@ -7321,7 +7321,7 @@ LRESULT CMFCToolBar::OnPromptReset(WPARAM, LPARAM)
+ 	}
+ 
+ 	CString strPrompt;
+-	strPrompt.Format(IDS_AFXBARRES_RESET_TOOLBAR_FMT, strCaption);
++	strPrompt.Format(IDS_AFXBARRES_RESET_TOOLBAR_FMT, (LPCTSTR)strCaption);
+ 
+ 	//Ask for reset
+ 	if (AfxMessageBox(strPrompt, MB_OKCANCEL|MB_ICONWARNING) == IDOK)
+diff --git a/src/mfc/afxtoolbarfontcombobox.cpp b/src/mfc/afxtoolbarfontcombobox.cpp
+index 4d11ce2..3842d7c 100644
+--- a/src/mfc/afxtoolbarfontcombobox.cpp
++++ b/src/mfc/afxtoolbarfontcombobox.cpp
+@@ -471,7 +471,12 @@ int CMFCToolBarFontSizeComboBox::GetTwipSize() const
+ 	// -1 -- edit box empty
+ 	// >=0 -- font size in twips
+ 
+-	CString str = GetItem() == NULL ? m_strEdit : GetItem();
++	CString str;
++	if (GetItem() == NULL) {
++		str = m_strEdit;
++	} else {
++		str = GetItem();
++	}
+ 	if (m_lstItems.Find(m_strEdit) == NULL)
+ 	{
+ 		str = m_strEdit;
+diff --git a/src/mfc/afxtoolbarscustomizedialog.cpp b/src/mfc/afxtoolbarscustomizedialog.cpp
+index 850f07d..426673b 100644
+--- a/src/mfc/afxtoolbarscustomizedialog.cpp
++++ b/src/mfc/afxtoolbarscustomizedialog.cpp
+@@ -1008,7 +1008,7 @@ void CMFCToolBarsCustomizeDialog::AddMenuCommands(const CMenu* pMenu, BOOL bPopu
+ 					button.m_strTextCustom = strCustom.SpanExcluding(_T("\t"));
+ 				}
+ 
+-				AddButton(lpszCategory == NULL ? m_strAllCommands : lpszCategory, button);
++				AddButton(lpszCategory == NULL ? (LPCTSTR)m_strAllCommands : lpszCategory, button);
+ 			}
+ 		}
+ 	}
+diff --git a/src/mfc/afxtoolbarslistpropertypage.cpp b/src/mfc/afxtoolbarslistpropertypage.cpp
+index a27dd8c..137f4bd 100644
+--- a/src/mfc/afxtoolbarslistpropertypage.cpp
++++ b/src/mfc/afxtoolbarslistpropertypage.cpp
+@@ -395,7 +395,7 @@ void CMFCToolBarsListPropertyPage::OnResetToolbar()
+ 	m_pSelectedToolbar->GetWindowText(strName);
+ 
+ 	CString strPrompt;
+-	strPrompt.Format(IDS_AFXBARRES_RESET_TOOLBAR_FMT, strName);
++	strPrompt.Format(IDS_AFXBARRES_RESET_TOOLBAR_FMT, (LPCTSTR)strName);
+ 
+ 	if (AfxMessageBox(strPrompt, MB_YESNO | MB_ICONQUESTION) != IDYES)
+ 	{
+@@ -461,7 +461,7 @@ void CMFCToolBarsListPropertyPage::OnDeleteToolbar()
+ 	m_pSelectedToolbar->GetWindowText(strName);
+ 
+ 	CString strPrompt;
+-	strPrompt.Format(IDS_AFXBARRES_DELETE_TOOLBAR_FMT, strName);
++	strPrompt.Format(IDS_AFXBARRES_DELETE_TOOLBAR_FMT, (LPCTSTR)strName);
+ 
+ 	if (AfxMessageBox(strPrompt, MB_YESNO | MB_ICONQUESTION) != IDYES)
+ 	{
+diff --git a/src/mfc/afxtoolbarsmenupropertypage.cpp b/src/mfc/afxtoolbarsmenupropertypage.cpp
+index 336f604..f4fd53a 100644
+--- a/src/mfc/afxtoolbarsmenupropertypage.cpp
++++ b/src/mfc/afxtoolbarsmenupropertypage.cpp
+@@ -479,7 +479,7 @@ void CMFCToolBarsMenuPropertyPage::OnResetMenu()
+ 
+ 	{
+ 		CString strPrompt;
+-		strPrompt.Format(IDS_AFXBARRES_RESET_MENU_FMT, m_strContextMenuName);
++		strPrompt.Format(IDS_AFXBARRES_RESET_MENU_FMT, (LPCTSTR)m_strContextMenuName);
+ 
+ 		if (AfxMessageBox(strPrompt, MB_YESNO | MB_ICONQUESTION) != IDYES)
+ 		{
+@@ -527,7 +527,7 @@ void CMFCToolBarsMenuPropertyPage::OnResetFrameMenu()
+ 
+ 	{
+ 		CString strPrompt;
+-		strPrompt.Format(IDS_AFXBARRES_RESET_MENU_FMT, m_strMenuName);
++		strPrompt.Format(IDS_AFXBARRES_RESET_MENU_FMT, (LPCTSTR)m_strMenuName);
+ 
+ 		if (AfxMessageBox(strPrompt, MB_YESNO | MB_ICONQUESTION) != IDYES)
+ 		{
+diff --git a/src/mfc/afxusertool.cpp b/src/mfc/afxusertool.cpp
+index b240efd..4f11878 100644
+--- a/src/mfc/afxusertool.cpp
++++ b/src/mfc/afxusertool.cpp
+@@ -65,7 +65,7 @@ BOOL CUserTool::Invoke()
+ 
+ 	if (::ShellExecute(AfxGetMainWnd()->GetSafeHwnd(), NULL, m_strCommand, m_strArguments, m_strInitialDirectory, SW_SHOWNORMAL) <(HINSTANCE) 32)
+ 	{
+-		TRACE(_T("Can't invoke command: %s\n"), m_strCommand);
++		TRACE(_T("Can't invoke command: %s\n"), m_strCommand.GetString());
+ 		return FALSE;
+ 	}
+ 
+diff --git a/src/mfc/afxvisualmanageroffice2007.cpp b/src/mfc/afxvisualmanageroffice2007.cpp
+index 7ea6633..4959368 100644
+--- a/src/mfc/afxvisualmanageroffice2007.cpp
++++ b/src/mfc/afxvisualmanageroffice2007.cpp
+@@ -362,7 +362,7 @@ BOOL __stdcall CMFCVisualManagerOffice2007::SetStyle(Style style, LPCTSTR lpszPa
+ 
+ 	if (::FindResource(hinstRes, strStyle, AFX_RT_STYLE_XML) == NULL)
+ 	{
+-		TRACE(_T("Cannot load Style: %s\r\n"), strStyle);
++		TRACE(_T("Cannot load Style: %s\r\n"), strStyle.GetString());
+ 		ASSERT(FALSE);
+ 		return FALSE;
+ 	}
+diff --git a/src/mfc/afxvisualmanagervs2008.cpp b/src/mfc/afxvisualmanagervs2008.cpp
+index e713676..b644156 100644
+--- a/src/mfc/afxvisualmanagervs2008.cpp
++++ b/src/mfc/afxvisualmanagervs2008.cpp
+@@ -1,4 +1,4 @@
+-,// This is a part of the Microsoft Foundation Classes C++ library.
++// This is a part of the Microsoft Foundation Classes C++ library.
+ // Copyright(C) Microsoft Corporation
+ // All rights reserved.
+ //
+diff --git a/src/mfc/afxvisualmanagerwindows7.cpp b/src/mfc/afxvisualmanagerwindows7.cpp
+index a30071d..5b80c2e 100644
+--- a/src/mfc/afxvisualmanagerwindows7.cpp
++++ b/src/mfc/afxvisualmanagerwindows7.cpp
+@@ -126,7 +126,7 @@ BOOL __stdcall CMFCVisualManagerWindows7::SetStyle(LPCTSTR lpszPath)
+ 
+ 	if (::FindResource(hinstRes, strStyle, AFX_RT_STYLE_XML) == NULL)
+ 	{
+-		TRACE(_T("Cannot load Style: %s\r\n"), strStyle);
++		TRACE(_T("Cannot load Style: %s\r\n"), strStyle.GetString());
+ 		ASSERT(FALSE);
+ 		return FALSE;
+ 	}
+diff --git a/src/mfc/apphelp.cpp b/src/mfc/apphelp.cpp
+index cffad7f..3ef1c0f 100644
+--- a/src/mfc/apphelp.cpp
++++ b/src/mfc/apphelp.cpp
+@@ -21,7 +21,7 @@ void AFXAPI AfxFormatStrings(CString& rString, UINT nIDS,
+ 		LPCTSTR const* rglpsz, int nString)
+ {
+ 	CString strFormat;
+-	if (!strFormat.LoadString(nIDS) != 0)
++	if (strFormat.LoadString(nIDS) == 0)
+ 	{
+ 		TRACE(traceAppMsg, 0, "Error: failed to load AfxFormatString string 0x%04x.\n", nIDS);
+ 		ASSERT(FALSE);
+diff --git a/src/mfc/arccore.cpp b/src/mfc/arccore.cpp
+index 214cb77..8de2583 100644
+--- a/src/mfc/arccore.cpp
++++ b/src/mfc/arccore.cpp
+@@ -720,13 +720,13 @@ LPTSTR CArchive::ReadString(_Out_z_cap_(nMax+1) LPTSTR lpsz, _In_ UINT nMax)
+ 	{
+ 		while (nRead < nStop)
+ 		{
+-			*this >> ch;
++			*this >> (BYTE&) ch;
+ 
+ 			// stop and end-of-line (trailing '\n' is ignored)
+ 			if (ch == '\n' || ch == '\r')
+ 			{
+ 				if (ch == '\r')
+-					*this >> ch;
++					*this >> (BYTE&) ch;
+ 				// store the newline when called with negative nMax
+ 				if ((int)nMax != nStop)
+ 					lpsz[nRead++] = ch;
+diff --git a/src/mfc/arcstrm.cpp b/src/mfc/arcstrm.cpp
+index cb5c112..7eb60fb 100644
+--- a/src/mfc/arcstrm.cpp
++++ b/src/mfc/arcstrm.cpp
+@@ -101,9 +101,9 @@ STDMETHODIMP CArchiveStream::Seek(LARGE_INTEGER uliOffset, DWORD dwOrigin,
+ 		return E_NOTIMPL;
+ 	m_pArchive->Flush();
+ 
+-	ASSERT(STREAM_SEEK_SET == CFile::begin);
+-	ASSERT(STREAM_SEEK_CUR == CFile::current);
+-	ASSERT(STREAM_SEEK_END == CFile::end);
++	ASSERT((INT)STREAM_SEEK_SET == (INT)CFile::begin);
++	ASSERT((INT)STREAM_SEEK_CUR == (INT)CFile::current);
++	ASSERT((INT)STREAM_SEEK_END == (INT)CFile::end);
+ 	ULONGLONG lNew;
+ 	TRY
+ 	{
+diff --git a/src/mfc/ctlfont.cpp b/src/mfc/ctlfont.cpp
+index b4a7488..6a0e56b 100644
+--- a/src/mfc/ctlfont.cpp
++++ b/src/mfc/ctlfont.cpp
+@@ -48,7 +48,7 @@ void CFontHolder::ReleaseFont()
+ }
+ 
+ AFX_STATIC_DATA const FONTDESC _afxFontDescDefault =
+-	{ sizeof(FONTDESC), OLESTR("MS Shell Dlg"), FONTSIZE(12), FW_NORMAL,
++	{ sizeof(FONTDESC), LPOLESTR("MS Shell Dlg"), FONTSIZE(12), FW_NORMAL,
+ 	  DEFAULT_CHARSET, FALSE, FALSE, FALSE };
+ 
+ void CFontHolder::InitializeFont(const FONTDESC* pFontDesc,
+diff --git a/src/mfc/ctlinplc.cpp b/src/mfc/ctlinplc.cpp
+index b231e4f..e14bdc0 100644
+--- a/src/mfc/ctlinplc.cpp
++++ b/src/mfc/ctlinplc.cpp
+@@ -27,7 +27,7 @@ struct _AFXCTL_UIACTIVE_INFO
+ _AFXCTL_UIACTIVE_INFO::_AFXCTL_UIACTIVE_INFO(HMENU hInPlaceMenu,
+ 	LPOLEINPLACEFRAME pInPlaceFrame)
+ {
+-	memset(&m_menuWidths, 0, sizeof m_menuWidths);
++	memset(&m_menuWidths, 0, sizeof(m_menuWidths));
+ 	m_hSharedMenu = NULL;
+ 	m_hOleMenu = NULL;
+ 
+diff --git a/src/mfc/ctlprop.cpp b/src/mfc/ctlprop.cpp
+index 8976907..e7f7744 100644
+--- a/src/mfc/ctlprop.cpp
++++ b/src/mfc/ctlprop.cpp
+@@ -18,6 +18,9 @@
+ 
+ #define new DEBUG_NEW
+ 
++extern "C" const IID CLSID_StockFontPage  = {0x7ebdaae0,0x8120,0x11cf,{0x89,0x9f,0x00,0xaa,0x00,0x68,0x8b,0x10}};
++extern "C" const IID CLSID_StockColorPage = {0x7ebdaae1,0x8120,0x11cf,{0x89,0x9f,0x00,0xaa,0x00,0x68,0x8b,0x10}};
++
+ /////////////////////////////////////////////////////////////////////////////
+ // Stock property mask
+ 
+@@ -877,13 +880,13 @@ BOOL AFXAPI _GetI4Property(LPDISPATCH pDispatch, DISPID dwDispID, DWORD* pdwResu
+ 		return FALSE;
+ 
+ 	DISPPARAMS dispparams;
+-	memset(&dispparams, 0, sizeof dispparams);
++	memset(&dispparams, 0, sizeof(dispparams));
+ 
+ 	VARIANT vaResult;
+ 	AfxVariantInit(&vaResult);
+ 
+ 	EXCEPINFO excepInfo;
+-	memset(&excepInfo, 0, sizeof excepInfo);
++	memset(&excepInfo, 0, sizeof(excepInfo));
+ 
+ 	UINT nArgErr = (UINT)-1;  // initialize to invalid arg
+ 
+diff --git a/src/mfc/ctlpropx.cpp b/src/mfc/ctlpropx.cpp
+index 1cb5433..874fc73 100644
+--- a/src/mfc/ctlpropx.cpp
++++ b/src/mfc/ctlpropx.cpp
+@@ -429,7 +429,7 @@ BOOL CArchivePropExchange::ExchangePersistentProp(LPCTSTR pszPropName,
+ 			m_ar >> clsid2.Data1;
+ 			m_ar >> clsid2.Data2;
+ 			m_ar >> clsid2.Data3;
+-			m_ar.EnsureRead(&clsid2.Data4[0], sizeof clsid2.Data4);
++			m_ar.EnsureRead(&clsid2.Data4[0], sizeof(clsid2.Data4));
+ 
+ 			// check for GUID_NULL first and skip if found
+ 			if (IsEqualCLSID(clsid2, GUID_NULL))
+diff --git a/src/mfc/ctlpset.cpp b/src/mfc/ctlpset.cpp
+index 2bf82ba..1db3a1f 100644
+--- a/src/mfc/ctlpset.cpp
++++ b/src/mfc/ctlpset.cpp
+@@ -705,7 +705,7 @@ BOOL AFXAPI _AfxInitStreamDataFromBlobProp(LPSTREAM pstm, CProperty* pprop)
+ }
+ 
+ AFX_STATIC_DATA const FONTDESC _afxFontDescHelv =
+-	{ sizeof(FONTDESC), OLESTR("Helv"), FONTSIZE(12), FW_NORMAL,
++	{ sizeof(FONTDESC), LPOLESTR("Helv"), FONTSIZE(12), FW_NORMAL,
+ 	  DEFAULT_CHARSET, FALSE, FALSE, FALSE };
+ 
+ LPFONT AFXAPI _AfxCreateFontFromStream(LPSTREAM pstm)
+diff --git a/src/mfc/ctlreg.cpp b/src/mfc/ctlreg.cpp
+index aef0221..cc17686 100644
+--- a/src/mfc/ctlreg.cpp
++++ b/src/mfc/ctlreg.cpp
+@@ -145,7 +145,7 @@ BOOL AFXAPI AfxOleRegisterTypeLib(HINSTANCE hInstance, REFGUID tlid,
+ 	}
+ 	else
+ 	{
+-		TRACE(traceAppMsg, 0, L"Warning: Could not load type library from %s\n", strPathNameW);
++		TRACE(traceAppMsg, 0, L"Warning: Could not load type library from %s\n", strPathNameW.GetString());
+ 	}
+ 
+ 	return bSuccess;
+@@ -240,7 +240,7 @@ BOOL AFXAPI AfxOleUnregisterTypeLib(REFGUID tlid, WORD wVerMajor,
+ 
+ 					// Only remove the keys specific to the 32-bit version
+ 					// of control, leaving things intact for 16-bit version.
+-					error = _AfxRecursiveRegDeleteKey(hKeyLocale, TYPELIBWIN);
++					error = _AfxRecursiveRegDeleteKey(hKeyLocale, (LPTSTR)TYPELIBWIN);
+ 					bSurgicalVersion = TRUE;
+ 					RegCloseKey(hKeyLocale);
+ 				}
+diff --git a/src/mfc/dbcore.cpp b/src/mfc/dbcore.cpp
+index 30b886d..b60250b 100644
+--- a/src/mfc/dbcore.cpp
++++ b/src/mfc/dbcore.cpp
+@@ -63,7 +63,7 @@ void AFXAPI AfxThrowDBException(RETCODE nRetCode, CDatabase* pdb, HSTMT hstmt)
+ 		VERIFY((bResult = pException->m_strError.LoadString(AFX_IDP_SQL_FIRST+(nRetCode-AFX_SQL_ERROR))) == TRUE);
+ 		if (!bResult)
+ 			pException->m_strError = szUnableToLoadErrorString;		
+-		TRACE(traceDatabase, 0, _T("%s\n"), pException->m_strError);
++		TRACE(traceDatabase, 0, _T("%s\n"), pException->m_strError.GetString());
+ 	}
+ 	THROW(pException);
+ }
+@@ -170,16 +170,16 @@ void CDBException::TraceErrorMessage(LPCTSTR szTrace) const
+ 	CString strTrace = szTrace;
+ 
+ 	if (strTrace.GetLength() <= 80)
+-		TRACE(traceDatabase, 0, _T("%s\n"), strTrace);
++		TRACE(traceDatabase, 0, _T("%s\n"), strTrace.GetString());
+ 	else
+ 	{
+ 		// Display 80 chars/line
+ 		while (strTrace.GetLength() > 80)
+ 		{
+-			TRACE(traceDatabase, 0, _T("%s\n"), strTrace.Left(80));
++			TRACE(traceDatabase, 0, _T("%s\n"), strTrace.Left(80).GetString());
+ 			strTrace = strTrace.Right(strTrace.GetLength() - 80);
+ 		}
+-		TRACE(traceDatabase, 0, _T("%s\n"), strTrace);
++		TRACE(traceDatabase, 0, _T("%s\n"), strTrace.GetString());
+ 	}
+ }
+ #endif // _DEBUG
+@@ -1168,7 +1168,7 @@ void CRecordset::Close()
+ 	if (m_pvFieldProxy != NULL)
+ 	{
+ 		for (UINT nField = 0; nField < m_nProxyFields; nField++)
+-			delete m_pvFieldProxy[nField];
++			delete (TIMESTAMP_STRUCT*)m_pvFieldProxy[nField];
+ 
+ 		delete [] m_pvFieldProxy;
+ 		m_pvFieldProxy = NULL;
+@@ -1178,7 +1178,7 @@ void CRecordset::Close()
+ 	if (m_pvParamProxy != NULL)
+ 	{
+ 		for (UINT nParam = 0; nParam < m_nProxyParams; nParam++)
+-			delete m_pvParamProxy[nParam];
++			delete (TIMESTAMP_STRUCT*)m_pvParamProxy[nParam];
+ 
+ 		delete [] m_pvParamProxy;
+ 		m_pvParamProxy = NULL;
+diff --git a/src/mfc/dbrfx.cpp b/src/mfc/dbrfx.cpp
+index 09aa5c6..90c75db 100644
+--- a/src/mfc/dbrfx.cpp
++++ b/src/mfc/dbrfx.cpp
+@@ -602,7 +602,7 @@ void RFX_Text(CFieldExchange* pFX, LPCTSTR szName,
+ 	{
+ 	default:
+ 		pFX->Default(szName, value.GetBuffer(0), plLength,
+-			nFieldType, value.GetLength() * sizeof(StringType::XCHAR), nMaxLength);
++			nFieldType, value.GetLength() * sizeof(typename StringType::XCHAR), nMaxLength);
+ 		value.ReleaseBuffer();
+ 		return;
+ 
+@@ -617,7 +617,7 @@ void RFX_Text(CFieldExchange* pFX, LPCTSTR szName,
+ 
+ 			AFX_SQL_SYNC(::SQLBindParameter(pFX->m_hstmt, (UWORD)nField,
+ 				 (SWORD)pFX->m_nFieldType, nFieldType, (SWORD)nColumnType,
+-				 nMaxLength, nScale, pvParam, nMaxLength * sizeof(StringType::XCHAR),
++				 nMaxLength, nScale, pvParam, nMaxLength * sizeof(typename StringType::XCHAR),
+ 				 plLength));
+ 
+ 			value.ReleaseBuffer();
+@@ -699,7 +699,7 @@ void RFX_Text(CFieldExchange* pFX, LPCTSTR szName,
+ 			pvData = value.LockBuffer();
+ 
+ 			AFX_SQL_SYNC(::SQLBindCol(pFX->m_prs->m_hstmt, (UWORD)nField,
+-				nFieldType, pvData, (cbColumn+1) * sizeof(StringType::XCHAR),
++				nFieldType, pvData, (cbColumn+1) * sizeof(typename StringType::XCHAR),
+ 				plLength));
+ 			value.ReleaseBuffer();
+ 			if (!pFX->m_prs->Check(nRetCode))
+@@ -719,11 +719,11 @@ void RFX_Text(CFieldExchange* pFX, LPCTSTR szName,
+ 		}
+ 		else
+ 		{
+-			StringType::XCHAR *lpsz = value.GetBuffer(0);
++			typename StringType::XCHAR *lpsz = value.GetBuffer(0);
+ 			if (pFX->m_prs->m_pDatabase->m_bStripTrailingSpaces)
+ 			{
+ 				// find first trailing space
+-				StringType::XCHAR *lpszFirstTrailing = NULL;
++				typename StringType::XCHAR *lpszFirstTrailing = NULL;
+ 				while (*lpsz != 0)
+ 				{
+ 					if (*lpsz != cSpace)
+@@ -741,7 +741,7 @@ void RFX_Text(CFieldExchange* pFX, LPCTSTR szName,
+ 
+ 			}
+ 			value.ReleaseBuffer();
+-			*plLength = value.GetLength() * sizeof(StringType::XCHAR);
++			*plLength = value.GetLength() * sizeof(typename StringType::XCHAR);
+ 		}
+ 		return;
+ 
+@@ -785,7 +785,7 @@ void RFX_Text(CFieldExchange* pFX, LPCTSTR szName,
+ 		else
+ 			pFX->m_prs->ClearNullFieldStatus(nField - 1);
+ 		pFX->Default(szName, &value, plLength,
+-			nFieldType, value.GetLength() * sizeof(StringType::XCHAR), nMaxLength);
++			nFieldType, value.GetLength() * sizeof(typename StringType::XCHAR), nMaxLength);
+ 		return;
+ 
+ 	case CFieldExchange::LoadField:
+@@ -800,7 +800,7 @@ void RFX_Text(CFieldExchange* pFX, LPCTSTR szName,
+ 			if (!pFX->m_prs->IsFieldStatusNull(nField - 1))
+ 			{
+ 				value = *static_cast<StringType *>(pInfo->m_pvDataCache);
+-				*plLength = value.GetLength() * sizeof(StringType::XCHAR);
++				*plLength = value.GetLength() * sizeof(typename StringType::XCHAR);
+ 			}
+ 			else
+ 				*plLength = SQL_NULL_DATA;
+diff --git a/src/mfc/dcprev.cpp b/src/mfc/dcprev.cpp
+index 556567d..bed4a6d 100644
+--- a/src/mfc/dcprev.cpp
++++ b/src/mfc/dcprev.cpp
+@@ -25,7 +25,8 @@ AFX_STATIC long AFXAPI _AfxMultMultDivDiv(
+ #ifdef _AFX_PORTABLE
+ 	// make sure that (num1 * num2) does not overflow 31-bits.
+ 	long temp = num1 < 0 ? -num1 : num1;
+-	for (int nBitsResult = 0; temp != 0; nBitsResult++)
++	int nBitsResult;
++	for (nBitsResult = 0; temp != 0; nBitsResult++)
+ 		temp >>= 1;
+ 	temp = num2 < 0 ? -num2 : num2;
+ 	for (; temp != 0; nBitsResult++)
+diff --git a/src/mfc/dlgdhtml.cpp b/src/mfc/dlgdhtml.cpp
+index 6f87410..15b83ef 100644
+--- a/src/mfc/dlgdhtml.cpp
++++ b/src/mfc/dlgdhtml.cpp
+@@ -24,9 +24,9 @@ BEGIN_MESSAGE_MAP(CDHtmlDialog, CDialog)
+ END_MESSAGE_MAP()
+ 
+ BEGIN_EVENTSINK_MAP(CDHtmlDialog, CDialog)
+-	ON_EVENT(CDHtmlDialog, AFX_IDC_BROWSER, 252 /* NavigateComplete2 */, _OnNavigateComplete2, VTS_DISPATCH VTS_PVARIANT)
+-	ON_EVENT(CDHtmlDialog, AFX_IDC_BROWSER, 250 /* BeforeNavigate2 */, _OnBeforeNavigate2, VTS_DISPATCH VTS_PVARIANT VTS_PVARIANT VTS_PVARIANT VTS_PVARIANT VTS_PVARIANT VTS_PBOOL)
+-	ON_EVENT(CDHtmlDialog, AFX_IDC_BROWSER, 259 /* DocumentComplete */, _OnDocumentComplete, VTS_DISPATCH VTS_PVARIANT)
++	ON_EVENT(CDHtmlDialog, AFX_IDC_BROWSER, 252 /* NavigateComplete2 */, CDHtmlDialog::_OnNavigateComplete2, VTS_DISPATCH VTS_PVARIANT)
++	ON_EVENT(CDHtmlDialog, AFX_IDC_BROWSER, 250 /* BeforeNavigate2 */, CDHtmlDialog::_OnBeforeNavigate2, VTS_DISPATCH VTS_PVARIANT VTS_PVARIANT VTS_PVARIANT VTS_PVARIANT VTS_PVARIANT VTS_PBOOL)
++	ON_EVENT(CDHtmlDialog, AFX_IDC_BROWSER, 259 /* DocumentComplete */, CDHtmlDialog::_OnDocumentComplete, VTS_DISPATCH VTS_PVARIANT)
+ END_EVENTSINK_MAP()
+ 
+ /////////////////////////////////////////////////////////////////////////////
+@@ -565,7 +565,7 @@ HRESULT CDHtmlElementEventSink::Advise(LPUNKNOWN pUnkObj, REFIID iid)
+ 
+ HRESULT CDHtmlElementEventSink::UnAdvise(LPUNKNOWN pUnkObj, REFIID iid)
+ {
+-	iid; // unused
++	(void)iid; // unused
+ 
+ 	return AtlUnadvise((LPUNKNOWN)pUnkObj, __uuidof(HTMLElementEvents), m_dwCookie);
+ }
+diff --git a/src/mfc/dlgfile.cpp b/src/mfc/dlgfile.cpp
+index 606a4ce..408652e 100644
+--- a/src/mfc/dlgfile.cpp
++++ b/src/mfc/dlgfile.cpp
+@@ -490,7 +490,7 @@ HRESULT CFileDialog::_PSGetPropertyDescriptionListFromString(LPCWSTR pszPropList
+ 	return (*pFunc)(pszPropList, riid, ppv);
+ }
+ 
+-IFileOpenDialog* CFileDialog::GetIFileOpenDialog()
++IFileOpenDialog* CFileDialog::GetIFileOpenDialog() noexcept
+ {
+ 	ASSERT(m_bVistaStyle == TRUE);
+ 	IFileOpenDialog* pIFileOpenDialog = NULL;
+@@ -501,7 +501,7 @@ IFileOpenDialog* CFileDialog::GetIFileOpenDialog()
+ 	return pIFileOpenDialog;
+ }
+ 
+-IFileSaveDialog* CFileDialog::GetIFileSaveDialog()
++IFileSaveDialog* CFileDialog::GetIFileSaveDialog() noexcept
+ {
+ 	ASSERT(m_bVistaStyle == TRUE);
+ 	IFileSaveDialog* pIFileSaveDialog = NULL;
+@@ -512,7 +512,7 @@ IFileSaveDialog* CFileDialog::GetIFileSaveDialog()
+ 	return pIFileSaveDialog;
+ }
+ 
+-IFileDialogCustomize* CFileDialog::GetIFileDialogCustomize()
++IFileDialogCustomize* CFileDialog::GetIFileDialogCustomize() noexcept
+ {
+ 	ASSERT(m_bVistaStyle == TRUE);
+ 	IFileDialogCustomize* pIFileDialogCustomize = NULL;
+@@ -523,7 +523,7 @@ IFileDialogCustomize* CFileDialog::GetIFileDialogCustomize()
+ 	return pIFileDialogCustomize;
+ }
+ 
+-void CFileDialog::AddPlace(LPCWSTR lpszFolder, FDAP fdap)
++void CFileDialog::AddPlace(LPCWSTR lpszFolder, FDAP fdap) noexcept
+ {
+ 	if (!m_bVistaStyle)
+ 	{
+@@ -540,7 +540,7 @@ void CFileDialog::AddPlace(LPCWSTR lpszFolder, FDAP fdap)
+ 	AddPlace(shellItem, fdap);
+ }
+ 
+-void CFileDialog::AddPlace(IShellItem* psi, FDAP fdap)
++void CFileDialog::AddPlace(IShellItem* psi, FDAP fdap) noexcept
+ {
+ 	if (!m_bVistaStyle)
+ 	{
+@@ -767,7 +767,7 @@ INT_PTR CFileDialog::DoModal()
+ 	return nResult ? nResult : IDCANCEL;
+ }
+ 
+-IShellItem *CFileDialog::GetResult()
++IShellItem *CFileDialog::GetResult() noexcept
+ {
+ 	IShellItem *pItem = NULL;
+ 	if (!m_bVistaStyle)
+@@ -792,7 +792,7 @@ IShellItem *CFileDialog::GetResult()
+ 	return pItem;
+ }
+ 
+-IShellItemArray *CFileDialog::GetResults()
++IShellItemArray *CFileDialog::GetResults() noexcept
+ {
+ 	IShellItemArray *pItems = NULL;
+ 	if (!m_bVistaStyle)
+@@ -963,10 +963,12 @@ CString CFileDialog::GetFileExt() const
+ 	}
+ 
+ 	if (m_pofnTemp != NULL)
++	{
+ 		if (m_pofnTemp->nFileExtension == 0)
+ 			return _T("");
+ 		else
+ 			return m_pofnTemp->lpstrFile + m_pofnTemp->nFileExtension;
++	}
+ 
+ 	if (m_ofn.nFileExtension == 0)
+ 		return _T("");
+@@ -1839,7 +1841,7 @@ void CFileDialog::Dump(CDumpContext& dc) const
+ 
+ 	dc << "\nm_ofn.lpstrFilter = ";
+ 	LPCTSTR lpstrItem = m_ofn.lpstrFilter;
+-	LPTSTR lpszBreak = _T("|");
++	LPCTSTR lpszBreak = _T("|");
+ 
+ 	while (lpstrItem != NULL && *lpstrItem != '\0')
+ 	{
+diff --git a/src/mfc/dlgprntx.cpp b/src/mfc/dlgprntx.cpp
+index 61c1bd2..b8904db 100644
+--- a/src/mfc/dlgprntx.cpp
++++ b/src/mfc/dlgprntx.cpp
+@@ -18,11 +18,13 @@
+ /////////////////////////////////////////////////////////////////////////////
+ // Windows 2000 Print dialog
+ 
++#ifdef _MSC_VER
+ #include "initguid.h"
+ #define INITGUID
+ 
+ DEFINE_GUID(IID_IPrintDialogCallback, 0x5852a2c3, 0x6530, 0x11d1, 0xb6, 0xa3, 0x0, 0x0, 0xf8, 0x75, 0x7b, 0xf9);
+ DEFINE_GUID(IID_IPrintDialogServices, 0x509aaeda, 0x5639, 0x11d1, 0xb6, 0xa1, 0x0, 0x0, 0xf8, 0x75, 0x7b, 0xf9);
++#endif
+ 
+ BEGIN_MESSAGE_MAP(CPrintDialogEx, CCommonDialog)
+ 	//{{AFX_MSG_MAP(CPrintDialogEx)
+diff --git a/src/mfc/dlgprop.cpp b/src/mfc/dlgprop.cpp
+index 40d317e..615e6de 100644
+--- a/src/mfc/dlgprop.cpp
++++ b/src/mfc/dlgprop.cpp
+@@ -873,6 +873,7 @@ BOOL CPropertySheet::ContinueModal()
+ 	return bResult;
+ }
+ 
++#if (WINVER >= 0x0601)
+ INT_PTR CPropertySheet::DoModal()
+ {
+ 	ASSERT_VALID(this);
+@@ -981,6 +982,7 @@ INT_PTR CPropertySheet::DoModal()
+ 
+ 	return nResult;
+ }
++#endif
+ 
+ int CALLBACK
+ AfxPropSheetCallback(HWND, UINT message, LPARAM lParam)
+@@ -1015,7 +1017,9 @@ AfxPropSheetCallback(HWND, UINT message, LPARAM lParam)
+ 
+ BOOL CPropertySheet::Create(CWnd* pParentWnd, DWORD dwStyle, DWORD dwExStyle)
+ {
++#if (WINVER >= 0x0601)
+ 	ENSURE( 0 == ( m_psh.dwFlags & PSH_AEROWIZARD ) );
++#endif
+ 
+ 	_AFX_THREAD_STATE* pState = AfxGetThreadState();
+ 
+@@ -1193,7 +1197,7 @@ BOOL CPropertySheet::SetActivePage(CPropertyPage* pPage)
+ 	ASSERT_KINDOF(CPropertyPage, pPage);
+ 
+ 	int nPage = GetPageIndex(pPage);
+-	ASSERT(pPage >= 0);
++	ASSERT(pPage != NULL);
+ 
+ 	return SetActivePage(nPage);
+ }
+diff --git a/src/mfc/dllinit.cpp b/src/mfc/dllinit.cpp
+index d09305f..d781e6f 100644
+--- a/src/mfc/dllinit.cpp
++++ b/src/mfc/dllinit.cpp
+@@ -599,7 +599,7 @@ BOOL WINAPI DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID)
+ 			VERIFY(AfxInitExtensionModule(coreDLL, hInstance));
+ 
+ #ifdef _AFX_OLE_IMPL
+-			AfxWinInit(hInstance, NULL, _T(""), 0);
++			AfxWinInit(hInstance, NULL, const_cast<LPTSTR>(_T("")), 0);
+ 
+ 			// Register class factories in context of private module state
+ 			if (bRegister)
+diff --git a/src/mfc/doccore.cpp b/src/mfc/doccore.cpp
+index 5292a83..9990816 100644
+--- a/src/mfc/doccore.cpp
++++ b/src/mfc/doccore.cpp
+@@ -866,6 +866,10 @@ void CDocument::OnCloseDocument()
+ 		delete this;
+ }
+ 
++#ifdef DocumentEvent
++#undef DocumentEvent // defined in winspool.h
++#endif
++
+ void CDocument::OnDocumentEvent(DocumentEvent deEvent)
+ {
+ 	// check if recovery handling is enabled...
+@@ -1652,7 +1656,7 @@ void CDocument::RemoveChunk(REFCLSID guid, DWORD pid)
+ 	POSITION pos = FindChunk(guid, pid);
+ 	if (pos != NULL)
+ 	{
+-		delete m_lstChunks.GetAt(pos);
++		delete (IFilterChunkValue*)m_lstChunks.GetAt(pos);
+ 		m_lstChunks.RemoveAt(pos);
+ 	}
+ }
+diff --git a/src/mfc/dockstat.cpp b/src/mfc/dockstat.cpp
+index 9917c8f..0881094 100644
+--- a/src/mfc/dockstat.cpp
++++ b/src/mfc/dockstat.cpp
+@@ -340,7 +340,7 @@ void CDockState::LoadState(LPCTSTR lpszProfileName)
+ 	// delete current information since the new one is about to be loaded
+ 	for (int i = 0; i < m_arrBarInfo.GetSize(); i++)
+ 	{
+-		delete m_arrBarInfo[i];
++		delete (CControlBarInfo*)m_arrBarInfo[i];
+ 	}
+ 	m_arrBarInfo.SetSize(0);
+ 	for (int i = 0; i < nBars; i++)
+diff --git a/src/mfc/doctempl.cpp b/src/mfc/doctempl.cpp
+index f740f09..2a79719 100644
+--- a/src/mfc/doctempl.cpp
++++ b/src/mfc/doctempl.cpp
+@@ -29,10 +29,10 @@ CDocTemplate::CDocTemplate(UINT nIDResource, CRuntimeClass* pDocClass,
+ 		pViewClass->IsDerivedFrom(RUNTIME_CLASS(CView)));
+ 
+ 	m_nIDResource = nIDResource;
+-	m_nIDServerResource = NULL;
+-	m_nIDEmbeddingResource = NULL;
+-	m_nIDContainerResource = NULL;
+-	m_nIDPreviewResource = NULL;
++	m_nIDServerResource = 0;
++	m_nIDEmbeddingResource = 0;
++	m_nIDContainerResource = 0;
++	m_nIDPreviewResource = 0;
+ 
+ 	m_pDocClass = pDocClass;
+ 	m_pFrameClass = pFrameClass;
+diff --git a/src/mfc/dumpinit.cpp b/src/mfc/dumpinit.cpp
+index b4959a2..1ed5ad3 100644
+--- a/src/mfc/dumpinit.cpp
++++ b/src/mfc/dumpinit.cpp
+@@ -27,7 +27,7 @@ static BOOL _afxMemoryLeakDump = TRUE;
+ static _CRT_DUMP_CLIENT pfnOldCrtDumpClient = NULL;
+ 
+ 
+-void __cdecl _AfxCrtDumpClient(void * pvData, size_t nBytes)
++void __cdecl _AfxCrtDumpClient(void * pvData, size_t nBytes) #
+ {
+ 	if(_CrtReportBlockType(pvData) != _AFX_CLIENT_BLOCK)
+ 		return;
+diff --git a/src/mfc/filecore.cpp b/src/mfc/filecore.cpp
+index fc1116f..eda8ebc 100644
+--- a/src/mfc/filecore.cpp
++++ b/src/mfc/filecore.cpp
+@@ -67,7 +67,7 @@ DEFINE_SHLGUID(IID_IShellLinkW, 0x000214F9L, 0, 0);
+ #define IShellLink IShellLinkW
+ #endif
+ 
+-#endif !_AFX_NO_OLE_SUPPORT
++#endif // !_AFX_NO_OLE_SUPPORT
+ 
+ ////////////////////////////////////////////////////////////////////////////
+ // CFile implementation
+diff --git a/src/mfc/filefind.cpp b/src/mfc/filefind.cpp
+index f6800ea..9cd4f9e 100644
+--- a/src/mfc/filefind.cpp
++++ b/src/mfc/filefind.cpp
+@@ -40,13 +40,13 @@ void CFileFind::Close()
+ {
+ 	if (m_pFoundInfo != NULL)
+ 	{
+-		delete m_pFoundInfo;
++		delete (WIN32_FIND_DATA*)m_pFoundInfo;
+ 		m_pFoundInfo = NULL;
+ 	}
+ 
+ 	if (m_pNextInfo != NULL)
+ 	{
+-		delete m_pNextInfo;
++		delete (WIN32_FIND_DATA*)m_pNextInfo;
+ 		m_pNextInfo = NULL;
+ 	}
+ 
+diff --git a/src/mfc/inet.cpp b/src/mfc/inet.cpp
+index 3a46c41..19413c9 100644
+--- a/src/mfc/inet.cpp
++++ b/src/mfc/inet.cpp
+@@ -2171,10 +2171,12 @@ BOOL CHttpFile::AddRequestHeaders(LPCTSTR pstrHeaders,
+ 	ASSERT(m_hFile != NULL);
+ 
+ 	if (dwHeadersLen == -1)
++	{
+ 		if (pstrHeaders == NULL)
+ 			dwHeadersLen = 0;
+ 		else
+ 			dwHeadersLen = lstrlen(pstrHeaders);
++	}
+ 
+ 	return HttpAddRequestHeaders(m_hFile, pstrHeaders, dwHeadersLen,
+ 		dwModifiers);
+@@ -2626,7 +2628,7 @@ BOOL CGopherFileFind::FindFile(CGopherLocator& refLocator,
+ 	m_pFoundInfo = new GOPHER_FIND_DATA;
+ 	if (m_pFoundInfo == NULL)
+ 	{
+-		delete m_pNextInfo;
++		delete (GOPHER_FIND_DATA*)m_pNextInfo;
+ 		m_pNextInfo = NULL;
+ 		return FALSE;
+ 	}
+diff --git a/src/mfc/occsite.cpp b/src/mfc/occsite.cpp
+index 35603aa..0a8e16c 100644
+--- a/src/mfc/occsite.cpp
++++ b/src/mfc/occsite.cpp
+@@ -18,6 +18,13 @@
+ 
+ #define S_QUICKACTIVATED S_FALSE
+ 
++#ifndef _MSC_VER
++extern "C" const OLEDBDECLSPEC GUID DBPROPSET_ROWSET	= { 0xc8b522be, 0x5cf3, 0x11ce, {0xad,0xe5,0x00,0xaa,0x00,0x44,0x77,0x3d} };
++extern "C" const DBCOLUMNID NEAR COLUMN_COLUMNID		= { _DBCIDGUID, DBCOLKIND_GUID_NUMBER, 7 };
++extern "C" const DBCOLUMNID NEAR COLUMN_NAME			= { _DBCIDGUID, DBCOLKIND_GUID_NUMBER, 16 };
++extern "C" const BYTE NEAR DBBMK_CURRENT				= 0x1;
++#endif
++
+ #include "initguid.h"
+ #define DBINITCONSTANTS
+ #define INITGUID
+@@ -25,6 +32,13 @@
+ DEFINE_GUID(IID_IDataSourceListener,0x7C0FFAB2L,0xCD84,0x11D0,0x94,0x9A,0x00,0xA0,0xC9,0x11,0x10,0xED);
+ DEFINE_GUID(IID_IDataSource,0x7c0ffab3L, 0xcd84, 0x11d0, 0x94, 0x9a, 0x00, 0xa0, 0xc9, 0x11, 0x10, 0xed);
+ 
++DEFINE_GUID(IID_IBoundObject, 0x9bfbbc00, 0xeff1, 0x101a, 0x84,0xed, 0x00,0xaa,0x00,0x34,0x1d,0x07);
++DEFINE_GUID(IID_IBoundObjectSite, 0x9bfbbc01, 0xeff1, 0x101a, 0x84,0xed, 0x00,0xaa,0x00,0x34,0x1d,0x07);
++DEFINE_GUID(IID_ICursor, 0x9f6aa700, 0xd188, 0x11cd, 0xad,0x48, 0x00,0xaa,0x00,0x3c,0x9c,0xb6);
++DEFINE_GUID(IID_ICursorMove, 0xacff0690, 0xd188, 0x11cd, 0xad,0x48, 0x00,0xaa,0x00,0x3c,0x9c,0xb6);
++DEFINE_GUID(IID_ICursorUpdateARow, 0xd14216a0, 0xd188, 0x11cd, 0xad,0x48, 0x00,0xaa,0x00,0x3c,0x9c,0xb6);
++DEFINE_GUID(IID_INotifyDBEvents, 0xdb526cc0, 0xd188, 0x11cd, 0xad,0x48, 0x00,0xaa,0x00,0x3c,0x9c,0xb6);
++
+ /////////////////////////////////////////////////////////////////////////////
+ // COleControlSite
+ 
+@@ -413,7 +427,7 @@ AFX_STATIC HRESULT AFXAPI _AfxCoCreateInstanceLic(REFCLSID clsid, LPUNKNOWN pUnk
+ 	return hr;
+ }
+ 
+-AFX_STATIC_DATA const struct { DISPID dwDispID; DWORD dwFlag; } _afxAmbients[] =
++AFX_STATIC const struct { DISPID dwDispID; DWORD dwFlag; } _afxAmbients[] =
+ {
+ 	{ DISPID_AMBIENT_USERMODE,          QACONTAINER_USERMODE },
+ 	{ DISPID_AMBIENT_UIDEAD,            QACONTAINER_UIDEAD },
+diff --git a/src/mfc/olecli1.cpp b/src/mfc/olecli1.cpp
+index d716114..d450f47 100644
+--- a/src/mfc/olecli1.cpp
++++ b/src/mfc/olecli1.cpp
+@@ -292,7 +292,7 @@ static void AfxGetIconInfo(LPCTSTR lpszRegInfo, _Out_ LPTSTR lpszImagePath,
+ 	// extract the index
+ 	if (*pstrSource != '\0')
+ 	{
+-		LPTSTR pstrIndex = _tcsinc(pstrSource);
++		LPCTSTR pstrIndex = _tcsinc(pstrSource);
+ 		nIndex = (UINT) _ttol(pstrIndex);
+ 	}
+ 	else
+diff --git a/src/mfc/oledisp2.cpp b/src/mfc/oledisp2.cpp
+index 1e467ec..7a2f99a 100644
+--- a/src/mfc/oledisp2.cpp
++++ b/src/mfc/oledisp2.cpp
+@@ -194,7 +194,7 @@ void COleDispatchDriver::InvokeHelperV(DISPID dwDispID, WORD wFlags,
+ 	}
+ 
+ 	COleDispParams dispparams;
+-	memset(&dispparams, 0, sizeof dispparams);
++	memset((PVOID)&dispparams, 0, sizeof(dispparams));
+ 
+ 	// determine number of arguments
+ 	if (pbParamInfo != NULL)
+@@ -388,7 +388,7 @@ void COleDispatchDriver::InvokeHelperV(DISPID dwDispID, WORD wFlags,
+ 
+ 	// initialize EXCEPINFO struct
+ 	EXCEPINFO excepInfo;
+-	memset(&excepInfo, 0, sizeof excepInfo);
++	memset(&excepInfo, 0, sizeof(excepInfo));
+ 
+ 	UINT nArgErr = (UINT)-1;  // initialize to invalid arg
+ 
+diff --git a/src/mfc/oledlgs1.cpp b/src/mfc/oledlgs1.cpp
+index fb94b2a..1222e3c 100644
+--- a/src/mfc/oledlgs1.cpp
++++ b/src/mfc/oledlgs1.cpp
+@@ -689,7 +689,7 @@ QueryAgain:
+ 		{
+ 			CString strKey;
+ 			CString strCLSID = AfxStringFromCLSID(clsidFile);
+-			strKey.Format(_T("CLSID\\%s\\DocObject"), strCLSID);
++			strKey.Format(_T("CLSID\\%s\\DocObject"), (LPCTSTR)strCLSID);
+ 
+ 			HKEY hKey;
+ 			if (ERROR_SUCCESS ==
+diff --git a/src/mfc/oledobj2.cpp b/src/mfc/oledobj2.cpp
+index cadc1f3..a3d4eea 100644
+--- a/src/mfc/oledobj2.cpp
++++ b/src/mfc/oledobj2.cpp
+@@ -253,7 +253,7 @@ void COleDataSource::DelayRenderData(CLIPFORMAT cfFormat, LPFORMATETC lpFormatEt
+ 
+ 	// add it to the cache
+ 	AFX_DATACACHE_ENTRY* pEntry = GetCacheEntry(lpFormatEtc, DATADIR_GET);
+-	memset(&pEntry->m_stgMedium, 0, sizeof pEntry->m_stgMedium);
++	memset(&pEntry->m_stgMedium, 0, sizeof(pEntry->m_stgMedium));
+ }
+ 
+ // DelaySetData -- used to allow SetData on given LPFORMATETC
+diff --git a/src/mfc/oledoccl.cpp b/src/mfc/oledoccl.cpp
+index f7c1a8a..c7b4299 100644
+--- a/src/mfc/oledoccl.cpp
++++ b/src/mfc/oledoccl.cpp
+@@ -327,7 +327,7 @@ void COleDocObjectItem::OnInsertMenus(CMenu* pMenuShared,
+ 		}
+ 
+ 		CString strTearOffName;
+-		strTearOffName.Format(_T("%s %s"), AfxGetAppName(), strHelpMenuName);
++		strTearOffName.Format(_T("%s %s"), AfxGetAppName(), (LPCTSTR)strHelpMenuName);
+ 		strTearOffName.Remove('&');
+ 
+ 		// get the normal frame menu
+diff --git a/src/mfc/oledocip.cpp b/src/mfc/oledocip.cpp
+index 111a41c..1ba4841 100644
+--- a/src/mfc/oledocip.cpp
++++ b/src/mfc/oledocip.cpp
+@@ -128,7 +128,7 @@ BOOL COleDocIPFrameWnd::BuildSharedMenu()
+ 		return FALSE;
+ 
+ 	// start out by getting menu from container
+-	memset(&m_menuWidths, 0, sizeof m_menuWidths);
++	memset(&m_menuWidths, 0, sizeof(m_menuWidths));
+ 	if (m_lpFrame->InsertMenus(m_hSharedMenu, &m_menuWidths) != NOERROR)
+ 	{
+ 		::DestroyMenu(m_hSharedMenu);
+diff --git a/src/mfc/oleipfrm.cpp b/src/mfc/oleipfrm.cpp
+index 0cbc03a..9cff6c4 100644
+--- a/src/mfc/oleipfrm.cpp
++++ b/src/mfc/oleipfrm.cpp
+@@ -123,7 +123,7 @@ COleIPFrameWnd::COleIPFrameWnd()
+ {
+ 	// initialize OLEINPLACEFRAMEINFO struct
+ 	memset(&m_frameInfo, 0, sizeof(m_frameInfo));
+-	m_frameInfo.cb = sizeof m_frameInfo;
++	m_frameInfo.cb = sizeof(m_frameInfo);
+ 
+ 	// initialize in-place state
+ 	m_bUIActive = FALSE;
+@@ -571,7 +571,7 @@ BOOL COleIPFrameWnd::BuildSharedMenu()
+ 		return FALSE;
+ 
+ 	// start out by getting menu from container
+-	memset(&m_menuWidths, 0, sizeof m_menuWidths);
++	memset(&m_menuWidths, 0, sizeof(m_menuWidths));
+ 	if (m_lpFrame->InsertMenus(m_hSharedMenu, &m_menuWidths) != S_OK)
+ 	{
+ 		::DestroyMenu(m_hSharedMenu);
+diff --git a/src/mfc/olemisc.cpp b/src/mfc/olemisc.cpp
+index d35719c..60b396a 100644
+--- a/src/mfc/olemisc.cpp
++++ b/src/mfc/olemisc.cpp
+@@ -987,7 +987,7 @@ HGLOBAL AFXAPI _AfxOleGetObjectDescriptorData(
+ 		::ATL::CComHeapPtr<OLECHAR>	sposzNewFullUserTypeName;
+ 		if(sposzNewFullUserTypeName.Allocate(nBuf))
+ 		{
+-			ATL_CRT_ERRORCHECK_SPRINTF(_snwprintf_s(sposzNewFullUserTypeName, nBuf, nBuf - 1, strLinkedTypeFmt.GetString(), sposzFullUserTypeName));
++			ATL_CRT_ERRORCHECK_SPRINTF(_snwprintf_s(sposzNewFullUserTypeName, nBuf, nBuf - 1, strLinkedTypeFmt.GetString(), (LPCTSTR)sposzFullUserTypeName));
+ 			sposzFullUserTypeName.Attach(sposzNewFullUserTypeName.Detach());
+ 		}
+ 	}
+diff --git a/src/mfc/olereg.cpp b/src/mfc/olereg.cpp
+index 7313678..6cc1106 100644
+--- a/src/mfc/olereg.cpp
++++ b/src/mfc/olereg.cpp
+@@ -548,7 +548,7 @@ BOOL AFXAPI AfxRegisterPreviewHandler(LPCTSTR lpszCLSID, LPCTSTR lpszShortTypeNa
+ 
+ 	if (regKey.SetValue(NULL, REG_SZ, (LPCVOID)lpszCLSID, (ULONG)(_tcslen(lpszCLSID) * sizeof(TCHAR))) != ERROR_SUCCESS)
+ 	{
+-		TRACE(traceOle, 0, _T("Error: failed setting value '%s' for key HKEY_CLASSES_ROOT\\'%s'.\n"), lpszCLSID, strShellExKey);
++		TRACE(traceOle, 0, _T("Error: failed setting value '%s' for key HKEY_CLASSES_ROOT\\'%s'.\n"), lpszCLSID, strShellExKey.GetString());
+ 		return FALSE;
+ 	}
+ 
+@@ -582,7 +582,7 @@ BOOL AFXAPI AfxRegisterThumbnailHandler(LPCTSTR lpszCLSID, LPCTSTR lpszFilterExt
+ 
+ 	if (regKey.SetValue(NULL, REG_SZ, (LPCVOID) lpszCLSID, (ULONG)(_tcslen(lpszCLSID) * sizeof(TCHAR))) != ERROR_SUCCESS)
+ 	{
+-		TRACE(traceOle, 0, _T("Error: failed setting value '%s' for key HKEY_CLASSES_ROOT\\'%s'.\n"), lpszCLSID, strShellExKey);
++		TRACE(traceOle, 0, _T("Error: failed setting value '%s' for key HKEY_CLASSES_ROOT\\'%s'.\n"), lpszCLSID, strShellExKey.GetString());
+ 		return FALSE;
+ 	}
+ 	else
+@@ -615,7 +615,13 @@ BOOL AFXAPI AfxOleInprocRegisterHelper(HKEY hkeyProgID,
+ 			(hkeyClassIDInsertable.Create(hkeyClassID, _T("Insertable"), NULL, 0, KEY_READ | KEY_WRITE, NULL, NULL) == ERROR_SUCCESS);
+ 	}
+ 	if (!bSuccess)
+-		goto Error;
++		// Cleanup any values set in the registry
++		if (nRegFlags & afxRegInsertable)
++		{
++			RegDeleteKey(hkeyClassID, _T("Insertable"));
++			RegDeleteKey(hkeyProgID, _T("Insertable"));
++		}
++		return bSuccess;
+ 
+ 	LPTSTR pstrThreadingModel = NULL;
+ 
+@@ -656,14 +662,6 @@ BOOL AFXAPI AfxOleInprocRegisterHelper(HKEY hkeyProgID,
+ 	{
+ 		return TRUE;
+ 	}
+-Error:
+-	// Cleanup any values set in the registry
+-	if (nRegFlags & afxRegInsertable)
+-	{
+-		RegDeleteKey(hkeyClassID, _T("Insertable"));
+-		RegDeleteKey(hkeyProgID, _T("Insertable"));
+-	}
+-	return bSuccess;
+ }
+ 
+ /////////////////////////////////////////////////////////////////////////////
+diff --git a/src/mfc/olestrm.cpp b/src/mfc/olestrm.cpp
+index 20e6d15..fc39139 100644
+--- a/src/mfc/olestrm.cpp
++++ b/src/mfc/olestrm.cpp
+@@ -370,9 +370,9 @@ ULONGLONG COleStreamFile::Seek(LONGLONG lOff, UINT nFrom)
+ 	ASSERT_VALID(this);
+ 	ASSERT(m_lpStream != NULL);
+ 
+-	ASSERT(STREAM_SEEK_SET == begin);
+-	ASSERT(STREAM_SEEK_CUR == current);
+-	ASSERT(STREAM_SEEK_END == end);
++	ASSERT((INT)STREAM_SEEK_SET == (INT)begin);
++	ASSERT((INT)STREAM_SEEK_CUR == (INT)current);
++	ASSERT((INT)STREAM_SEEK_END == (INT)end);
+ 
+ 	ULARGE_INTEGER liNewPosition;
+ 	LARGE_INTEGER liOff;
+diff --git a/src/mfc/oleunk.cpp b/src/mfc/oleunk.cpp
+index 2589ac6..5431dae 100644
+--- a/src/mfc/oleunk.cpp
++++ b/src/mfc/oleunk.cpp
+@@ -199,7 +199,7 @@ LPUNKNOWN CCmdTarget::GetInterface(const void* iid)
+ 		if (IsTracingEnabled(traceOle, 1))
+ 		{
+ 			CString strIID = AfxGetIIDString(*(IID*)(iid));
+-			TRACE(traceOle, 1, _T("QueryInterface(%s) succeeded\n"), strIID);
++			TRACE(traceOle, 1, _T("QueryInterface(%s) succeeded\n"), strIID.GetString());
+ 		}
+ #endif
+ 		return lpUnkHook;
+@@ -232,7 +232,7 @@ LPUNKNOWN CCmdTarget::GetInterface(const void* iid)
+ 					if (IsTracingEnabled(traceOle, 1))
+ 					{
+ 						CString strIID = AfxGetIIDString(*(IID*)(iid));
+-						TRACE(traceOle, 1, _T("QueryInterface(%s) succeeded\n"), strIID);
++						TRACE(traceOle, 1, _T("QueryInterface(%s) succeeded\n"), strIID.GetString());
+ 					}
+ #endif
+ 					return lpUnk;
+@@ -254,7 +254,7 @@ LPUNKNOWN CCmdTarget::GetInterface(const void* iid)
+ 		if (IsTracingEnabled(traceOle, 1))
+ 		{
+ 			CString strIID = AfxGetIIDString(*(IID*)(iid));
+-			TRACE(traceOle, 1, _T("QueryInterface(%s) failed\n"), strIID);
++			TRACE(traceOle, 1, _T("QueryInterface(%s) failed\n"), strIID.GetString());
+ 		}
+ #endif
+ 		// interface ID not found, fail the call
+@@ -283,7 +283,7 @@ LPUNKNOWN CCmdTarget::GetInterface(const void* iid)
+ 					if (IsTracingEnabled(traceOle, 1))
+ 					{
+ 						CString strIID = AfxGetIIDString(*(IID*)(iid));
+-						TRACE(traceOle, 1, _T("QueryInterface(%s) succeeded\n"), strIID);
++						TRACE(traceOle, 1, _T("QueryInterface(%s) succeeded\n"), strIID.GetString());
+ 					}
+ #endif
+ 					return lpUnk;
+@@ -306,7 +306,7 @@ LPUNKNOWN CCmdTarget::GetInterface(const void* iid)
+ 	if (IsTracingEnabled(traceOle, 1))
+ 	{
+ 		CString strIID = AfxGetIIDString(*(IID*)(iid));
+-		TRACE(traceOle, 1, _T("QueryInterface(%s) failed\n"), strIID);
++		TRACE(traceOle, 1, _T("QueryInterface(%s) failed\n"), strIID.GetString());
+ 	}
+ #endif
+ 	// interface ID not found, fail the call
+@@ -391,9 +391,9 @@ DWORD CCmdTarget::ExternalQueryInterface(const void* iid,
+ 		{
+ 			CString strIID = AfxGetIIDString(*(IID*)(iid));
+ 			if (SUCCEEDED(hRes))
+-				TRACE(traceOle, 1, _T("QueryInterface(%s) succeeded\n"), strIID);
++				TRACE(traceOle, 1, _T("QueryInterface(%s) succeeded\n"), strIID.GetString());
+ 			else
+-				TRACE(traceOle, 1, _T("QueryInterface(%s) failed\n"), strIID);
++				TRACE(traceOle, 1, _T("QueryInterface(%s) failed\n"), strIID.GetString());
+ 		}
+ #endif
+ 		return hRes;
+diff --git a/src/mfc/olevar.cpp b/src/mfc/olevar.cpp
+index 6fbf566..485f1c7 100644
+--- a/src/mfc/olevar.cpp
++++ b/src/mfc/olevar.cpp
+@@ -892,7 +892,7 @@ CArchive& AFXAPI operator<<(CArchive& ar, COleVariant varSrc)
+ 				ar << clsid.Data1;
+ 				ar << clsid.Data2;
+ 				ar << clsid.Data3;
+-				ar.Write(&clsid.Data4[0], sizeof clsid.Data4);
++				ar.Write(&clsid.Data4[0], sizeof(clsid.Data4));
+ 
+ 				// Always assume object is dirty
+ 				AfxCheckError(pPersistStream->Save(&stm, TRUE));
+@@ -1005,7 +1005,7 @@ CArchive& AFXAPI operator>>(CArchive& ar, COleVariant& varSrc)
+ 			ar >> clsid.Data1;
+ 			ar >> clsid.Data2;
+ 			ar >> clsid.Data3;
+-			ar.EnsureRead(&clsid.Data4[0], sizeof clsid.Data4);
++			ar.EnsureRead(&clsid.Data4[0], sizeof(clsid.Data4));
+ 
+ 			// Create the object
+ 			SCODE sc = CoCreateInstance(clsid, NULL, CLSCTX_ALL | CLSCTX_REMOTE_SERVER,
+@@ -1327,7 +1327,7 @@ COleCurrency COleCurrency::operator-(const COleCurrency& cur) const
+ COleCurrency COleCurrency::operator-() const
+ {
+ 	// If operand not Valid, just return
+-	if (!GetStatus() == valid)
++	if (GetStatus() != valid)
+ 		return *this;
+ 
+ 	COleCurrency curResult;
+@@ -1460,7 +1460,7 @@ COleCurrency COleCurrency::operator*(long nOperand) const
+ COleCurrency COleCurrency::operator/(long nOperand) const
+ {
+ 	// If operand not Valid, just return
+-	if (!GetStatus() == valid)
++	if (GetStatus() != valid)
+ 		return *this;
+ 
+ 	COleCurrency curResult;
+@@ -2162,7 +2162,7 @@ void COleSafeArray::Create(VARTYPE vtSrc, DWORD dwDims, SAFEARRAYBOUND* rgsaboun
+ 	if (parray == NULL)
+ 		AfxThrowMemoryException();
+ 
+-	vt = unsigned short(vtSrc | VT_ARRAY);
++	vt = USHORT (vtSrc | VT_ARRAY);
+ 	m_dwDims = dwDims;
+ 	m_dwElementSize = GetElemSize();
+ }
+@@ -2255,7 +2255,7 @@ void COleSafeArray::DestroyDescriptor()
+ void AFXAPI AfxSafeArrayInit(COleSafeArray* psa)
+ {
+ 	if(psa != NULL)
+-		memset(psa, 0, sizeof(*psa));
++		memset((PVOID)psa, 0, sizeof(*psa));
+ }
+ 
+ /////////////////////////////////////////////////////////////////////////////
+diff --git a/src/mfc/rawdllmainproxy.c b/src/mfc/rawdllmainproxy.c
+index 809f5ac..e63a6ea 100644
+--- a/src/mfc/rawdllmainproxy.c
++++ b/src/mfc/rawdllmainproxy.c
+@@ -22,6 +22,11 @@
+ 
+ #ifndef _AFX_DLLMODULE_HELPER
+ 
++#ifndef _MSC_VER
++#define __try try
++#define __except(x) catch(...)
++#endif
++
+ extern IMAGE_DOS_HEADER __ImageBase;
+ 
+ /***
+@@ -204,7 +209,7 @@ BOOL WINAPI _RawDllMainProxy(HINSTANCE, DWORD dwReason, LPVOID);
+ #pragma warning(push)
+ #pragma warning(disable:4132)
+ /* _pActualRawDllMain is a communal, and it's really treated as a const pointer */
+-BOOL (WINAPI * const _pActualRawDllMain)(HINSTANCE , DWORD , LPVOID);
++BOOL (WINAPI * const _pActualRawDllMain)(HINSTANCE , DWORD , LPVOID) = NULL;
+ #pragma warning(pop)
+ 
+ BOOL (WINAPI * const _pRawDllMain)(HINSTANCE , DWORD , LPVOID) = &_RawDllMainProxy;
+diff --git a/src/mfc/sockcore.cpp b/src/mfc/sockcore.cpp
+index 17ab05f..e89dd22 100644
+--- a/src/mfc/sockcore.cpp
++++ b/src/mfc/sockcore.cpp
+@@ -538,7 +538,7 @@ void PASCAL CAsyncSocket::DetachHandle(SOCKET hSocket, BOOL bDead)
+ 			pState->m_pmapDeadSockets->RemoveAll();
+ 
+ 			while (!pState->m_plistSocketNotifications->IsEmpty())
+-				delete pState->m_plistSocketNotifications->RemoveHead();
++				delete (CPtrList*)pState->m_plistSocketNotifications->RemoveHead();
+ 		}
+ 	}
+ 	else
+diff --git a/src/mfc/stdafx.h b/src/mfc/stdafx.h
+index 9905da1..c1dfa63 100644
+--- a/src/mfc/stdafx.h
++++ b/src/mfc/stdafx.h
+@@ -11,6 +11,8 @@
+ // STDAFX.H is the header that includes the standard includes that are used
+ //  for most of the project.  These are compiled into a pre-compiled header
+ 
++#ifdef _MSC_VER
++
+ #include <winsdkver.h>
+ 
+ #undef _WIN32_WINNT
+@@ -18,6 +20,31 @@
+ 
+ #include <sdkddkver.h>
+ 
++#else
++
++#ifndef WINVER
++#define WINVER		0x0601
++#endif
++#ifndef _WIN32_WINNT
++#define _WIN32_WINNT	0x0601
++#endif
++#ifndef _WIN32_IE
++#define _WIN32_IE		0x0601
++#endif
++#ifndef NTDDI_VERSION
++#define NTDDI_VERSION	0x06010000
++#endif
++
++#include <malloc.h>
++
++#if (WINVER >= 0x0601)
++#define PSH_AEROWIZARD	0x00004000
++#endif
++
++#define _MFC_USER_BUILD
++
++#endif // _MSC_VER
++
+ // turn off warnings for /W4 (just for MFC implementation)
+ #ifndef ALL_WARNINGS
+ #pragma warning(disable: 4073)  // disable warning about using init_seg
+@@ -98,7 +125,7 @@
+ #endif
+ 
+ #include <winreg.h>
+-	#include "afxcom_.h"
++#include "afxcom_.h"
+ #include "afxole.h"
+ #include "afxdtctl.h"
+ #include "afxocc.h"
+@@ -222,4 +249,20 @@
+ #define NO_CPP_EXCEPTION(expr)
+ 
+ 
++#ifdef NOMINMAX
++#define min(a,b)             \
++({                           \
++    __typeof__ (a) _a = (a); \
++    __typeof__ (b) _b = (b); \
++    _a < _b ? _a : _b;       \
++})
++
++#define max(a,b)             \
++({                           \
++    __typeof__ (a) _a = (a); \
++    __typeof__ (b) _b = (b); \
++    _a > _b ? _a : _b;       \
++})
++#endif
++
+ /////////////////////////////////////////////////////////////////////////////
+diff --git a/src/mfc/strcore.cpp b/src/mfc/strcore.cpp
+index 627f55e..6aa405e 100644
+--- a/src/mfc/strcore.cpp
++++ b/src/mfc/strcore.cpp
+@@ -120,24 +120,26 @@ public:
+ 
+ // IAtlStringMgr
+ public:
+-	virtual CStringData* Allocate( int nChars, int nCharSize ) throw();
+-	virtual void Free( CStringData* pData ) throw();
+-	virtual CStringData* Reallocate( CStringData* pData, int nChars, int nCharSize ) throw();
+-	virtual CStringData* GetNilString() throw();
+-	virtual IAtlStringMgr* Clone() throw();
++	virtual CStringData* Allocate( int nChars, int nCharSize ) noexcept;
++	virtual void Free( CStringData* pData ) noexcept;
++	virtual CStringData* Reallocate( CStringData* pData, int nChars, int nCharSize ) noexcept;
++	virtual CStringData* GetNilString() noexcept;
++	virtual IAtlStringMgr* Clone() noexcept;
+ 
+ protected:
+ 	CNilStringData m_nil;
+ };
+ 
+-CAfxStringMgr afxStringManager;
++// CAfxStringMgr afxStringManager;
+ 
+ IAtlStringMgr* AFXAPI AfxGetStringManager()
+ {
+-	return &afxStringManager;
++    // constructed on first use, never destroyed
++    static CAfxStringMgr* s_pMgr = new CAfxStringMgr;
++    return s_pMgr;
+ }
+ 
+-CStringData* CAfxStringMgr::Allocate( int nChars, int nCharSize ) throw()
++CStringData* CAfxStringMgr::Allocate( int nChars, int nCharSize ) noexcept
+ {
+ 	size_t nTotalSize;
+ 	CStringData* pData;
+@@ -164,12 +166,12 @@ CStringData* CAfxStringMgr::Allocate( int nChars, int nCharSize ) throw()
+ 	return pData;
+ }
+ 
+-void CAfxStringMgr::Free( CStringData* pData ) throw()
++void CAfxStringMgr::Free( CStringData* pData ) noexcept
+ {
+ 	free(pData);
+ }
+ 
+-CStringData* CAfxStringMgr::Reallocate( CStringData* pData, int nChars, int nCharSize ) throw()
++CStringData* CAfxStringMgr::Reallocate( CStringData* pData, int nChars, int nCharSize ) noexcept
+ {
+ 	CStringData* pNewData;
+ 	size_t nTotalSize;
+@@ -196,13 +198,13 @@ CStringData* CAfxStringMgr::Reallocate( CStringData* pData, int nChars, int nCha
+ }
+ 
+ 
+-CStringData* CAfxStringMgr::GetNilString() throw()
++CStringData* CAfxStringMgr::GetNilString() noexcept
+ {
+ 	m_nil.AddRef();
+ 	return &m_nil;
+ }
+ 
+-IAtlStringMgr* CAfxStringMgr::Clone() throw()
++IAtlStringMgr* CAfxStringMgr::Clone() noexcept
+ {
+ 	return this;
+ }
+diff --git a/src/mfc/timecore.cpp b/src/mfc/timecore.cpp
+index 3ec6ddf..893042d 100644
+--- a/src/mfc/timecore.cpp
++++ b/src/mfc/timecore.cpp
+@@ -34,9 +34,9 @@ CDumpContext& AFXAPI operator <<(CDumpContext& dc, CTime time)
+ CArchive& CTime::Serialize64(CArchive& ar)
+ {
+ 	if (ar.IsStoring())
+-		return ar << (__int64) m_time;
++		return ar << (__int64&) m_time;
+ 	else
+-		return ar >> (__int64) m_time;
++		return ar >> (__int64&) m_time;
+ }
+ const __int32 cTime64Mark = INT_MIN + 10;
+ CArchive& AFXAPI operator <<(CArchive& ar, CTime time)
+@@ -58,7 +58,7 @@ CArchive& AFXAPI operator >>(CArchive& ar, CTime& rtime)
+ 	if (static_cast<__int32>(timeOld)==cTime64Mark)
+ 	{
+ 		__time64_t t64;
+-		ar >> (__int64) t64;
++		ar >> (__int64&) t64;
+ 		rtime = t64;
+ 	} else
+ 	{
+@@ -83,9 +83,9 @@ CDumpContext& AFXAPI operator <<(CDumpContext& dc, CTimeSpan timeSpan)
+ CArchive& CTimeSpan::Serialize64(CArchive& ar)
+ {
+ 	if (ar.IsStoring())
+-		return ar << (__int64) m_timeSpan;
++		return ar << (__int64&) m_timeSpan;
+ 	else
+-		return ar >> (__int64) m_timeSpan;
++		return ar >> (__int64&) m_timeSpan;
+ }
+ 
+ CArchive& AFXAPI operator <<(CArchive& ar, CTimeSpan timeSpan)
+diff --git a/src/mfc/viewhtml.cpp b/src/mfc/viewhtml.cpp
+index 9f8efd2..3349539 100644
+--- a/src/mfc/viewhtml.cpp
++++ b/src/mfc/viewhtml.cpp
+@@ -21,6 +21,8 @@
+ 
+ #endif
+ 
++extern "C" const GUID CGID_MSHTML = { 0xde4ba900, 0x59ca, 0x11cf, 0x95,0x92, 0x44,0x45,0x53,0x54,0x00,0x00 };
++
+ /////////////////////////////////////////////////////////////////////////////
+ // CHtmlView
+ 
+@@ -41,25 +43,25 @@ BEGIN_MESSAGE_MAP(CHtmlView, CFormView)
+ END_MESSAGE_MAP()
+ 
+ BEGIN_EVENTSINK_MAP(CHtmlView, CFormView)
+-	ON_EVENT(CHtmlView, AFX_IDW_PANE_FIRST, DISPID_STATUSTEXTCHANGE, OnStatusTextChange, VTS_BSTR)
+-	ON_EVENT(CHtmlView, AFX_IDW_PANE_FIRST, DISPID_PROGRESSCHANGE, OnProgressChange, VTS_I4 VTS_I4)
+-	ON_EVENT(CHtmlView, AFX_IDW_PANE_FIRST, DISPID_COMMANDSTATECHANGE, OnCommandStateChange, VTS_I4 VTS_BOOL)
+-	ON_EVENT(CHtmlView, AFX_IDW_PANE_FIRST, DISPID_DOWNLOADBEGIN, OnDownloadBegin, VTS_NONE)
+-	ON_EVENT(CHtmlView, AFX_IDW_PANE_FIRST, DISPID_DOWNLOADCOMPLETE, OnDownloadComplete, VTS_NONE)
+-	ON_EVENT(CHtmlView, AFX_IDW_PANE_FIRST, DISPID_TITLECHANGE, OnTitleChange, VTS_BSTR)
+-	ON_EVENT(CHtmlView, AFX_IDW_PANE_FIRST, DISPID_NAVIGATECOMPLETE2, NavigateComplete2, VTS_DISPATCH VTS_PVARIANT)
+-	ON_EVENT(CHtmlView, AFX_IDW_PANE_FIRST, DISPID_BEFORENAVIGATE2, BeforeNavigate2, VTS_DISPATCH VTS_PVARIANT VTS_PVARIANT VTS_PVARIANT VTS_PVARIANT VTS_PVARIANT VTS_PBOOL)
+-	ON_EVENT(CHtmlView, AFX_IDW_PANE_FIRST, DISPID_PROPERTYCHANGE, OnPropertyChange, VTS_BSTR)
+-	ON_EVENT(CHtmlView, AFX_IDW_PANE_FIRST, DISPID_NEWWINDOW2, OnNewWindow2, VTS_PDISPATCH VTS_PBOOL)
+-	ON_EVENT(CHtmlView, AFX_IDW_PANE_FIRST, DISPID_DOCUMENTCOMPLETE, DocumentComplete, VTS_DISPATCH VTS_PVARIANT)
+-	ON_EVENT(CHtmlView, AFX_IDW_PANE_FIRST, DISPID_NAVIGATEERROR, NavigateError, VTS_DISPATCH VTS_PVARIANT VTS_PVARIANT VTS_PVARIANT VTS_PBOOL)
+-	ON_EVENT(CHtmlView, AFX_IDW_PANE_FIRST, DISPID_ONQUIT, OnQuit, VTS_NONE)
+-	ON_EVENT(CHtmlView, AFX_IDW_PANE_FIRST, DISPID_ONVISIBLE, OnVisible, VTS_BOOL)
+-	ON_EVENT(CHtmlView, AFX_IDW_PANE_FIRST, DISPID_ONTOOLBAR, OnToolBar, VTS_BOOL)
+-	ON_EVENT(CHtmlView, AFX_IDW_PANE_FIRST, DISPID_ONMENUBAR, OnMenuBar, VTS_BOOL)
+-	ON_EVENT(CHtmlView, AFX_IDW_PANE_FIRST, DISPID_ONSTATUSBAR, OnStatusBar, VTS_BOOL)
+-	ON_EVENT(CHtmlView, AFX_IDW_PANE_FIRST, DISPID_ONFULLSCREEN, OnFullScreen, VTS_BOOL)
+-	ON_EVENT(CHtmlView, AFX_IDW_PANE_FIRST, DISPID_ONTHEATERMODE, OnTheaterMode, VTS_BOOL)
++	ON_EVENT(CHtmlView, AFX_IDW_PANE_FIRST, DISPID_STATUSTEXTCHANGE, CHtmlView::OnStatusTextChange, VTS_BSTR)
++	ON_EVENT(CHtmlView, AFX_IDW_PANE_FIRST, DISPID_PROGRESSCHANGE, CHtmlView::OnProgressChange, VTS_I4 VTS_I4)
++	ON_EVENT(CHtmlView, AFX_IDW_PANE_FIRST, DISPID_COMMANDSTATECHANGE, CHtmlView::OnCommandStateChange, VTS_I4 VTS_BOOL)
++	ON_EVENT(CHtmlView, AFX_IDW_PANE_FIRST, DISPID_DOWNLOADBEGIN, CHtmlView::OnDownloadBegin, VTS_NONE)
++	ON_EVENT(CHtmlView, AFX_IDW_PANE_FIRST, DISPID_DOWNLOADCOMPLETE, CHtmlView::OnDownloadComplete, VTS_NONE)
++	ON_EVENT(CHtmlView, AFX_IDW_PANE_FIRST, DISPID_TITLECHANGE, CHtmlView::OnTitleChange, VTS_BSTR)
++	ON_EVENT(CHtmlView, AFX_IDW_PANE_FIRST, DISPID_NAVIGATECOMPLETE2, CHtmlView::NavigateComplete2, VTS_DISPATCH VTS_PVARIANT)
++	ON_EVENT(CHtmlView, AFX_IDW_PANE_FIRST, DISPID_BEFORENAVIGATE2, CHtmlView::BeforeNavigate2, VTS_DISPATCH VTS_PVARIANT VTS_PVARIANT VTS_PVARIANT VTS_PVARIANT VTS_PVARIANT VTS_PBOOL)
++	ON_EVENT(CHtmlView, AFX_IDW_PANE_FIRST, DISPID_PROPERTYCHANGE, CHtmlView::OnPropertyChange, VTS_BSTR)
++	ON_EVENT(CHtmlView, AFX_IDW_PANE_FIRST, DISPID_NEWWINDOW2, CHtmlView::OnNewWindow2, VTS_PDISPATCH VTS_PBOOL)
++	ON_EVENT(CHtmlView, AFX_IDW_PANE_FIRST, DISPID_DOCUMENTCOMPLETE, CHtmlView::DocumentComplete, VTS_DISPATCH VTS_PVARIANT)
++	ON_EVENT(CHtmlView, AFX_IDW_PANE_FIRST, DISPID_NAVIGATEERROR, CHtmlView::NavigateError, VTS_DISPATCH VTS_PVARIANT VTS_PVARIANT VTS_PVARIANT VTS_PBOOL)
++	ON_EVENT(CHtmlView, AFX_IDW_PANE_FIRST, DISPID_ONQUIT, CHtmlView::OnQuit, VTS_NONE)
++	ON_EVENT(CHtmlView, AFX_IDW_PANE_FIRST, DISPID_ONVISIBLE, CHtmlView::OnVisible, VTS_BOOL)
++	ON_EVENT(CHtmlView, AFX_IDW_PANE_FIRST, DISPID_ONTOOLBAR, CHtmlView::OnToolBar, VTS_BOOL)
++	ON_EVENT(CHtmlView, AFX_IDW_PANE_FIRST, DISPID_ONMENUBAR, CHtmlView::OnMenuBar, VTS_BOOL)
++	ON_EVENT(CHtmlView, AFX_IDW_PANE_FIRST, DISPID_ONSTATUSBAR, CHtmlView::OnStatusBar, VTS_BOOL)
++	ON_EVENT(CHtmlView, AFX_IDW_PANE_FIRST, DISPID_ONFULLSCREEN, CHtmlView::OnFullScreen, VTS_BOOL)
++	ON_EVENT(CHtmlView, AFX_IDW_PANE_FIRST, DISPID_ONTHEATERMODE, CHtmlView::OnTheaterMode, VTS_BOOL)
+ END_EVENTSINK_MAP()
+ 
+ /////////////////////////////////////////////////////////////////////////////
+@@ -107,7 +109,7 @@ void CHtmlView::OnFilePrint()
+ 		{
+ 			// the control will handle all printing UI
+ 
+-			CComQIPtr<IOleCommandTarget> spTarget = spDisp;
++			CComQIPtr<IOleCommandTarget> spTarget(spDisp.p);
+ 			if (spTarget != NULL)
+ 				spTarget->Exec(NULL, OLECMDID_PRINT, 0, NULL, NULL);
+ 		}
+@@ -611,7 +613,7 @@ BOOL CHtmlView::PreTranslateMessage(MSG* pMsg)
+ 	BOOL bRet = FALSE;
+ 	if(m_pBrowserApp != NULL)
+ 	{
+-		CComQIPtr<IOleInPlaceActiveObject> spInPlace = m_pBrowserApp;
++		CComQIPtr<IOleInPlaceActiveObject> spInPlace(m_pBrowserApp.p);
+ 		if (spInPlace)
+ 			bRet = (spInPlace->TranslateAccelerator(pMsg) == S_OK) ? TRUE : FALSE;
+ 	}
+@@ -941,10 +943,10 @@ HRESULT CHtmlView::ExecFormsCommand(DWORD dwCommandID,
+ 	HRESULT hr = E_FAIL;
+ 	CComPtr<IDispatch> spDispDocument;
+ 	m_pBrowserApp->get_Document(&spDispDocument);
+-	CComQIPtr<IHTMLDocument2> spDoc = spDispDocument;
++	CComQIPtr<IHTMLDocument2> spDoc(spDispDocument.p);
+ 	if (spDoc != NULL)
+ 	{
+-		CComQIPtr<IOleCommandTarget> spCmdTarget = spDoc;
++		CComQIPtr<IOleCommandTarget> spCmdTarget(spDoc.p);
+ 		if (spCmdTarget != NULL)
+ 			hr = spCmdTarget->Exec(&CMDSETID_Forms3, dwCommandID,
+ 				OLECMDEXECOPT_DONTPROMPTUSER, pVarIn, pVarOut);
+@@ -961,10 +963,10 @@ HRESULT CHtmlView::QueryFormsCommand(DWORD dwCommandID,
+ 
+ 	CComPtr<IDispatch> spDispDocument;
+ 	m_pBrowserApp->get_Document(&spDispDocument);
+-	CComQIPtr<IHTMLDocument2> spDoc = spDispDocument;	
++	CComQIPtr<IHTMLDocument2> spDoc(spDispDocument.p);	
+ 	if (spDoc != NULL)
+ 	{
+-		CComQIPtr<IOleCommandTarget> spCmdTarget = spDoc;
++		CComQIPtr<IOleCommandTarget> spCmdTarget(spDoc.p);
+ 		if (spCmdTarget != NULL)
+ 		{
+ 			OLECMD cmdInfo;
+@@ -1065,7 +1067,7 @@ BOOL CHtmlView::GetSource(CString& refString)
+ 		hMemory = GlobalAlloc(GMEM_MOVEABLE, 0);
+ 		if (hMemory != NULL)
+ 		{
+-			CComQIPtr<IPersistStreamInit> spPersistStream = spDisp;
++			CComQIPtr<IPersistStreamInit> spPersistStream(spDisp.p);
+ 			if (spPersistStream != NULL)
+ 			{
+ 				CComPtr<IStream> spStream;
+@@ -1599,7 +1601,7 @@ CHtmlEditCtrl::~CHtmlEditCtrl()
+ /////////////////////////////////////////////////////////////////////////////
+ // CHtmlEditCtrl message handlers
+ BEGIN_EVENTSINK_MAP(CHtmlEditCtrl, CWnd)
+-	ON_EVENT_REFLECT(CHtmlEditCtrl, 252 /* NavigateComplete2 */, _OnNavigateComplete2, VTS_DISPATCH VTS_PVARIANT)
++	ON_EVENT_REFLECT(CHtmlEditCtrl, 252 /* NavigateComplete2 */, CHtmlEditCtrl::_OnNavigateComplete2, VTS_DISPATCH VTS_PVARIANT)
+ END_EVENTSINK_MAP()
+ 
+ void CHtmlEditCtrl::_OnNavigateComplete2(LPDISPATCH pDisp, VARIANT FAR* URL)
+@@ -2000,7 +2002,7 @@ void CHtmlEditDoc::Dump(CDumpContext& dc) const
+ {
+ 	CDocument::Dump(dc);
+ }
+-#endif _DEBUG
++#endif // _DEBUG
+ 
+ /////////////////////////////////////////////////////////////////////////////
+ // Inline function declarations expanded out-of-line
+diff --git a/src/mfc/viewoled.cpp b/src/mfc/viewoled.cpp
+index 5e3512b..400e9e5 100644
+--- a/src/mfc/viewoled.cpp
++++ b/src/mfc/viewoled.cpp
+@@ -155,7 +155,7 @@ static _AfxUINT128 operator/( const _AfxUINT128& a, const _AfxUINT128& b )
+ 
+ 	a_ = a;
+ 	b_ = b;
+-	while( !(b_.nHi&(1i64<<63)) )
++	while( !(b_.nHi&(1LL<<63)) )
+ 	{
+ 		b_ <<= 1;
+ 	}
+@@ -184,7 +184,7 @@ static _AfxUINT128 operator%( const _AfxUINT128& a, const _AfxUINT128& b )
+ 
+ 	a_ = a;
+ 	b_ = b;
+-	while( !(b_.nHi&(1i64<<63)) )
++	while( !(b_.nHi&(1LL<<63)) )
+ 	{
+ 		b_ <<= 1;
+ 	}
+diff --git a/src/mfc/viewprnt.cpp b/src/mfc/viewprnt.cpp
+index 057afa8..8eaa2ba 100644
+--- a/src/mfc/viewprnt.cpp
++++ b/src/mfc/viewprnt.cpp
+@@ -21,7 +21,7 @@ public:
+ 	//{{AFX_DATA(CPrintingDialog)
+ 	enum { IDD = AFX_IDD_PRINTDLG };
+ 	//}}AFX_DATA
+-	CPrintingDialog::CPrintingDialog(CWnd* pParent)
++	CPrintingDialog(CWnd* pParent)
+ 		{
+ 			Create(CPrintingDialog::IDD, pParent);      // modeless !
+ 			_afxWinState->m_bUserAbort = FALSE;
+diff --git a/src/mfc/wincore.cpp b/src/mfc/wincore.cpp
+index 4cb5798..f377089 100644
+--- a/src/mfc/wincore.cpp
++++ b/src/mfc/wincore.cpp
+@@ -26,6 +26,8 @@ PROCESS_LOCAL(_AFX_HTMLHELP_STATE, _afxHtmlHelpState)
+ 
+ #define new DEBUG_NEW
+ 
++extern "C" const IID IID_IAccessibleProxy = { 0x7a7d9dcf, 0xb7a1, 0x4019, 0x90,0x31, 0x25,0x82,0x68,0x84,0x69,0x80 };
++
+ /////////////////////////////////////////////////////////////////////////////
+ // Globals
+ 
+@@ -536,7 +538,7 @@ _AfxCbtFilterHook(int code, WPARAM wParam, LPARAM lParam)
+ 			else
+ 			{
+ 				szClassName[0] = '\0';
+-				GlobalGetAtomName((ATOM)lpcs->lpszClass, szClassName, _countof(szClassName));
++				GlobalGetAtomName((UINT_PTR)lpcs->lpszClass, szClassName, _countof(szClassName));
+ 				pszClassName = szClassName;
+ 			}
+ 
+@@ -611,7 +613,7 @@ _AfxCbtFilterHook(int code, WPARAM wParam, LPARAM lParam)
+ 				oldWndProc = (WNDPROC)GetWindowLongPtr(hWnd, GWLP_WNDPROC);
+ 				if (oldWndProc != NULL && GetProp(hWnd, _afxOldWndProc) == NULL)
+ 				{
+-					SetProp(hWnd, _afxOldWndProc, oldWndProc);
++					SetProp(hWnd, _afxOldWndProc, (PVOID)oldWndProc);
+ 					if ((WNDPROC)GetProp(hWnd, _afxOldWndProc) == oldWndProc)
+ 					{
+ 						GlobalAddAtom(_afxOldWndProc);
+@@ -1537,8 +1539,8 @@ BOOL CWnd::RegisterTouchWindow(BOOL bRegister, ULONG ulFlags)
+ 	static HMODULE hUserDll = AfxCtxLoadLibrary(_T("user32.dll"));
+ 	ENSURE(hUserDll != NULL);
+ 
+-	typedef	BOOL (__stdcall *PFNREGISTERTOUCHWINDOW)(HWND, ULONG);
+-	typedef	BOOL (__stdcall *PFNUNREGISTERTOUCHWINDOW)(HWND);
++	typedef BOOL (__stdcall *PFNREGISTERTOUCHWINDOW)(HWND, ULONG);
++	typedef BOOL (__stdcall *PFNUNREGISTERTOUCHWINDOW)(HWND);
+ 
+ 	static PFNREGISTERTOUCHWINDOW pfRegister = (PFNREGISTERTOUCHWINDOW)GetProcAddress(hUserDll, "RegisterTouchWindow");
+ 	static PFNUNREGISTERTOUCHWINDOW pfUnregister = (PFNUNREGISTERTOUCHWINDOW)GetProcAddress(hUserDll, "UnregisterTouchWindow");
+@@ -2608,7 +2610,11 @@ LDispatch:
+ 		lResult = TRUE;
+ 		break;
+ 	case AfxSig_INPUTDEVICECHANGE:
++#if (WINVER >= 0x0601)
++		(this->*mmf.pfn_INPUTDEVICECHANGE)(GET_DEVICE_CHANGE_WPARAM(wParam), reinterpret_cast<HANDLE>(lParam));
++#else
+ 		(this->*mmf.pfn_INPUTDEVICECHANGE)(GET_DEVICE_CHANGE_LPARAM(wParam), reinterpret_cast<HANDLE>(lParam));
++#endif
+ 		break;
+ 	case AfxSig_v_u_hkl:
+ 		(this->*mmf.pfn_v_u_h)(static_cast<UINT>(wParam), reinterpret_cast<HKL>(lParam));
+@@ -3628,26 +3634,26 @@ public:
+ 	// also catch mismatched Release in debug builds
+ 	~CMFCComObject()
+ 	{
+-		m_dwRef = -(LONG_MAX/2);
+-		FinalRelease();
++		LONG m_dwRef = -(LONG_MAX/2);
++		this->FinalRelease();
+ #ifdef _ATL_DEBUG_INTERFACES
+-		_AtlDebugInterfacesModule.DeleteNonAddRefThunk(_GetRawUnknown());
++		_AtlDebugInterfacesModule.DeleteNonAddRefThunk(this->_GetRawUnknown());
+ #endif
+ 		AfxOleUnlockApp();
+ 	}
+ 	//If InternalAddRef or InternalRelease is undefined then your class
+ 	//doesn't derive from CComObjectRoot
+-	STDMETHOD_(ULONG, AddRef)() throw() {return InternalAddRef();}
+-	STDMETHOD_(ULONG, Release)() throw()
++	STDMETHOD_(ULONG, AddRef)() noexcept {return this->InternalAddRef();}
++	STDMETHOD_(ULONG, Release)() noexcept
+ 	{
+-		ULONG l = InternalRelease();
++		ULONG l = this->InternalRelease();
+ 		if (l == 0)
+ 			delete this;
+ 		return l;
+ 	}
+ 	//if _InternalQueryInterface is undefined then you forgot BEGIN_COM_MAP
+-	STDMETHOD(QueryInterface)(REFIID iid, void ** ppvObject) throw()
+-	{return _InternalQueryInterface(iid, ppvObject);}
++	STDMETHOD(QueryInterface)(REFIID iid, void ** ppvObject) noexcept
++	{return this->_InternalQueryInterface(iid, ppvObject);}
+ 	template <class Q>
+ 	HRESULT STDMETHODCALLTYPE QueryInterface(Q** pp)
+ 	{
+diff --git a/src/mfc/winfrm.cpp b/src/mfc/winfrm.cpp
+index 3b268e7..35d5b80 100644
+--- a/src/mfc/winfrm.cpp
++++ b/src/mfc/winfrm.cpp
+@@ -142,7 +142,7 @@ CFrameWnd::~CFrameWnd()
+ 			pThreadState->m_pPushRoutingFrame->Pop();
+ 
+ 		if (m_phWndDisable != NULL)
+-			delete[] (void*)m_phWndDisable;
++			delete[] (HWND*)m_phWndDisable;
+ 
+ 	AFX_END_DESTRUCTOR
+ }
+@@ -449,7 +449,7 @@ void CFrameWnd::EndModalState()
+ 			::EnableWindow(m_phWndDisable[nIndex], TRUE);
+ 		++nIndex;
+ 	}
+-	delete[] (void*)m_phWndDisable;
++	delete[] (HWND*)m_phWndDisable;
+ 	m_phWndDisable = NULL;
+ }
+ 
+diff --git a/src/mfc/winmain.cpp b/src/mfc/winmain.cpp
+index af6c8da..41b9ae1 100644
+--- a/src/mfc/winmain.cpp
++++ b/src/mfc/winmain.cpp
+@@ -16,6 +16,7 @@
+ // Standard WinMain implementation
+ //  Can be replaced as long as 'AfxWinInit' is called first
+ 
++extern "C"
+ int AFXAPI AfxWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
+ 	_In_ LPTSTR lpCmdLine, int nCmdShow)
+ {

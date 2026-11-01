@@ -1,0 +1,33 @@
+diff --git a/src/mfcm/postdllmain.cpp b/src/mfcm/postdllmain.cpp
+index 46b25e8..d6bf45c 100644
+--- a/src/mfcm/postdllmain.cpp
++++ b/src/mfcm/postdllmain.cpp
+@@ -75,9 +75,11 @@ private:
+ 	HINSTANCE m_hInstance;
+ };
+ 
++#ifdef _MSC_VER
+ #pragma warning(push)
+ #pragma warning(disable:4378)
+ #pragma init_seg(".CRTMP$XCY")
+ #pragma warning(pop)
++#endif
+ 
+ const PostDllMain postDllMain;
+diff --git a/src/mfcm/postrawdllmain.cpp b/src/mfcm/postrawdllmain.cpp
+index c3756dd..4e934b7 100644
+--- a/src/mfcm/postrawdllmain.cpp
++++ b/src/mfcm/postrawdllmain.cpp
+@@ -56,10 +56,12 @@ public:
+ 	}
+ };
+ 
++#ifdef _MSC_VER
+ #pragma warning(push)
+ #pragma warning(disable:4378)
+ #pragma const_seg(".CRTMA$XCB")
+ #pragma init_seg(".CRTMP$XCB")
+ #pragma warning(pop)
++#endif
+ 
+ const PostRawDllMain postRawDllMain;
