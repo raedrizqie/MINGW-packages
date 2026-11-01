@@ -1,0 +1,97 @@
+# Maintainer: Raed Rizqie <raed.rizqie@gmail.com>
+
+_realname=atlmfc
+pkgbase=mingw-w64-${_realname}
+pkgname="${MINGW_PACKAGE_PREFIX}-${_realname}"
+pkgver=10.00.40219
+pkgrel=1
+pkgdesc='Microsoft Active Template Library / Microsoft Foundation Classes C++ (Unicode) library (mingw-w64)'
+url='https://www.microsoft.com/'
+license=('spdx:MS-PL')
+arch=('any')
+mingw_arch=('clang64')
+makedepends=(
+  "${MINGW_PACKAGE_PREFIX}-cc"
+  "${MINGW_PACKAGE_PREFIX}-clang"
+  "${MINGW_PACKAGE_PREFIX}-lld"
+  "${MINGW_PACKAGE_PREFIX}-llvm-tools"
+  "${MINGW_PACKAGE_PREFIX}-uasm"
+  "git"
+)
+_commit="c06a69f615000e4b8c39bde71a54fe3c2adaf1b7"
+source=("${_realname}::git+https://github.com/adzm/atlmfc.git#commit=${_commit}"
+        001-atlmfc-10-headers.patch
+        002-atlmfc-10-atl.patch
+        003-atlmfc-10-mfc.patch
+        004-atlmfc-10-mfcm.patch
+        005-fix-resource-file.patch
+        Makefile
+        objs.mk
+        atluuid.h)
+sha256sums=('SKIP'
+            'SKIP'
+            'SKIP'
+            'SKIP'
+            'SKIP'
+            'SKIP'
+            'SKIP'
+            'SKIP'
+            'SKIP')
+
+apply_patch_with_msg() {
+  for _patch in "$@"
+  do
+    msg2 "Applying ${_patch}"
+    patch -p1 -i "${srcdir}/${_patch}"
+  done
+}
+
+prepare() {
+  cd ${_realname}
+
+  # windres cannot handle UTF-16 file encoding
+  dos2unix include/*.rc
+  dos2unix src/mfc/*.rc
+
+  apply_patch_with_msg \
+    001-atlmfc-10-headers.patch \
+    002-atlmfc-10-atl.patch \
+    003-atlmfc-10-mfc.patch \
+    004-atlmfc-10-mfcm.patch \
+    005-fix-resource-file.patch
+
+  cp -f ../{Makefile,objs.mk} .
+  cp -f ../atluuid.h include
+}
+
+build() {
+  cd ${_realname}
+
+  # build options:
+  #   DEBUG=1    build a debug library, default is release build
+  #   X86=1      build for X86, default is X64
+  #   MBCS=1     build an ansi codepage library, default is unicode build
+  #   ATLSLIB=1  build static atl library only
+  #   MFCENU=1   build english resources dll only
+
+  make V=0
+}
+
+package() {
+  cd ${_realname}
+
+  local _buildtype=release
+  if check_option "debug" "y"; then
+    _buildtype=debug
+  fi
+
+  install -d "${pkgdir}"${MINGW_PREFIX}/bin
+  install -Dm755 ${_buildtype}/libmfc*.dll		"${pkgdir}"${MINGW_PREFIX}/bin/
+
+  install -d "${pkgdir}"${MINGW_PREFIX}/include/atlmfc
+  install -Dm644 include/*.{h,inl}				"${pkgdir}"${MINGW_PREFIX}/include/atlmfc/
+
+  install -d ${pkgdir}${MINGW_PREFIX}/lib
+  install -Dm644 ${_buildtype}/libatl10.a			"${pkgdir}"${MINGW_PREFIX}/lib/
+  install -Dm644 ${_buildtype}/libmfc*.dll.a		"${pkgdir}"${MINGW_PREFIX}/lib/
+}

@@ -1,0 +1,81 @@
+--- a/include/ver_.rc
++++ b/include/ver_.rc
+@@ -14,6 +14,7 @@
+ //
+ 
+ #include "atlbuild.h"
++#include <winver.h>
+ 
+ #define __QUOTELANGCHAR(x)		#x
+ #define _QUOTELANGCHAR(x, y)	__QUOTELANGCHAR(x##y)
+diff --git a/src/mfc/mfcdll.rc b/src/mfc/mfcdll.rc
+index ed00cbf..ea6228d 100644
+--- a/src/mfc/mfcdll.rc
++++ b/src/mfc/mfcdll.rc
+@@ -25,7 +25,9 @@
+ #include "prompts.rc"
+ 
+ // include the ribbon/control bar resources
++#ifdef _MSC_VER
+ #include "afxribbon.rc"
++#endif
+ 
+ #ifdef _AFX_MONOLITHIC
+ // include all the standard OLE resources
+diff --git a/src/mfcm/mfcm.rc b/src/mfcm/mfcm.rc
+new file mode 100644
+index 0000000..cbd9175
+--- /dev/null
++++ b/src/mfcm/mfcm.rc
+@@ -0,0 +1,51 @@
++// mfcm.rc : Defines the resources for the MFCM DLL
++//
++// This is a part of the Microsoft Foundation Classes C++ library.
++// Copyright (C) Microsoft Corporation
++// All rights reserved.
++//
++// This source code is only intended as a supplement to the
++// Microsoft Foundation Classes Reference and related
++// electronic documentation provided with the library.
++// See these sources for detailed information regarding the
++// Microsoft Foundation Classes product.
++
++
++#include "afxres.h"
++
++/////////////////////////////////////////////////////////////////////////////
++// Version stamp for this .DLL
++
++#ifdef RC_INVOKED
++
++#include "winver.h"
++
++#define VER_FILETYPE	VFT_DLL
++
++#ifdef _DEBUG
++
++#define VER_FILEDESCRIPTION_STR "MFC Managed Library - Debug Version"
++#ifdef _UNICODE
++#define VER_ORIGINALFILENAME_STR "MFCM" _MFC_FILENAME_VER "UD.DLL"
++#else
++#define VER_ORIGINALFILENAME_STR "MFCM" _MFC_FILENAME_VER "D.DLL"
++#endif
++
++#else
++
++#define VER_FILEDESCRIPTION_STR "MFC Managed Library - Retail Version"
++#ifdef _UNICODE
++#define VER_ORIGINALFILENAME_STR "MFCM" _MFC_FILENAME_VER "U.DLL"
++#else
++#define VER_ORIGINALFILENAME_STR "MFCM" _MFC_FILENAME_VER ".DLL"
++#endif
++
++#endif
++
++#define VER_COPYRIGHTSTARTYEAR_STR	"1993"
++
++#include "ver_.rc"
++
++#endif
++
++/////////////////////////////////////////////////////////////////////////////
