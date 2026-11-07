@@ -4,19 +4,20 @@ _realname=libarchive
 pkgbase=mingw-w64-${_realname}
 pkgname="${MINGW_PACKAGE_PREFIX}-${_realname}"
 pkgver=3.8.11
-pkgrel=1
-pkgdesc="Multi-format archive and compression library (mingw-w64)"
+pkgrel=2
+pkgdesc='Multi-format archive and compression library (mingw-w64)'
 arch=('any')
 mingw_arch=('mingw32' 'mingw64' 'ucrt64' 'clang64' 'clangarm64')
 url="https://www.libarchive.org/"
 msys2_repository_url='https://github.com/libarchive/libarchive/'
 msys2_references=(
   'archlinux: libarchive'
-  "cpe: cpe:/a:libarchive:libarchive"
+  'aur:' # different package
+  'cpe: cpe:/a:libarchive:libarchive'
   'cygwin: libarchive'
   'gentoo: app-arch/libarchive'
 )
-license=("spdx:BSD-2-Clause")
+license=('spdx:BSD-2-Clause AND BSD-4-Clause-UC')
 depends=(
   "${MINGW_PACKAGE_PREFIX}-cc-libs"
   "${MINGW_PACKAGE_PREFIX}-bzip2"
@@ -32,72 +33,50 @@ depends=(
 )
 makedepends=(
   "${MINGW_PACKAGE_PREFIX}-cc"
-  "${MINGW_PACKAGE_PREFIX}-cmake"
-  "${MINGW_PACKAGE_PREFIX}-ninja"
+  "${MINGW_PACKAGE_PREFIX}-pkgconf"
 )
 provides=("${MINGW_PACKAGE_PREFIX}-unzip")
-source=("${msys2_repository_url}releases/download/v${pkgver}/${_realname}-${pkgver}.tar.xz"
-        "001-fix-static-library-output-name-on-mingw.patch")
-sha256sums=('a3dc0872b1b39da34dc18ef1b944f0f11ffd37425d70ae04be679279f1cf43d2'
-            '4331c43882b4dad45f6036ee5e81671e0b54bdacbea48a64597282fd3d1bfb85')
-
-prepare() {
-  cd ${_realname}-${pkgver}
-  patch -p1 -i "${srcdir}"/001-fix-static-library-output-name-on-mingw.patch
-}
+source=("${msys2_repository_url}releases/download/v${pkgver}/${_realname}-${pkgver}.tar.xz")
+sha256sums=('a3dc0872b1b39da34dc18ef1b944f0f11ffd37425d70ae04be679279f1cf43d2')
 
 build() {
-  declare -a _extra_config
-  if check_option "debug" "n"; then
-    _extra_config+=("-DCMAKE_BUILD_TYPE=Release")
-  else
-    _extra_config+=("-DCMAKE_BUILD_TYPE=Debug")
-  fi
+  mkdir -p build-${MSYSTEM}-static && cd build-${MSYSTEM}-static
 
-  MSYS2_ARG_CONV_EXCL="-DCMAKE_INSTALL_PREFIX=" \
-    cmake \
-      -Wno-author \
-      -GNinja \
-      -DCMAKE_INSTALL_PREFIX="${MINGW_PREFIX}" \
-      "${_extra_config[@]}" \
-      -DCMAKE_DLL_NAME_WITH_SOVERSION=ON \
-      -DENABLE_BZip2=ON \
-      -DENABLE_CNG=ON \
-      -DENABLE_EXPAT=ON \
-      -DENABLE_ICONV=ON \
-      -DENABLE_LIBB2=ON \
-      -DENABLE_LZ4=ON \
-      -DENABLE_LZMA=ON \
-      -DENABLE_PCRE2POSIX=ON \
-      -DENABLE_ZLIB=ON \
-      -DENABLE_ZSTD=ON \
-      -DENABLE_OPENSSL=ON \
-      -DENABLE_CAT_SHARED=ON \
-      -DENABLE_CPIO_SHARED=ON \
-      -DENABLE_TAR_SHARED=ON \
-      -DENABLE_LIBXML2=OFF \
-      -DENABLE_LZO=OFF \
-      -DENABLE_NETTLE=OFF \
-      -DENABLE_TEST=OFF \
-      -DENABLE_UNZIP=ON \
-      -DPOSIX_REGEX_LIB=LIBPCRE2POSIX \
-      -S "${_realname}-${pkgver}" \
-      -B "build-${MSYSTEM}"
+  PKG_CONFIG="pkg-config --static" \
+  MSYS2_ARG_CONV_EXCL="--prefix=" \
+  ../${_realname}-${pkgver}/configure \
+  --prefix=${MINGW_PREFIX} \
+  --build=${MINGW_CARCH} \
+  --disable-shared \
+  --without-xml2
 
-  cmake --build "build-${MSYSTEM}"
+  make
+
+  mkdir -p build-${MSYSTEM}-shared && cd build-${MSYSTEM}-shared
+
+  MSYS2_ARG_CONV_EXCL="--prefix=" \
+  ../${_realname}-${pkgver}/configure \
+  --prefix=${MINGW_PREFIX} \
+  --build=${MINGW_CARCH} \
+  --disable-static \
+  --without-xml2
+
+  make
 }
 
 check() {
-  cmake -DENABLE_TEST=ON -S"${_realname}-${pkgver}" -B"build-${MSYSTEM}"
-  cmake --build "build-${MSYSTEM}"
-  ctest --test-dir build-${MSYSTEM} --output-on-failure || true
+  cd build-${MSYSTEM}-shared
+  make check
 }
 
 package() {
-  DESTDIR="${pkgdir}" cmake --install build-${MSYSTEM}
+  cd build-${MSYSTEM}-shared
+
+  make install DESTDIR="${pkgdir}"
 
   install -Dm644 "${srcdir}"/${_realname}-${pkgver}/COPYING \
     "${pkgdir}"${MINGW_PREFIX}/share/licenses/${_realname}/LICENSE
+
   cd "${pkgdir}${MINGW_PREFIX}/bin/"
   ln bsdunzip.exe unzip.exe # see provides array
 }
