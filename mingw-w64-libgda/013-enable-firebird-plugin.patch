@@ -2,15 +2,6 @@ diff --git a/libgda/gda-config.c b/libgda/gda-config.c
 index 1ec4248..af19db6 100644
 --- a/libgda/gda-config.c
 +++ b/libgda/gda-config.c
-@@ -11,7 +11,7 @@
-  * Copyright (C) 2004 Alan Knowles <alank@src.gnome.org>
-  * Copyright (C) 2004 Dani Baeyens <daniel.baeyens@hispalinux.es>
-  * Copyright (C) 2005 Stanislav Brabec <sbrabec@suse.de>
-- * Copyright (C) 2008 Przemysław Grzegorczyk <pgrzegorczyk@gmail.com>
-+ * Copyright (C) 2008 Przemyslaw Grzegorczyk <pgrzegorczyk@gmail.com>
-  * Copyright (C) 2009 Bas Driessen <bas.driessen@xobas.com>
-  * Copyright (C) 2010 David King <davidk@openismus.com>
-  * Copyright (C) 2010 Jonh Wendell <jwendell@gnome.org>
 @@ -1696,9 +1696,11 @@ gda_config_get_provider (const gchar *provider_name, GError **error)
  			return NULL;
  		}
