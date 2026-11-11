@@ -7,10 +7,9 @@ pkgver=5.4.14
 pkgrel=1
 pkgdesc="A system-independent interface for user-level packet capture (mingw-w64)"
 arch=('any')
-mingw_arch=('mingw64' 'ucrt64' 'clang64')
+mingw_arch=('ucrt64' 'clang64')
 url="https://www.vectorcamp.gr/projects/vectorscan"
 msys2_repository_url='https://github.com/VectorCamp/vectorscan'
-
 license=('spdx:BSD-3-Clause')
 depends=(
   "${MINGW_PACKAGE_PREFIX}-boost"
@@ -45,7 +44,8 @@ build() {
     -DBUILD_SHARED_LIBS=ON \
     -DBUILD_DOC=OFF \
     -DNO_SIMDE_IN_FAT=ON \
-    "../${_realname}-${_realname}-${pkgver}"
+    -S ${_realname}-${_realname}-${pkgver} \
+    -B build-${MSYSTEM}
 
   cmake --build build-${MSYSTEM}
 }
