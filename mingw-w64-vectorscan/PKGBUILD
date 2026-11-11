@@ -14,7 +14,7 @@ license=('spdx:BSD-3-Clause')
 depends=(
   "${MINGW_PACKAGE_PREFIX}-boost"
   "${MINGW_PACKAGE_PREFIX}-libpcap"
-  "${MINGW_PACKAGE_PREFIX}-pcre2"
+  "${MINGW_PACKAGE_PREFIX}-pcre"
   "${MINGW_PACKAGE_PREFIX}-sqlite"
 )
 makedepends=(
@@ -39,6 +39,7 @@ build() {
     -GNinja \
     -DCMAKE_INSTALL_PREFIX=${MINGW_PREFIX} \
     "${_extra_config[@]}" \
+    -DCMAKE_CXX_STANDARD=17 \
     -DFAT_RUNTIME=ON \
     -DBUILD_STATIC_LIBS=ON \
     -DBUILD_SHARED_LIBS=ON \
