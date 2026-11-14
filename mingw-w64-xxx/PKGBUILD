@@ -75,7 +75,7 @@ build() {
   #   ATLSLIB=1  build static atl library only
   #   MFCENU=1   build english resources dll only
 
-  make DEBUG=1 V=0
+  make
 }
 
 package() {
