@@ -185,8 +185,8 @@ package_libgda() {
     sed -e '1 { s/^#!.*$// }' -i "${_f}"
   done
 
-  mkdir -p docs"${pkgdir}${MINGW_PREFIX}"/share
-  mv "${pkgdir}${MINGW_PREFIX}"/share/gtk-doc docs"${pkgdir}${MINGW_PREFIX}"/share/
+  mkdir -p docs"${MINGW_PREFIX}"/share
+  mv "${pkgdir}${MINGW_PREFIX}"/share/gtk-doc docs"${MINGW_PREFIX}"/share/
 
   install -d "${pkgdir}${MINGW_PREFIX}"/share/licenses/${_realname}
   install -Dm644 ${_realname}-${pkgver}/COPYING* -t "${pkgdir}${MINGW_PREFIX}"/share/licenses/${_realname}
@@ -197,7 +197,7 @@ package_libgda-docs() {
   depends=("${MINGW_PACKAGE_PREFIX}-${_realname}"
            "${MINGW_PACKAGE_PREFIX}-git-doc-html")
 
-  mv docs/* .
+  mv docs/* "${pkgdir}"
 }
 
 # template start; name=mingw-w64-splitpkg-wrappers; version=1.0;
