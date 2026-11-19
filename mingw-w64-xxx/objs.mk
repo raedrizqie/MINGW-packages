@@ -25,7 +25,7 @@ else
 STDCTHUNK := stdcallthunk.obj
 ifeq ($(DEBUG), 1)
 ATLS_OBJS += $(OUTDIR)/atl/atls/amd64/atlthunk.obj
-QITHUNK   := qithunk.obj
+QITHUNK   := #qithunk.obj
 endif
 
 ATLS_OBJS += $(if $(QITHUNK),$(OUTDIR)/atl/atls/$(QITHUNK)) $(if $(STDCTHUNK),$(OUTDIR)/atl/atls/$(STDCTHUNK))
