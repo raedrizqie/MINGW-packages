@@ -187,7 +187,7 @@ $(MFCDLL): $(MFC_OBJS) $(MFCDLL_RES) $(ATLSLIB)
 	@mkdir -p $(dir $@)
 	$(Q)$(RM) $@ $@.a
 	$(Q)$(CXX) $(LDFLAGS) -o $@ -Wl,--out-implib,$@.a \
-		$(MFC_OBJS) $(MFCDLL_RES) -Wl,--whole-archive $(ATLSLIB) -Wl,--no-whole-archive $(CRTLIBS) $(LIBS)
+		$(MFC_OBJS) $(MFCDLL_RES) -Wl,--start-group $(ATLSLIB) -Wl,--end-group $(CRTLIBS) $(LIBS)
 
 $(MFCMDLL): $(MFCMDLL_OBJS) $(MFCMDLL_RES) $(MFCDLL)
 	@echo "  LD      $@"
