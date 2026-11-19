@@ -12,27 +12,26 @@ ATLS_OBJS :=	\
 	$(OUTDIR)/atl/atls/atlstr.obj $(OUTDIR)/atl/atls/atltrace.obj $(OUTDIR)/atl/atls/AtlTraceModuleManager.obj \
 	$(OUTDIR)/atl/atls/atlwinmodule.obj $(OUTDIR)/atl/atls/Externs.obj $(OUTDIR)/atl/atls/LoadNSave.obj
 
-# Asm objects (filenames only; Makefile prepends OUTDIR)
-QITHUNK   :=
-STDCTHUNK :=
-
-ifeq ($(X86), 1)
-ATLS_OBJS += $(OUTDIR)/atl/atls/atlfuncs.obj $(OUTDIR)/atl/atls/INTEL/atlthunk.obj
-ifeq ($(DEBUG), 1)
-ATLS_OBJS += $(OUTDIR)/atl/atls/atldebuginterfacesmodule.obj
-endif
-else
-STDCTHUNK := stdcallthunk.obj
-ifeq ($(DEBUG), 1)
-ATLS_OBJS += $(OUTDIR)/atl/atls/amd64/atlthunk.obj
-QITHUNK   := #qithunk.obj
-endif
-
-ATLS_OBJS += $(if $(QITHUNK),$(OUTDIR)/atl/atls/$(QITHUNK)) $(if $(STDCTHUNK),$(OUTDIR)/atl/atls/$(STDCTHUNK))
-endif
-
 ifeq ($(DEBUG), 1)
 ATLS_OBJS += $(OUTDIR)/atl/atls/atltime.obj $(OUTDIR)/atl/atls/atltypes.obj
+endif
+
+ifeq ($(X86), 1)
+ATLS_OBJS += $(OUTDIR)/atl/atls/atlfuncs.obj $(OUTDIR)/atl/atls/INTEL/atlthunk.obj $(OUTDIR)/atl/atls/atldebuginterfacesmodule.obj
+else
+ATLS_OBJS += $(OUTDIR)/atl/atls/amd64/atlthunk.obj
+endif
+
+# Asm objects (filenames only; Makefile prepends OUTDIR)
+ifeq ($(DEBUG), 1)
+ifeq ($(X86), 1)
+QITHUNK   :=
+STDCTHUNK :=
+else
+STDCTHUNK := stdcallthunk.obj
+QITHUNK   := #qithunk.obj
+endif
+ATLS_OBJS += $(if $(QITHUNK),$(OUTDIR)/atl/atls/$(QITHUNK)) $(if $(STDCTHUNK),$(OUTDIR)/atl/atls/$(STDCTHUNK))
 endif
 
 # =============================================================================
