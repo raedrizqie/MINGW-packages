@@ -145,7 +145,7 @@ index a61ed24..7ef0ca6 100644
  
  #define _ATL_STATIC_LIB_IMPL
 +
-+#if defined(_DEBUG) && !defined(_ATL_DEBUG_INTERFACES)
++#if defined(_DEBUG) && defined(_ATL_DEBUG_REFCOUNT)
  #define _ATL_DEBUG_INTERFACES
 +#endif
  
