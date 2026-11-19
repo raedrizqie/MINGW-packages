@@ -240,7 +240,7 @@ define ASM
 endef
 
 #ifneq ($(X86),1)
-$(OUTDIR)/qithunk.s: Makefile
+$(OUTDIR)/atl/atls/qithunk.s: Makefile
 	@mkdir -p $(dir $@)
 	@echo "  GEN     $@"
 	$(Q)awk 'BEGIN { print "\t.text"; \
@@ -252,7 +252,7 @@ $(OUTDIR)/qithunk.s: Makefile
 	    printf "\tmovq (%%rax), %%rax\n\tjmp *%d(%%rax)\n", 8*i; } }' > $@
 
 ifneq ($(QITHUNK),)
-$(OUTDIR)/$(QITHUNK): $(OUTDIR)/qithunk.s
+$(OUTDIR)/$(QITHUNK): $(OUTDIR)/atl/atls/qithunk.s
 	@mkdir -p $(dir $@)
 	@echo "  ASM     $@"
 	$(Q)$(CXX) --target=$(TARGET) -c $< -o $@
