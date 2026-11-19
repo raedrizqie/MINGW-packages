@@ -187,7 +187,7 @@ $(MFCDLL): $(MFC_OBJS) $(MFCDLL_RES) $(ATLSLIB)
 	@mkdir -p $(dir $@)
 	$(Q)$(RM) $@ $@.a
 	$(Q)$(CXX) $(LDFLAGS) -o $@ -Wl,--out-implib,$@.a \
-		$(MFC_OBJS) $(MFCDLL_RES) $(ATLSLIB) $(CRTLIBS) $(LIBS)
+		$(MFC_OBJS) $(MFCDLL_RES) -Wl,--whole-archive $(ATLSLIB) -Wl,--no-whole-archive $(CRTLIBS) $(LIBS)
 
 $(MFCMDLL): $(MFCMDLL_OBJS) $(MFCMDLL_RES) $(MFCDLL)
 	@echo "  LD      $@"
@@ -268,7 +268,7 @@ $(OUTDIR)/olecall_.obj: src/mfc/amd64/olecall_.s
 
 $(OUTDIR)/inetcal_.obj: src/mfc/amd64/inetcal_.s
 	$(ASM)
-endif
+#endif
 
 # ---- Resources --------------------------------------------------------------
 
