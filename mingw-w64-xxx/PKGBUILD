@@ -9,8 +9,8 @@ pkgdesc='Microsoft Active Template Library / Microsoft Foundation Classes C++ (U
 url='https://www.microsoft.com/'
 license=('spdx:MS-PL')
 arch=('any')
-mingw_arch=('clang64')
-options=('!strip' 'debug')
+mingw_arch=('ucrt64' 'clang64')
+options=('!strip' '!debug')
 makedepends=(
   "${MINGW_PACKAGE_PREFIX}-cc"
   "${MINGW_PACKAGE_PREFIX}-clang"
