@@ -151,7 +151,13 @@ LIBS       := -luuid -luxtheme -lgdiplus -luserenv -lshlwapi -loleacc -loledlg \
               -lwindowscodecs -ladvapi32 -lmsimg32 -limm32 -lcomctl32 -lodbc32 -lodbccp32 \
               -lshell32 -lkernel32 -luser32 -lgdi32 -lcomdlg32 -lole32 -loleaut32
 
-RC_COMMON  := -DRELEASE -DRC_INVOKED -D_AFX_MONOLITHIC
+ifeq ($(DEBUG),1)
+RC_COMMON  := -D_DEBUG
+else
+RC_COMMON  := -DRELEASE
+endif
+
+RC_COMMON  += -DRC_INVOKED -D_AFX_MONOLITHIC
 RC_LANG    := -DLANG=ENU -DLANGCODE=\"0409\" -DLANGID=0x0409 -DVER_LANGID=0x0409 -DVER_LANGID_HEX=0409
 
 # ---- Object lists (ATLS_OBJS, MFC_OBJS, MFCMDLL_OBJS, *_RES, asm objs, ...) --
