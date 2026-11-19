@@ -28,7 +28,7 @@ ATLS_OBJS += $(OUTDIR)/atl/atls/amd64/atlthunk.obj
 QITHUNK   := qithunk.obj
 endif
 
-ATLS_OBJS += $(if $(QITHUNK),$(OUTDIR)/$(QITHUNK)) $(if $(STDCTHUNK),$(OUTDIR)/$(STDCTHUNK))
+ATLS_OBJS += $(if $(QITHUNK),$(OUTDIR)/atl/atls/$(QITHUNK)) $(if $(STDCTHUNK),$(OUTDIR)/atl/atls/$(STDCTHUNK))
 endif
 
 ifeq ($(DEBUG), 1)
