@@ -67,6 +67,7 @@ prepare() {
 
 build() {
   cd ${_realname}
+  rm -rf {debug,release}
 
   # build options:
   #   DEBUG=1    build a debug library, default is release build
