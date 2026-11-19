@@ -2,7 +2,7 @@
 # Included by the main Makefile. Expects X86, DEBUG, MBCS, and OUTDIR to be set.
 
 # =============================================================================
-# ATL (libatls.a)
+# ATL (libatl100.a)
 # =============================================================================
 
 ATLS_OBJS :=	\
@@ -24,11 +24,11 @@ endif
 else
 STDCTHUNK := stdcallthunk.obj
 ifeq ($(DEBUG), 1)
+ATLS_OBJS += $(OUTDIR)/atl/atls/amd64/atlthunk.obj
 QITHUNK   := qithunk.obj
 endif
 
-ATLS_OBJS += \
-	$(if $(QITHUNK),$(OUTDIR)/$(QITHUNK)) $(if $(STDCTHUNK),$(OUTDIR)/$(STDCTHUNK)) $(OUTDIR)/atl/atls/amd64/atlthunk.obj
+ATLS_OBJS += $(if $(QITHUNK),$(OUTDIR)/atl/atls/$(QITHUNK)) $(if $(STDCTHUNK),$(OUTDIR)/atl/atls/$(STDCTHUNK))
 endif
 
 ifeq ($(DEBUG), 1)
@@ -263,8 +263,8 @@ ifeq ($(X86), 1)
 DAO      := $(OUTDIR)/mfc/daocore.obj $(OUTDIR)/mfc/daodfx.obj $(OUTDIR)/mfc/daoview.obj
 INTERNET += $(OUTDIR)/mfc/inetcall.obj
 else
-OLEASM   := $(OUTDIR)/olecall_.obj
-INETASM  := $(OUTDIR)/inetcal_.obj
+OLEASM   := $(OUTDIR)/mfc/olecall_.obj
+INETASM  := $(OUTDIR)/mfc/inetcal_.obj
 endif
 
 
