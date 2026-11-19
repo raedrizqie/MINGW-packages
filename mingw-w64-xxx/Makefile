@@ -252,21 +252,21 @@ $(OUTDIR)/atl/atls/qithunk.s: Makefile
 	    printf "\tmovq (%%rax), %%rax\n\tjmp *%d(%%rax)\n", 8*i; } }' > $@
 
 ifneq ($(QITHUNK),)
-$(OUTDIR)/$(QITHUNK): $(OUTDIR)/atl/atls/qithunk.s
+$(OUTDIR)/atl/atls/$(QITHUNK): $(OUTDIR)/atl/atls/qithunk.s
 	@mkdir -p $(dir $@)
 	@echo "  ASM     $@"
 	$(Q)$(CXX) --target=$(TARGET) -c $< -o $@
 endif
 
 ifneq ($(STDCTHUNK),)
-$(OUTDIR)/$(STDCTHUNK): src/atl/atls/amd64/stdcallthunk.s
+$(OUTDIR)/atl/atls/$(STDCTHUNK): src/atl/atls/amd64/stdcallthunk.s
 	$(ASM)
 endif
 
-$(OUTDIR)/olecall_.obj: src/mfc/amd64/olecall_.s
+$(OUTDIR)/mfc/olecall_.obj: src/mfc/amd64/olecall_.s
 	$(ASM)
 
-$(OUTDIR)/inetcal_.obj: src/mfc/amd64/inetcal_.s
+$(OUTDIR)/mfc/inetcal_.obj: src/mfc/amd64/inetcal_.s
 	$(ASM)
 #endif
 
