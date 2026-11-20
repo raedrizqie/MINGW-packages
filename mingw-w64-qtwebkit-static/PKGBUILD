@@ -181,8 +181,8 @@ prepare() {
   # Add support for static build
   apply_patch_with_msg \
     0901-fix-loading-prl-files-in-static-build.patch \
-    0902-minimal-private-libs-in-static-build.patch
-    #0903-ensure-static-linking-no-exported-main.patch
+    0902-minimal-private-libs-in-static-build.patch \
+    0903-ensure-static-linking-no-exported-main.patch
 }
 
 build() {
@@ -200,7 +200,6 @@ build() {
     -DCMAKE_INSTALL_PREFIX=${MINGW_PREFIX}/qt5-static \
     -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
     "${_extra_config[@]}" \
-    -DCMAKE_CXX_FLAGS="-DQ_DECL_EXPORT=" \
     -DCMAKE_MODULE_LINKER_FLAGS="-static" \
     -DPORT=Qt \
     -DENABLE_JIT=OFF \
