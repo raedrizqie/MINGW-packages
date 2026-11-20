@@ -10,7 +10,8 @@ ATLS_OBJS :=	\
 	$(OUTDIR)/atl/atls/stdafx.obj $(OUTDIR)/atl/atls/ATLComTime.obj $(OUTDIR)/atl/atls/AtlDebugAPI.obj \
 	$(OUTDIR)/atl/atls/atlimage.obj $(OUTDIR)/atl/atls/atlimage2.obj $(OUTDIR)/atl/atls/atlmem.obj \
 	$(OUTDIR)/atl/atls/atlstr.obj $(OUTDIR)/atl/atls/atltrace.obj $(OUTDIR)/atl/atls/AtlTraceModuleManager.obj \
-	$(OUTDIR)/atl/atls/atlwinmodule.obj $(OUTDIR)/atl/atls/Externs.obj $(OUTDIR)/atl/atls/LoadNSave.obj
+	$(OUTDIR)/atl/atls/atlwinmodule.obj $(OUTDIR)/atl/atls/Externs.obj $(OUTDIR)/atl/atls/LoadNSave.obj \
+	$(OUTDIR)/atl/atls/stdafx.obj
 
 ifeq ($(DEBUG), 1)
 ATLS_OBJS += $(OUTDIR)/atl/atls/atltime.obj $(OUTDIR)/atl/atls/atltypes.obj
