@@ -423,7 +423,7 @@ index e1ba22b..4c9ca3c 100644
  target_link_libraries(qmlwebkitplugin
 -    WebKit Qt5::Quick)
 +    WebKit${DEBUG_SUFFIX}
-+    ${WEBP_LIBRARIES}
++    ${WEBP_LINK_LIBRARIES}
 +    Qt5::Quick
 +)
  
