@@ -48,7 +48,7 @@ endif
 
 # ---- Outputs ----------------------------------------------------------------
 
-ATLSLIB    := $(OUTDIR)/libatl100.a
+ATLSLIB    := $(OUTDIR)/libatls.a
 
 ifeq ($(DEBUG),1)
 MFCDLL     := $(OUTDIR)/libmfc100$(SUFFIX)d.dll
@@ -57,6 +57,7 @@ else
 MFCDLL     := $(OUTDIR)/libmfc100$(SUFFIX).dll
 MFCMDLL    := $(OUTDIR)/libmfcm100$(SUFFIX).dll
 endif
+
 MFCENUDLL  := $(OUTDIR)/libmfc100enu.dll
 
 # ---- Flags ------------------------------------------------------------------
@@ -77,7 +78,7 @@ endif
 $(info CXX_STDLIB = $(CXX_STDLIB))
 
 ifeq ($(CXX_STDLIB),libstdc++)
-# libstdc++ uses '__in' etc. as identifiers, which collide with the SAL macros (sal.h),
+# libstdc++ uses '__in' etc, as identifiers, which collide with SAL macros,
 # so we must load this header first to avoid error.
 CXXBASE += -include atluuid.h -include bits/stdc++.h
 else
