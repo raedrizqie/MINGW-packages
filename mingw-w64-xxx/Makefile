@@ -1,5 +1,5 @@
 # ATL/MFC 10.00.40219 for MSYS2 MinGW-w64 (CLAN64, UCRT64 & MINGW64 environments)
-# with Clang and LLVM lld.
+# built with Clang and LLVM lld.
 # Usage: make -j$(nproc) [X86=1] [DEBUG=1] [MBCS=1] [MFCENU=1] [V=1]
 
 CXX  := clang++
@@ -106,17 +106,17 @@ endif
 
 CXXFLAGS   := $(OPT) $(CXXBASE) $(COMMON) $(ARCHFLAGS) $(CHARFLAGS)
 
-ATL_FLAGS := -D_ATL_STATIC_REGISTRY -D_ATL_NO_DEFAULT_LIBS
+ATL_FLAGS  := -D_ATL_STATIC_REGISTRY -D_ATL_NO_DEFAULT_LIBS
 MFC_FLAGS  := -D_AFXDLL -D_MFC_BLD -D_MFC_DLL_BLD -D_AFX_DISABLE_DEPRECATED -D_AFX_MONOLITHIC \
               -D_AFX_CORE_IMPL -D_AFX_OLE_IMPL -D_AFX_DB_IMPL -D_AFX_NET_IMPL
 MFCM_FLAGS := -D_AFXDLL -D_AFXEXT -DBUILD_MFCM
 
 ifeq ($(DEBUG),1)
-ATL_FLAGS += -D_DEBUG -D_ATL_NO_DEBUG_CRT -D_ATL_DISABLE_NO_VTABLE
+ATL_FLAGS  += -D_DEBUG -D_ATL_NO_DEBUG_CRT -D_ATL_DISABLE_NO_VTABLE
 MFC_FLAGS  += -D_DEBUG -D_AFX_ENABLE_INLINES -D_AFX_NO_DEBUG_CRT $(ATL_FLAGS)
 MFCM_FLAGS += -D_DEBUG -D_AFX_ENABLE_INLINES
 else
-ATL_FLAGS += -DNDEBUG
+ATL_FLAGS  += -DNDEBUG
 MFC_FLAGS  += -DNDEBUG
 MFCM_FLAGS += -DNDEBUG
 endif
@@ -138,7 +138,7 @@ ifeq ($(CXX_STDLIB),libstdc++)
 LIBLDFLAGS += -Wl,-Bstatic -lwinpthread -Wl,-Bdynamic
 endif
 
-LDFLAGS    := -fuse-ld=lld -shared -mwindows -Wl,--export-all-symbols $(LIBLDFLAGS)
+LDFLAGS    := -fuse-ld=lld -shared -mwindows $(LIBLDFLAGS)
 
 ifeq ($(CRT_TYPE),UCRT)
 CRTLIBS := -lucrt
@@ -193,7 +193,7 @@ $(MFCDLL): $(MFC_OBJS) $(MFCDLL_RES) $(ATLSLIB)
 	@mkdir -p $(dir $@)
 	$(Q)$(RM) $@ $@.a
 	$(Q)$(CXX) $(LDFLAGS) -o $@ -Wl,--out-implib,$@.a \
-		$(MFC_OBJS) $(MFCDLL_RES) -Wl,--start-group $(ATLSLIB) -Wl,--end-group $(CRTLIBS) $(LIBS)
+		$(MFC_OBJS) $(MFCDLL_RES) $(ATLSLIB) $(CRTLIBS) $(LIBS)
 
 $(MFCMDLL): $(MFCMDLL_OBJS) $(MFCMDLL_RES) $(MFCDLL)
 	@echo "  LD      $@"
