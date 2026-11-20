@@ -10,7 +10,7 @@ url='https://www.microsoft.com/'
 license=('spdx:MS-PL')
 arch=('any')
 mingw_arch=('ucrt64' 'clang64')
-options=('!strip' 'debug')
+options=('!strip' '!debug')
 makedepends=(
   "${MINGW_PACKAGE_PREFIX}-cc"
   "${MINGW_PACKAGE_PREFIX}-clang"
