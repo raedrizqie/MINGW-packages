@@ -14,13 +14,12 @@ ATLS_OBJS :=	\
 	$(OUTDIR)/atl/atls/stdafx.obj
 
 ifeq ($(DEBUG), 1)
-ATLS_OBJS += $(OUTDIR)/atl/atls/atltime.obj $(OUTDIR)/atl/atls/atltypes.obj
-endif
-
 ifeq ($(X86), 1)
 ATLS_OBJS += $(OUTDIR)/atl/atls/atlfuncs.obj $(OUTDIR)/atl/atls/INTEL/atlthunk.obj $(OUTDIR)/atl/atls/atldebuginterfacesmodule.obj
 else
 ATLS_OBJS += $(OUTDIR)/atl/atls/amd64/atlthunk.obj
+endif
+ATLS_OBJS += $(OUTDIR)/atl/atls/atltime.obj $(OUTDIR)/atl/atls/atltypes.obj
 endif
 
 # Asm objects (filenames only; Makefile prepends OUTDIR)
