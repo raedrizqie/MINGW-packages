@@ -53,12 +53,15 @@ build() {
     _cxx="aarch64"
   fi
 
+  export CC="${srcdir}/zig/zig.exe cc"
+  export CXX="${srcdir}/zig/zig.exe c++"
+
   MSYS2_ARG_CONV_EXCL="-DCMAKE_INSTALL_PREFIX=" \
   cmake -Wno-author \
     -DCMAKE_INSTALL_PREFIX=${MINGW_PREFIX} \
-    -DCMAKE_C_COMPILER="${srcdir}/zig/zig.exe;cc" \
-    -DCMAKE_CXX_COMPILER="${srcdir}/zig/zig.exe;c++" \
-    -DCMAKE_AR="${srcdir}/zig/zig.exe" \
+    -DCMAKE_C_COMPILER=${CC} \
+    -DCMAKE_CXX_COMPILER=${CXX} \
+    -DCMAKE_AR="zig/zig.exe" \
     -DZIG_HOST_TARGET_TRIPLE=${CARCH}-windows-gnu \
     -DZIG_TARGET_TRIPLE=${CARCH}-windows-gnu \
     -DZIG_AR_WORKAROUND=ON \
