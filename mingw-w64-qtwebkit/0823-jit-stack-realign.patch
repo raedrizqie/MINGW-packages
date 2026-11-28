@@ -1,0 +1,30 @@
+diff --git a/Source/JavaScriptCore/CMakeLists.txt b/Source/JavaScriptCore/CMakeLists.txt
+index afd76ca..1ba7936 100644
+--- a/Source/JavaScriptCore/CMakeLists.txt
++++ b/Source/JavaScriptCore/CMakeLists.txt
+@@ -870,6 +870,10 @@ set(JavaScriptCore_OBJECT_LUT_SOURCES
+     runtime/SymbolPrototype.cpp
+ )
+ 
++if (MINGW AND ENABLE_JIT)
++    add_compile_options(-mstackrealign)
++endif ()
++
+ set(JavaScriptCore_LIBRARIES
+     WTF${DEBUG_SUFFIX}
+     ${ICU_I18N_LIBRARIES}
+diff --git a/Source/WebKit2/CMakeLists.txt b/Source/WebKit2/CMakeLists.txt
+index aa7863c..9ba6be3 100644
+--- a/Source/WebKit2/CMakeLists.txt
++++ b/Source/WebKit2/CMakeLists.txt
+@@ -722,6 +722,10 @@ set(WebKit2_MESSAGES_IN_FILES
+     WebProcess/WebPage/WebPageGroupProxy.messages.in
+ )
+ 
++if (MINGW AND ENABLE_JIT)
++    add_compile_options(-mstackrealign)
++endif ()
++
+ set(WebProcess_LIBRARIES
+     WebKit2
+ )

@@ -48,6 +48,40 @@ index 57efa67d0b3e..4fc69838c710 100644
  
                  // Free the underlying memory without invoking the destructor.
                  operator delete (currentSelector);
+diff --git a/Source/WebCore/html/canvas/CanvasStyle.cpp b/Source/WebCore/html/canvas/CanvasStyle.cpp
+index 2485da2..7a53a31 100644
+--- a/Source/WebCore/html/canvas/CanvasStyle.cpp
++++ b/Source/WebCore/html/canvas/CanvasStyle.cpp
+@@ -224,7 +224,7 @@ bool CanvasStyle::isEquivalentCMYKA(float c, float m, float y, float k, float a)
+ 
+ CanvasStyle::CanvasStyle(const CanvasStyle& other)
+ {
+-    memcpy(this, &other, sizeof(CanvasStyle));
++    memcpy(static_cast<void*>(this), &other, sizeof(CanvasStyle));
+     if (m_type == Gradient)
+         m_gradient->ref();
+     else if (m_type == ImagePattern)
+diff --git a/Source/WebCore/html/canvas/CanvasStyle.h b/Source/WebCore/html/canvas/CanvasStyle.h
+index 9beb162..a484ce1 100644
+--- a/Source/WebCore/html/canvas/CanvasStyle.h
++++ b/Source/WebCore/html/canvas/CanvasStyle.h
+@@ -141,14 +141,14 @@ namespace WebCore {
+ 
+     inline CanvasStyle::CanvasStyle(CanvasStyle&& other)
+     {
+-        memcpy(this, &other, sizeof(CanvasStyle));
++        memcpy(static_cast<void*>(this), &other, sizeof(CanvasStyle));
+         other.m_type = Invalid;
+     }
+ 
+     inline CanvasStyle& CanvasStyle::operator=(CanvasStyle&& other)
+     {
+         if (this != &other) {
+-            memcpy(this, &other, sizeof(CanvasStyle));
++            memcpy(static_cast<void*>(this), &other, sizeof(CanvasStyle));
+             other.m_type = Invalid;
+         }
+         return *this;
 diff --git a/Source/WebCore/platform/graphics/Gradient.cpp b/Source/WebCore/platform/graphics/Gradient.cpp
 index e7f8c6710153..8994c021edfb 100644
 --- a/Source/WebCore/platform/graphics/Gradient.cpp
@@ -75,6 +109,19 @@ index d3fc934fe4be..bd9cd0009afb 100644
  }
  
  FontCustomPlatformData::~FontCustomPlatformData()
+diff --git a/Source/WebCore/platform/graphics/transforms/TransformationMatrix.h b/Source/WebCore/platform/graphics/transforms/TransformationMatrix.h
+index 5d0446e..c004a47 100644
+--- a/Source/WebCore/platform/graphics/transforms/TransformationMatrix.h
++++ b/Source/WebCore/platform/graphics/transforms/TransformationMatrix.h
+@@ -417,7 +417,7 @@ private:
+     void setMatrix(const Matrix4 m)
+     {
+         if (m && m != m_matrix)
+-            memcpy(m_matrix, m, sizeof(Matrix4));
++            memcpy(static_cast<void*>(m_matrix), m, sizeof(Matrix4));
+     }
+ 
+     Matrix4 m_matrix;
 diff -Naur qtwebkit-5.212.0-alpha3-orig/Source/JavaScriptCore/b3/B3ValueRep.h qtwebkit-5.212.0-alpha3/Source/JavaScriptCore/b3/B3ValueRep.h
 --- qtwebkit-5.212.0-alpha3-orig/Source/JavaScriptCore/b3/B3ValueRep.h	2019-06-26 19:25:02.000000000 +0300
 +++ qtwebkit-5.212.0-alpha3/Source/JavaScriptCore/b3/B3ValueRep.h	2019-07-16 09:45:00.192287500 +0300
